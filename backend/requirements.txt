@@ -1,0 +1,15 @@
+fastapi==0.111.0
+uvicorn==0.29.0
+sqlalchemy==2.0.30
+psycopg2-binary==2.9.9
+pydantic==2.7.1
+pydantic-settings==2.2.1
+python-dotenv==1.0.1
+supabase==2.5.1
+chromadb==0.5.0
+langchain==0.2.1
+langchain-community==0.2.1
+langchain-google-genai==1.0.4
+groq==0.8.0
+PyPDF2==3.0.1
+python-multipart==0.0.9
