@@ -10,8 +10,13 @@ const tajawal = Tajawal({
 });
 
 export const metadata: Metadata = {
-  title: "المنصة الذكية للطلاب | Smart Lectures",
+  title: "منصة لمّاح | Lammah",
   description: "تلخيص المحاضرات بالذكاء الاصطناعي مع استخراج القاموس السياقي ونقاط التركيز",
+  openGraph: {
+    title: "منصة لمّاح | Lammah",
+    description: "تلخيص المحاضرات بالذكاء الاصطناعي مع استخراج القاموس السياقي ونقاط التركيز",
+    images: [{ url: "/lammah-logo.png" }],
+  },
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

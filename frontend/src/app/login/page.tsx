@@ -3,119 +3,26 @@ import { useAuth } from "@/context/AuthContext";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
-import { Phone, KeyRound, Loader2, BookOpen, ShieldCheck, ChevronDown } from "lucide-react";
-
-const COUNTRY_CODES = [
-  { code: "+970", flag: "🇵🇸", name: "فلسطين" },
-  { code: "+972", flag: "🇮🇱", name: "إسرائيل" },
-  { code: "+966", flag: "🇸🇦", name: "السعودية" },
-  { code: "+971", flag: "🇦🇪", name: "الإمارات" },
-  { code: "+962", flag: "🇯🇴", name: "الأردن" },
-  { code: "+20", flag: "🇪🇬", name: "مصر" },
-  { code: "+961", flag: "🇱🇧", name: "لبنان" },
-  { code: "+964", flag: "🇮🇶", name: "العراق" },
-  { code: "+968", flag: "🇴🇲", name: "عمان" },
-  { code: "+974", flag: "🇶🇦", name: "قطر" },
-  { code: "+973", flag: "🇧🇭", name: "البحرين" },
-  { code: "+965", flag: "🇰🇼", name: "الكويت" },
-  { code: "+963", flag: "🇸🇾", name: "سوريا" },
-  { code: "+967", flag: "🇾🇪", name: "اليمن" },
-  { code: "+218", flag: "🇱🇾", name: "ليبيا" },
-  { code: "+216", flag: "🇹🇳", name: "تونس" },
-  { code: "+213", flag: "🇩🇿", name: "الجزائر" },
-  { code: "+212", flag: "🇲🇦", name: "المغرب" },
-  { code: "+249", flag: "🇸🇩", name: "السودان" },
-  { code: "+252", flag: "🇸🇴", name: "الصومال" },
-  { code: "+90", flag: "🇹🇷", name: "تركيا" },
-  { code: "+98", flag: "🇮🇷", name: "إيران" },
-  { code: "+92", flag: "🇵🇰", name: "باكستان" },
-  { code: "+91", flag: "🇮🇳", name: "الهند" },
-  { code: "+60", flag: "🇲🇾", name: "ماليزيا" },
-  { code: "+62", flag: "🇮🇩", name: "إندونيسيا" },
-  { code: "+1", flag: "🇺🇸", name: "أمريكا" },
-  { code: "+44", flag: "🇬🇧", name: "بريطانيا" },
-  { code: "+49", flag: "🇩🇪", name: "ألمانيا" },
-  { code: "+33", flag: "🇫🇷", name: "فرنسا" },
-  { code: "+34", flag: "🇪🇸", name: "إسبانيا" },
-  { code: "+39", flag: "🇮🇹", name: "إيطاليا" },
-  { code: "+31", flag: "🇳🇱", name: "هولندا" },
-  { code: "+46", flag: "🇸🇪", name: "السويد" },
-  { code: "+47", flag: "🇳🇴", name: "النرويج" },
-  { code: "+45", flag: "🇩🇰", name: "الدنمارك" },
-  { code: "+41", flag: "🇨🇭", name: "سويسرا" },
-  { code: "+43", flag: "🇦🇹", name: "النمسا" },
-  { code: "+32", flag: "🇧🇪", name: "بلجيكا" },
-  { code: "+48", flag: "🇵🇱", name: "بولندا" },
-  { code: "+7", flag: "🇷🇺", name: "روسيا" },
-  { code: "+380", flag: "🇺🇦", name: "أوكرانيا" },
-  { code: "+86", flag: "🇨🇳", name: "الصين" },
-  { code: "+81", flag: "🇯🇵", name: "اليابان" },
-  { code: "+82", flag: "🇰🇷", name: "كوريا الجنوبية" },
-  { code: "+61", flag: "🇦🇺", name: "أستراليا" },
-  { code: "+64", flag: "🇳🇿", name: "نيوزيلندا" },
-  { code: "+55", flag: "🇧🇷", name: "البرازيل" },
-  { code: "+52", flag: "🇲🇽", name: "المكسيك" },
-  { code: "+27", flag: "🇿🇦", name: "جنوب أفريقيا" },
-  { code: "+234", flag: "🇳🇬", name: "نيجيريا" },
-  { code: "+254", flag: "🇰🇪", name: "كينيا" },
-  { code: "+251", flag: "🇪🇹", name: "إثيوبيا" },
-  { code: "+233", flag: "🇬🇭", name: "غانا" },
-  { code: "+63", flag: "🇵🇭", name: "الفلبين" },
-  { code: "+66", flag: "🇹🇭", name: "تايلاند" },
-  { code: "+84", flag: "🇻🇳", name: "فيتنام" },
-  { code: "+65", flag: "🇸🇬", name: "سنغافورة" },
-  { code: "+94", flag: "🇱🇰", name: "سريلانكا" },
-  { code: "+880", flag: "🇧🇩", name: "بنغلاديش" },
-  { code: "+977", flag: "🇳🇵", name: "نيبال" },
-  { code: "+993", flag: "🇹🇲", name: "تركمانستان" },
-  { code: "+998", flag: "🇺🇿", name: "أوزبكستان" },
-];
+import { Loader2, BookOpen, ShieldCheck } from "lucide-react";
 
 export default function LoginPage() {
-  const { user, loading, signInWithOtp, verifyOtp } = useAuth();
+  const { user, loading, signInWithGoogle } = useAuth();
   const router = useRouter();
-  const [phone, setPhone] = useState("");
-  const [countryCode, setCountryCode] = useState("+970");
-  const [showCountries, setShowCountries] = useState(false);
-  const [search, setSearch] = useState("");
-  const [otp, setOtp] = useState("");
-  const [step, setStep] = useState<"phone" | "otp">("phone");
   const [error, setError] = useState("");
   const [submitting, setSubmitting] = useState(false);
-  const [fullPhone, setFullPhone] = useState("");
 
   useEffect(() => {
     if (!loading && user) router.replace("/dashboard");
   }, [user, loading]);
 
-  const selectedCountry = COUNTRY_CODES.find(c => c.code === countryCode) || COUNTRY_CODES[0];
-
-  const filteredCountries = COUNTRY_CODES.filter(c =>
-    c.name.includes(search) || c.code.includes(search)
-  );
-
-  const handleSendOtp = async () => {
-    const cleaned = phone.replace(/\s/g, "").replace(/^0+/, "");
-    if (!cleaned || cleaned.length < 7) { setError("يرجى إدخال رقم هاتف صحيح."); return; }
-    
-    const formatted = `${countryCode}${cleaned}`;
-    setSubmitting(true); setError("");
-    
-    const { error } = await signInWithOtp(formatted);
-    setSubmitting(false);
-    if (error) { setError(error.message || "فشل في إرسال رمز التحقق."); return; }
-    
-    setFullPhone(formatted);
-    setStep("otp");
-  };
-
-  const handleVerifyOtp = async () => {
-    if (otp.length < 6) { setError("الرمز يجب أن يكون 6 أرقام."); return; }
-    setSubmitting(true); setError("");
-    const { error } = await verifyOtp(fullPhone, otp);
-    setSubmitting(false);
-    if (error) { setError(error.message || "رمز التحقق غير صحيح."); return; }
-    router.replace("/dashboard");
+  const handleGoogleLogin = async () => {
+    setSubmitting(true);
+    setError("");
+    const { error } = await signInWithGoogle();
+    if (error) {
+      setError(error.message || "فشل تسجيل الدخول عبر جوجل.");
+      setSubmitting(false);
+    }
   };
 
   if (loading) return (
@@ -126,110 +33,68 @@ export default function LoginPage() {
 
   return (
     <main className="min-h-screen bg-gradient-to-br from-slate-900 via-indigo-950 to-slate-900 text-slate-100 flex flex-col items-center justify-center p-8" dir="rtl">
-      <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="w-full max-w-md">
+      <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="w-full max-w-md relative z-50">
         
         <div className="text-center mb-10">
-          <div className="inline-flex items-center justify-center w-20 h-20 bg-indigo-500/20 rounded-full mb-6 ring-2 ring-indigo-400/30">
-            <BookOpen className="w-10 h-10 text-indigo-400" />
-          </div>
+          <img src="/lammah-logo.png" alt="Lammah Logo" className="w-24 h-24 mx-auto mb-6 object-contain drop-shadow-2xl" />
           <h1 className="text-3xl font-extrabold mb-3 bg-clip-text text-transparent bg-gradient-to-l from-indigo-300 to-purple-300">
-            المنصة الذكية للطلاب
+            منصة لمّاح
           </h1>
-          <p className="text-slate-400 text-sm">سجل دخولك برقم الهاتف للبدء</p>
+          <p className="text-slate-400 text-sm">سجل دخولك بحساب جوجل للبدء</p>
         </div>
 
         <div className="bg-slate-800/60 border border-slate-700/50 rounded-3xl p-8 backdrop-blur-xl shadow-2xl">
-          <div className="flex items-center mb-6 text-indigo-300">
+          <div className="flex items-center justify-center mb-8 text-indigo-300">
             <ShieldCheck className="w-5 h-5 ml-2" />
-            <span className="text-sm font-medium">تسجيل دخول آمن بالهاتف (OTP)</span>
+            <span className="text-sm font-medium">تسجيل دخول آمن وسريع المجاني</span>
           </div>
 
-          {step === "phone" ? (
-            <div className="space-y-5">
-              <div>
-                <label className="block text-sm text-slate-400 mb-2">رقم الهاتف</label>
-                <div className="flex gap-2" dir="ltr">
-                  {/* Country Selector */}
-                  <div className="relative">
-                    <button onClick={() => setShowCountries(!showCountries)} type="button"
-                      className="flex items-center gap-1.5 bg-slate-900/80 border border-slate-700 rounded-xl py-4 px-3 text-slate-100 hover:border-indigo-500 transition-all min-w-[110px]">
-                      <span className="text-xl">{selectedCountry.flag}</span>
-                      <span className="text-sm font-mono">{countryCode}</span>
-                      <ChevronDown className="w-3.5 h-3.5 text-slate-500" />
-                    </button>
+          <div className="space-y-5">
+            {error && <p className="text-red-400 text-sm bg-red-500/10 border border-red-500/30 rounded-lg p-4 text-center">{error}</p>}
 
-                    {showCountries && (
-                      <div className="absolute top-full mt-2 left-0 w-72 max-h-80 overflow-hidden bg-slate-800 border border-slate-700 rounded-2xl shadow-2xl z-50">
-                        <div className="p-3 border-b border-slate-700">
-                          <input type="text" value={search} onChange={(e) => setSearch(e.target.value)}
-                            placeholder="ابحث عن دولة..."
-                            className="w-full bg-slate-900/80 border border-slate-700 rounded-lg py-2 px-3 text-sm text-slate-100 placeholder:text-slate-500 outline-none focus:border-indigo-500" dir="rtl" autoFocus />
-                        </div>
-                        <div className="max-h-60 overflow-y-auto">
-                          {filteredCountries.map((c) => (
-                            <button key={c.code + c.name} type="button"
-                              onClick={() => { setCountryCode(c.code); setShowCountries(false); setSearch(""); }}
-                              className={`w-full flex items-center gap-3 px-4 py-3 hover:bg-slate-700/50 transition-colors text-left ${countryCode === c.code ? "bg-indigo-500/10 text-indigo-300" : ""}`}>
-                              <span className="text-xl">{c.flag}</span>
-                              <span className="text-sm flex-1" dir="rtl">{c.name}</span>
-                              <span className="text-xs font-mono text-slate-500">{c.code}</span>
-                            </button>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Phone Input */}
-                  <div className="relative flex-1">
-                    <input type="tel" value={phone} onChange={(e) => setPhone(e.target.value)}
-                      placeholder="5XX XXX XXXX"
-                      className="w-full bg-slate-900/80 border border-slate-700 rounded-xl py-4 px-4 text-slate-100 placeholder:text-slate-600 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none transition-all" />
-                  </div>
-                </div>
-              </div>
-
-              {error && <p className="text-red-400 text-sm bg-red-500/10 border border-red-500/30 rounded-lg p-3">{error}</p>}
-
-              <button onClick={handleSendOtp} disabled={submitting}
-                className="w-full bg-gradient-to-r from-indigo-600 to-purple-600 text-white font-bold py-4 rounded-xl shadow-lg hover:shadow-indigo-500/30 transition-all disabled:opacity-50">
-                {submitting ? <Loader2 className="w-5 h-5 animate-spin mx-auto" /> : "إرسال رمز التحقق"}
-              </button>
-            </div>
-          ) : (
-            <div className="space-y-5">
-              <p className="text-sm text-slate-400 text-center bg-slate-900/50 rounded-xl p-3 border border-slate-700">
-                تم إرسال رمز التحقق إلى <span className="text-indigo-300 font-mono" dir="ltr">{fullPhone}</span>
-              </p>
-
-              <div>
-                <label className="block text-sm text-slate-400 mb-2">رمز التحقق (6 أرقام)</label>
-                <div className="relative">
-                  <KeyRound className="absolute right-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-500" />
-                  <input type="text" value={otp} onChange={(e) => setOtp(e.target.value.replace(/\D/g, "").slice(0, 6))}
-                    placeholder="000000" maxLength={6}
-                    className="w-full bg-slate-900/80 border border-slate-700 rounded-xl py-4 pr-12 pl-4 text-slate-100 text-center font-mono text-2xl tracking-[0.5em] placeholder:text-slate-600 focus:border-indigo-500 outline-none transition-all" dir="ltr" />
-                </div>
-              </div>
-
-              {error && <p className="text-red-400 text-sm bg-red-500/10 border border-red-500/30 rounded-lg p-3">{error}</p>}
-
-              <button onClick={handleVerifyOtp} disabled={submitting}
-                className="w-full bg-gradient-to-r from-indigo-600 to-purple-600 text-white font-bold py-4 rounded-xl shadow-lg hover:shadow-indigo-500/30 transition-all disabled:opacity-50">
-                {submitting ? <Loader2 className="w-5 h-5 animate-spin mx-auto" /> : "تأكيد الدخول"}
-              </button>
-
-              <button onClick={() => { setStep("phone"); setOtp(""); setError(""); }}
-                className="w-full text-slate-400 text-sm hover:text-indigo-300 transition-colors">
-                ← تغيير رقم الهاتف
-              </button>
-            </div>
-          )}
+            <button 
+              onClick={handleGoogleLogin} 
+              disabled={submitting}
+              className="w-full bg-white text-slate-800 hover:bg-slate-100 font-bold py-4 rounded-xl shadow-lg hover:shadow-white/20 transition-all disabled:opacity-50 flex items-center justify-center gap-3"
+            >
+              {submitting ? (
+                <Loader2 className="w-6 h-6 animate-spin mx-auto text-slate-400" />
+              ) : (
+                <>
+                  <svg className="w-6 h-6" viewBox="0 0 24 24">
+                    <path
+                      d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
+                      fill="#4285F4"
+                    />
+                    <path
+                      d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
+                      fill="#34A853"
+                    />
+                    <path
+                      d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"
+                      fill="#FBBC05"
+                    />
+                    <path
+                      d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"
+                      fill="#EA4335"
+                    />
+                  </svg>
+                  المتابعة باستخدام Google
+                </>
+              )}
+            </button>
+            <p className="text-center text-xs text-slate-500 mt-6 leading-relaxed">
+              بالتسجيل فإنك توافق على شروط الاستخدام وسياسة الخصوصية الخاصة بالمنصة.
+            </p>
+          </div>
+          
+          <div className="mt-8 text-center border-t border-slate-800 pt-6">
+            <p className="text-slate-500 text-xs font-medium">
+              تم التطوير والتصميم بواسطة <span className="text-indigo-400 font-bold">فريق لمّاح</span> &copy; {new Date().getFullYear()}
+            </p>
+          </div>
         </div>
       </motion.div>
-
-      {/* Click outside to close dropdown */}
-      {showCountries && <div className="fixed inset-0 z-40" onClick={() => setShowCountries(false)} />}
     </main>
   );
 }

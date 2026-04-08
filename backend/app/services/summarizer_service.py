@@ -80,13 +80,13 @@ def generate_smart_annotations(transcript: str, pdf_context: list[str]) -> dict:
         else:
             from app.core.logger import logger
             logger.error("No JSON object found in Gemini response.")
-            return {"highlights": [], "sticky_notes": []}
+            raise ValueError("The AI model failed to produce a valid JSON response structure.")
             
     except Exception as e:
         import traceback
         from app.core.logger import logger
         logger.error(f"Error generating annotations JSON: {e}\n{traceback.format_exc()}")
-        return {"highlights": [], "sticky_notes": []}
+        raise e
 
 
 def extract_contextual_glossary(transcript: str) -> dict:

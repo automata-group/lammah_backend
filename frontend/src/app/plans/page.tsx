@@ -19,29 +19,15 @@ export default function PlansPage() {
   }, [user, loading]);
 
   useEffect(() => {
-    fetch("http://127.0.0.1:8000/api/v1/subscription/plans")
+    fetch(`${process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8500"}/api/v1/subscription/plans`)
       .then(r => r.json())
       .then(data => { setPlans(data); setLoadingPlans(false); })
       .catch(() => setLoadingPlans(false));
   }, []);
 
-  const handleSubscribe = async (planId: string) => {
+  const handleSubscribe = (planId: string) => {
     if (!session) return;
-    setSubscribing(planId); setMessage("");
-    try {
-      const res = await fetch("http://127.0.0.1:8000/api/v1/subscription/subscribe", {
-        method: "POST",
-        headers: { "Content-Type": "application/json", "Authorization": `Bearer ${session.access_token}` },
-        body: JSON.stringify({ plan_id: planId })
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.detail?.user_message || "فشل الاشتراك");
-      setMessage("🎉 تم الاشتراك بنجاح!");
-      setTimeout(() => router.push("/dashboard"), 1500);
-    } catch (e: any) {
-      setMessage(`❌ ${e.message}`);
-    }
-    setSubscribing("");
+    router.push(`/checkout/${planId}`);
   };
 
   const icons: Record<string, any> = { "أسبوعي - طالب": Star, "أسبوعي - متقدم": Zap, "أسبوعي - VIP": Crown, "شهري - أساسي": Star, "شهري - متقدم": Zap, "شهري - غير محدود": Crown };

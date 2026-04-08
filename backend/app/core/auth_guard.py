@@ -132,3 +132,12 @@ async def check_quota(profile=Depends(get_user_profile)):
         })
     
     return profile
+
+async def verify_admin(profile=Depends(get_user_profile)):
+    """Ensure the user has an admin role."""
+    if profile.get("role") != "admin":
+        raise HTTPException(status_code=403, detail={
+            "user_message": "🚫 ليس لديك صلاحية للوصول إلى هذه الصفحة."
+        })
+    return profile
+

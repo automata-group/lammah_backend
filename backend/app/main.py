@@ -5,6 +5,7 @@ from app.core.config import settings
 from app.api.routes import summarize
 from app.api.routes import subscription
 from app.api.routes import chat
+from app.api.routes import transactions
 from app.core.logger import logger
 import traceback
 
@@ -16,12 +17,7 @@ app = FastAPI(
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "http://localhost:3000",
-        "http://127.0.0.1:3000",
-        "http://localhost:3001",
-        "http://127.0.0.1:3001",
-    ],
+    allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -31,6 +27,7 @@ app.add_middleware(
 app.include_router(summarize.router, prefix="/api/v1/summarize", tags=["summarize"])
 app.include_router(subscription.router, prefix="/api/v1/subscription", tags=["subscription"])
 app.include_router(chat.router, prefix="/api/v1/chat", tags=["chat"])
+app.include_router(transactions.router, prefix="/api/v1/transactions", tags=["transactions"])
 
 # ====== Global Error Handler ======
 @app.exception_handler(Exception)
@@ -50,7 +47,7 @@ async def global_exception_handler(request: Request, exc: Exception):
 
 @app.get("/")
 def root():
-    return {"message": "Welcome to Smart Lecture Summarizer API", "version": settings.VERSION}
+    return {"message": "Welcome to Lammah API - لمّاح", "version": settings.VERSION}
 
 @app.get("/api/v1/health")
 def health():

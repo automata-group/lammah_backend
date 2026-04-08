@@ -69,7 +69,7 @@ export default function DashboardPage() {
         window.history.replaceState({}, document.title, window.location.pathname);
         setCurrentHistoryId(historyId);
 
-        fetch(`http://127.0.0.1:8000/api/v1/subscription/history/${historyId}`, {
+        fetch(`${process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8500"}/api/v1/subscription/history/${historyId}`, {
           headers: { "Authorization": `Bearer ${session.access_token}` }
         })
         .then(async r => {
@@ -97,7 +97,7 @@ export default function DashboardPage() {
   // Fetch quota on load - SHOW ERRORS
   useEffect(() => {
     if (session) {
-      fetch("http://127.0.0.1:8000/api/v1/subscription/quota", {
+      fetch(`${process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8500"}/api/v1/subscription/quota`, {
         headers: { "Authorization": `Bearer ${session.access_token}` }
       }).then(async r => {
         const data = await r.json();
@@ -139,7 +139,7 @@ export default function DashboardPage() {
     if (pdfFile) formData.append("pdf_file", pdfFile);
 
     try {
-      const response = await fetch("http://127.0.0.1:8000/api/v1/summarize/process-lecture", {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8500"}/api/v1/summarize/process-lecture`, {
         method: "POST", body: formData,
         headers: { "Authorization": `Bearer ${session.access_token}` },
       });
@@ -230,7 +230,7 @@ export default function DashboardPage() {
     setIsChatLoading(true);
 
     try {
-      const response = await fetch("http://127.0.0.1:8000/api/v1/chat/", {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8500"}/api/v1/chat/`, {
         method: "POST",
         headers: { 
           "Authorization": `Bearer ${session.access_token}`,
@@ -280,8 +280,8 @@ export default function DashboardPage() {
       <nav className="sticky top-0 z-50 bg-slate-900/80 backdrop-blur-xl border-b border-slate-800 px-6 py-3">
         <div className="max-w-6xl mx-auto flex items-center justify-between">
           <div className="flex items-center">
-            <BookOpen className="w-6 h-6 text-indigo-400 ml-2" />
-            <span className="font-bold text-lg bg-clip-text text-transparent bg-gradient-to-l from-indigo-300 to-purple-300">Smart Lectures</span>
+            <img src="/lammah-logo.png" alt="Lammah" className="w-8 h-8 ml-2 object-contain drop-shadow-md" />
+            <span className="font-bold text-lg bg-clip-text text-transparent bg-gradient-to-l from-indigo-300 to-purple-300">لمّاح</span>
           </div>
           <div className="flex items-center gap-3">
             {quota !== null && (
@@ -395,11 +395,27 @@ export default function DashboardPage() {
             <AnimatePresence>
               {error && (
                 <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }} className="mb-6">
-                  <div className="bg-red-500/10 border border-red-500/50 text-red-200 px-6 py-4 rounded-xl">
-                    <p className="text-sm">{error}</p>
-                    {error.includes("اشتراك") || error.includes("حصت") ? (
-                      <button onClick={() => router.push("/plans")} className="mt-3 text-sm bg-indigo-600 text-white px-4 py-2 rounded-lg">اشترك الآن</button>
-                    ) : null}
+                  <div className="bg-red-500/10 border border-red-500/50 text-red-200 px-6 py-4 rounded-xl flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                    <div className="flex-1">
+                      <p className="text-sm font-medium leading-relaxed">{error}</p>
+                    </div>
+                    <div className="flex flex-col sm:flex-row gap-2 shrink-0">
+                      {error.includes("اشتراك") || error.includes("حصت") ? (
+                        <button onClick={() => router.push("/plans")} className="text-sm bg-indigo-600 hover:bg-indigo-500 text-white px-4 py-2 rounded-lg font-bold transition-colors min-w-[120px]">ترقية الباقة</button>
+                      ) : null}
+                      
+                      <button 
+                        onClick={() => {
+                          const msg = `مرحباً بكِ مهندسة، أواجه مشكلة تقنية في المنصة.\nحسابي: ${user?.user_metadata?.full_name || user?.email || 'غير معروف'}\nالخطأ الذي ظهر لي:\n"${error}"\nأرجو المساعدة.`;
+                          window.open(`https://wa.me/970598298930?text=${encodeURIComponent(msg)}`, '_blank');
+                        }}
+                        className="text-sm bg-slate-800 border border-slate-600 hover:bg-slate-700 text-slate-200 px-4 py-2 rounded-lg flex items-center justify-center gap-2 transition-colors min-w-[140px]"
+                        title="إرسال سجل الخطأ للدعم الفني عبر واتساب"
+                      >
+                        <MessageCircle className="w-4 h-4 text-green-400" />
+                        إرسال الخطأ للإدارة
+                      </button>
+                    </div>
                   </div>
                 </motion.div>
               )}
@@ -423,14 +439,14 @@ export default function DashboardPage() {
                       <h2 className="text-2xl font-bold flex items-center text-indigo-300">
                         <BookOpen className="w-7 h-7 ml-3 text-indigo-400" />الملزمة الذكية
                       </h2>
-                      <a href={`http://127.0.0.1:8000${result.downloadUrl}`} download target="_blank"
+                      <a href={`${process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8500"}${result.downloadUrl}`} download target="_blank"
                          className="bg-gradient-to-l from-indigo-600 to-purple-600 hover:opacity-90 text-white px-6 py-2.5 rounded-xl font-bold transition flex items-center shadow-lg">
                          تحميل الملف المخطط الذكي
                       </a>
                     </div>
                     <iframe 
                        key={pdfPage || 'default'}
-                       src={`http://127.0.0.1:8000${result.downloadUrl}${pdfPage ? `#page=${pdfPage}` : ''}`} 
+                       src={`${process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8500"}${result.downloadUrl}${pdfPage ? `#page=${pdfPage}` : ''}`} 
                        className="w-full h-[600px] rounded-2xl border border-slate-700 bg-white transition-all" 
                     />
                   </div>
@@ -717,6 +733,15 @@ export default function DashboardPage() {
           )}
         </AnimatePresence>
       </div>
+
+      {/* Global Footer */}
+      <footer className="w-full bg-slate-900 border-t border-slate-800 py-6 mt-auto">
+        <div className="max-w-6xl mx-auto px-6 text-center flex flex-col items-center">
+          <p className="text-slate-500 text-sm font-medium">
+            جميع الحقوق محفوظة &copy; {new Date().getFullYear()} - تم التطوير والتصميم بواسطة <span className="text-indigo-400 font-bold hover:text-indigo-300 transition-colors cursor-default">فريق لمّاح</span>
+          </p>
+        </div>
+      </footer>
     </main>
   );
 }

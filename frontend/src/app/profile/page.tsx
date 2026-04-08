@@ -17,7 +17,7 @@ export default function ProfilePage() {
 
   useEffect(() => {
     if (session) {
-      fetch("http://127.0.0.1:8000/api/v1/subscription/me", {
+      fetch(`${process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8500"}/api/v1/subscription/me`, {
         headers: { "Authorization": `Bearer ${session.access_token}` }
       }).then(r => r.json()).then(data => { setInfo(data); setLoadingInfo(false); }).catch(() => setLoadingInfo(false));
     }
