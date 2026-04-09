@@ -1,12 +1,12 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, Suspense } from "react";
 import { useAuth } from "@/context/AuthContext";
 import { useRouter, useSearchParams } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import { Upload, FileAudio, FileText, CheckCircle, Loader2, BookOpen, AlertCircle, Quote, Eye, Clock, User, Package, History, LogOut, Target, Lightbulb, BrainCircuit, ListTodo, ChevronLeft, Check, X, MessageCircle, Send, Lock, Crown } from "lucide-react";
 
-export default function DashboardPage() {
+function DashboardContent() {
   const { user, session, loading, signOut } = useAuth();
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -743,5 +743,13 @@ export default function DashboardPage() {
         </div>
       </footer>
     </main>
+  );
+}
+
+export default function DashboardPage() {
+  return (
+    <Suspense fallback={<div className="min-h-screen bg-slate-950 flex items-center justify-center"><div className="text-white">جاري التحميل...</div></div>}>
+      <DashboardContent />
+    </Suspense>
   );
 }
