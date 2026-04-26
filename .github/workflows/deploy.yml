@@ -44,12 +44,10 @@ jobs:
           username: ${{ secrets.SERVER_USER }}
           key: ${{ secrets.SSH_PRIVATE_SERVER }}
           script: |
-            # Create project directory if not exists
             mkdir -p ~/lammah_backend
             cd ~/lammah_backend
             
-            # Create a simple docker-compose if not present
-            # Note: In a real scenario, you might want to SCP the docker-compose.yml
+            # Create docker-compose with environment variables
             cat <<EOF > docker-compose.yml
             services:
               backend:
@@ -57,6 +55,14 @@ jobs:
                 restart: unless-stopped
                 ports:
                   - "8000:8000"
+                environment:
+                  - SUPABASE_URL=${{ secrets.SUPABASE_URL }}
+                  - SUPABASE_KEY=${{ secrets.SUPABASE_KEY }}
+                  - SUPABASE_SERVICE_KEY=${{ secrets.SUPABASE_SERVICE_KEY }}
+                  - SECRET_KEY=${{ secrets.SECRET_KEY }}
+                  - GEMINI_API_KEY=${{ secrets.GEMINI_API_KEY }}
+                  - GROQ_API_KEY=${{ secrets.GROQ_API_KEY }}
+                  - OPENROUTER_API_KEY=${{ secrets.OPENROUTER_API_KEY }}
                 healthcheck:
                   test: ["CMD", "curl", "-f", "http://localhost:8000/api/v1/health"]
                   interval: 30s
@@ -64,7 +70,6 @@ jobs:
                   retries: 3
             EOF
             
-            # Pull and restart
             echo ${{ secrets.GHCR_PAT }} | docker login ${{ env.REGISTRY }} -u ${{ github.actor }} --password-stdin
             docker compose pull
             docker compose up -d
@@ -72,9 +77,8 @@ jobs:
       - name: Evaluate Health
         run: |
           echo "Waiting for service to be healthy..."
-          MAX_RETRIES=12
+          MAX_RETRIES=15
           COUNT=0
-          # We check the health via the server IP directly or via the domain if DNS is set
           until $(curl --output /dev/null --silent --head --fail http://${{ secrets.SERVER_IP }}:8000/api/v1/health); do
             if [ $COUNT -eq $MAX_RETRIES ]; then
               echo "Timeout: Service is not healthy!"
