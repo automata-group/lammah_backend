@@ -16,5 +16,3 @@ python-multipart
 openai
 langchain-openai
 PyMuPDF
-comtypes
-pywin32
