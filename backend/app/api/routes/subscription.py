@@ -26,26 +26,10 @@ async def list_plans():
         return {"weekly": [], "monthly": []}
 
 
-@router.post("/subscribe")
-async def subscribe(req: SubscribeRequest, profile=Depends(get_user_profile)):
-    """Subscribe to a plan (requires auth)."""
-    try:
-        from app.services.subscription_service import create_subscription
-        sub, error = create_subscription(
-            user_id=profile["id"],
-            plan_id=req.plan_id
-        )
-        
-        if error:
-            raise HTTPException(status_code=400, detail={"user_message": f"❌ {error}"})
-        
-        logger.info(f"✅ اشتراك ناجح: {profile['id']}")
-        return {"message": "تم الاشتراك بنجاح! 🎉", "subscription": sub}
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"❌ خطأ في الاشتراك: {str(e)}")
-        raise HTTPException(status_code=500, detail={"user_message": "❌ حدث خطأ. يرجى المحاولة لاحقاً."})
+# Removed for security: Users must subscribe via checkout/transactions
+# @router.post("/subscribe")
+# async def subscribe(req: SubscribeRequest, profile=Depends(get_user_profile)):
+#     ...
 
 
 @router.get("/me")

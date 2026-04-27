@@ -30,8 +30,15 @@ export default function PlansPage() {
     router.push(`/checkout/${planId}`);
   };
 
-  const icons: Record<string, any> = { "أسبوعي - طالب": Star, "أسبوعي - متقدم": Zap, "أسبوعي - VIP": Crown, "شهري - أساسي": Star, "شهري - متقدم": Zap, "شهري - غير محدود": Crown };
-  const colors: Record<string, string> = { "أسبوعي - طالب": "indigo", "شهري - أساسي": "indigo", "أسبوعي - متقدم": "purple", "شهري - متقدم": "purple", "أسبوعي - VIP": "amber", "شهري - غير محدود": "amber" };
+  const icons: Record<string, any> = { 
+    "أسبوعي - طالب": Star, "أسبوعي - متقدم": Zap, "أسبوعي - VIP": Crown, 
+    "شهري - أساسي": Star, "شهري - متقدم": Zap, "شهري - برو": Crown, "شهري - غير محدود": Crown 
+  };
+  const colors: Record<string, string> = { 
+    "أسبوعي - طالب": "indigo", "شهري - أساسي": "indigo", 
+    "أسبوعي - متقدم": "purple", "شهري - متقدم": "purple", 
+    "أسبوعي - VIP": "amber", "شهري - برو": "amber", "شهري - غير محدود": "amber" 
+  };
 
   if (loading || !user) return <div className="min-h-screen bg-gradient-to-br from-slate-900 via-indigo-950 to-slate-900 flex items-center justify-center"><Loader2 className="w-10 h-10 text-indigo-400 animate-spin" /></div>;
 
@@ -97,7 +104,16 @@ export default function PlansPage() {
                   <div className="space-y-3 mb-8">
                     <div className="flex items-center text-sm text-slate-300">
                       <Check className="w-4 h-4 text-green-400 ml-2 flex-shrink-0" />
-                      <span>{plan.lecture_quota} محاضرة</span>
+                      <span className="font-bold">{plan.lecture_quota} محاضرة</span>
+                    </div>
+                    {/* Chat Limit Logic */}
+                    <div className="flex items-center text-sm text-blue-300 bg-blue-500/5 p-2 rounded-lg border border-blue-500/10">
+                      <Check className="w-4 h-4 text-blue-400 ml-2 flex-shrink-0" />
+                      <span>محادثة ذكية: {
+                        plan.name.includes("متقدم") ? "40 رسالة / محاضرة" : 
+                        (plan.name.includes("VIP") || plan.name.includes("برو") || plan.name.includes("غير محدود")) ? "100 رسالة / محاضرة" : 
+                        "15 رسالة / محاضرة"
+                      }</span>
                     </div>
                     {plan.features && (Array.isArray(plan.features) ? plan.features : (() => { try { return JSON.parse(plan.features); } catch { return []; } })()).map((f: string, i: number) => (
                       <div key={i} className="flex items-center text-sm text-slate-300">

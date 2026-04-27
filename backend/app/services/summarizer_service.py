@@ -1,14 +1,6 @@
-from langchain_google_genai import ChatGoogleGenerativeAI
-from langchain.prompts import ChatPromptTemplate
-from app.core.config import settings
+from langchain_core.prompts import ChatPromptTemplate
+from app.services.llm_factory import get_llm_for_user
 import json
-
-# Initialize Gemini model
-llm = ChatGoogleGenerativeAI(
-    model="gemini-2.5-flash", 
-    google_api_key=settings.GEMINI_API_KEY, 
-    temperature=0.2
-) if settings.GEMINI_API_KEY else None
 
 SUMMARY_SYSTEM_PROMPT = (
     "أنت مساعد أكاديمي ذكي مهمتك مساعدة الطلاب في المذاكرة. "
@@ -32,26 +24,53 @@ SUMMARY_SYSTEM_PROMPT = (
     "هام جداً: \n"
     "- تأكد من أن المخرجات تمثل كائن JSON برمجي صالح 100% (Valid JSON).\n"
     "- لا تقم بإرجاع مصفوفات فارغة [] أبداً! ابذل أقصى جهدك لاستخراج أكبر كمية ممكنة من التظليلات والملاحظات حتى لو بشكل تقريبي.\n"
-    "- يجب عمل Escape لأية علامات تنصيص (\") داخل النصوص باستخدام (\\\")."
+    "- يجب عمل Escape لأية علامات تنصيص (\") داخل النصوص باستخدام (\\\").\n"
+    "- هام: يجب أن تكون جميع الردود والشروحات باللغة العربية حصراً وبأسلوب أكاديمي مبسط."
 )
 
-def generate_smart_annotations(transcript: str, pdf_context: list[str]) -> dict:
+def _truncate_text(text: str, max_chars: int) -> str:
+    """Truncate text to max_chars, preserving sentence boundaries."""
+    if len(text) <= max_chars:
+        return text
+    truncated = text[:max_chars]
+    # Try to end at a sentence boundary
+    last_period = max(truncated.rfind('.'), truncated.rfind('،'), truncated.rfind('\n'))
+    if last_period > max_chars * 0.8:  # Only cut at boundary if reasonable
+        truncated = truncated[:last_period + 1]
+    return truncated + "\n[... تم اختصار النص لأسباب تقنية ...]\n"
+
+
+def generate_smart_annotations(transcript: str, pdf_context: list[str], user_id: str = None) -> dict:
     """Generates structured JSON annotations (highlights, sticky notes) from transcript and RAG context."""
+    from app.core.logger import logger
+    llm = get_llm_for_user(user_id)
     if not llm:
         return {"highlights": [], "sticky_notes": []}
+
+    # Limit sizes to stay under Groq's 6000 TPM limit
+    # Arabic text ≈ 2 tokens/char, system prompt ≈ 700 tokens
+    # Budget: 6000 - 700 (prompt) - 500 (response) = 4800 for content
+    # Split: ~2800 transcript + ~2000 PDF = 4800 tokens ≈ 1400 + 1000 chars
+    MAX_TRANSCRIPT_CHARS = 2800   # ~1400 tokens for Arabic
+    MAX_PDF_CONTEXT_CHARS = 2000  # ~1000 tokens for Arabic
+
+    transcript_truncated = _truncate_text(transcript, MAX_TRANSCRIPT_CHARS)
+    if len(transcript_truncated) < len(transcript):
+        logger.warning(f"Transcript truncated from {len(transcript)} to {len(transcript_truncated)} chars")
 
     user_msg = ""
     if pdf_context:
         newline = "\n"
-        user_msg += f"سياق شرائح الـ PDF المتوفرة (مع أرقام الصفحات):\n{newline.join(pdf_context)}\n\n"
-    user_msg += f"النص الصوتي المفرغ:\n{transcript}\n\nتذكر: أرجع المخرجات ككائن JSON فقط!"
+        pdf_text = newline.join(pdf_context)
+        pdf_text = _truncate_text(pdf_text, MAX_PDF_CONTEXT_CHARS)
+        user_msg += f"سياق شرائح الـ PDF المتوفرة (مع أرقام الصفحات):\n{pdf_text}\n\n"
+    user_msg += f"النص الصوتي المفرغ:\n{transcript_truncated}\n\nتذكر: أرجع المخرجات ككائن JSON فقط!"
 
     prompt = ChatPromptTemplate.from_messages([
         ("system", SUMMARY_SYSTEM_PROMPT),
         ("human", "{user_input}")
     ])
     
-    chain = prompt | llm
     chain = prompt | llm
     try:
         result = chain.invoke({"user_input": user_msg})
@@ -70,13 +89,26 @@ def generate_smart_annotations(transcript: str, pdf_context: list[str]) -> dict:
         if start_idx != -1 and end_idx != -1:
             clean_json = content[start_idx:end_idx+1]
             try:
-                # strict=False allows literal newlines and control characters inside JSON strings
-                return json.loads(clean_json, strict=False)
-            except json.JSONDecodeError:
                 import re
-                # If it still fails, aggressively strip control characters
-                clean_json = re.sub(r'[\x00-\x1F]+', ' ', clean_json)
-                return json.loads(clean_json, strict=False)
+                # Fix trailing commas common in LLM JSON output
+                clean_json = re.sub(r',\s*([\]}])', r'\1', clean_json)
+                
+                # Fix missing commas between objects in an array: } { -> }, {
+                clean_json = re.sub(r'}\s*{', '}, {', clean_json)
+                # Fix missing commas between arrays: ] [ -> ], [
+                clean_json = re.sub(r']\s*\[', '], [', clean_json)
+                
+                # strict=False allows literal newlines and control characters inside JSON strings
+                try:
+                    return json.loads(clean_json, strict=False)
+                except json.JSONDecodeError:
+                    # If it still fails, aggressively strip control characters
+                    clean_json = re.sub(r'[\x00-\x1F]+', ' ', clean_json)
+                    return json.loads(clean_json, strict=False)
+            except json.JSONDecodeError as e:
+                from app.core.logger import logger
+                logger.error(f"Final JSON parsing failed: {e}")
+                raise e
         else:
             from app.core.logger import logger
             logger.error("No JSON object found in Gemini response.")
@@ -89,8 +121,9 @@ def generate_smart_annotations(transcript: str, pdf_context: list[str]) -> dict:
         raise e
 
 
-def extract_contextual_glossary(transcript: str) -> dict:
+def extract_contextual_glossary(transcript: str, user_id: str = None) -> dict:
     """Extracts difficult terms and their contextual Arabic meaning."""
+    llm = get_llm_for_user(user_id)
     if not llm:
         return {}
 
@@ -109,8 +142,9 @@ def extract_contextual_glossary(transcript: str) -> dict:
         return {}
 
 
-def detect_emphasis(transcript: str) -> list[dict]:
+def detect_emphasis(transcript: str, user_id: str = None) -> list[dict]:
     """Detects parts of the lecture the professor emphasized."""
+    llm = get_llm_for_user(user_id)
     if not llm:
         return []
 

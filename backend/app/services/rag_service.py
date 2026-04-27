@@ -1,4 +1,4 @@
-from langchain.text_splitter import RecursiveCharacterTextSplitter
+from langchain_text_splitters import RecursiveCharacterTextSplitter
 from app.db.vector_store import get_vector_collection
 
 def process_and_store_document(document_id: str, pages: list[dict]):
@@ -31,24 +31,24 @@ def process_and_store_document(document_id: str, pages: list[dict]):
     
     return total_chunks
 
+import logging
+logger = logging.getLogger(__name__)
+
 def query_relevant_context(query: str, n_results: int = 5, document_id: str | None = None) -> list[str]:
     """
     Retrieves the most relevant chunks from ChromaDB and returns them formatted with their page numbers.
-    Filters by document_id if provided (Critical to prevent cross-lecture data leaking).
+    Enforces document_id filtering to prevent cross-lecture data leaks.
     """
+    if not document_id:
+        logger.warning("🚫 query_relevant_context called without document_id. Returning empty to prevent cross-lecture leak.")
+        return []
+
     collection = get_vector_collection()
-    
-    if document_id:
-        results = collection.query(
-            query_texts=[query],
-            n_results=n_results,
-            where={"document_id": document_id}
-        )
-    else:
-        results = collection.query(
-            query_texts=[query],
-            n_results=n_results
-        )
+    results = collection.query(
+        query_texts=[query],
+        n_results=n_results,
+        where={"document_id": document_id}
+    )
     
     if not results or not results.get('documents') or not results['documents'][0]:
         return []

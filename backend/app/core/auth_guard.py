@@ -28,8 +28,8 @@ async def verify_token(credentials: HTTPAuthorizationCredentials = Depends(secur
         })
 
 
-async def get_user_profile(user=Depends(verify_token)):
-    """Get user profile. Auto-create if missing. FAIL LOUD on errors."""
+async def get_user_profile(request: Request, user=Depends(verify_token)):
+    """Get user profile. Auto-create if missing. Capture device metadata."""
     supabase = get_supabase()
     
     # Step 1: Try to get existing profile
@@ -41,14 +41,8 @@ async def get_user_profile(user=Depends(verify_token)):
         logger.error(f"❌ فشل جلب الملف الشخصي: {error_msg}")
         
         # If table doesn't exist, tell the user clearly
-        if "relation" in error_msg and "does not exist" in error_msg:
-            raise HTTPException(status_code=500, detail={
-                "user_message": "⚠️ جدول profiles غير موجود. يجب تنفيذ supabase_schema.sql في Supabase Dashboard أولاً.",
-                "technical": error_msg
-            })
         raise HTTPException(status_code=500, detail={
-            "user_message": f"❌ خطأ في قاعدة البيانات: {error_msg}",
-            "technical": error_msg
+            "user_message": f"❌ خطأ في قاعدة البيانات: {error_msg}"
         })
     
     # Step 2: Auto-create profile if not exists
@@ -69,24 +63,30 @@ async def get_user_profile(user=Depends(verify_token)):
         except Exception as e:
             error_msg = str(e)
             logger.error(f"❌ فشل إنشاء الملف الشخصي: {error_msg}")
-            
-            if "violates row-level security" in error_msg:
-                raise HTTPException(status_code=500, detail={
-                    "user_message": "⚠️ سياسة RLS تمنع إنشاء الملف الشخصي. يجب إضافة INSERT policy لجدول profiles.",
-                    "technical": error_msg
-                })
-            elif "relation" in error_msg and "does not exist" in error_msg:
-                raise HTTPException(status_code=500, detail={
-                    "user_message": "⚠️ جدول profiles غير موجود. نفذ supabase_schema.sql أولاً.",
-                    "technical": error_msg
-                })
-            else:
-                raise HTTPException(status_code=500, detail={
-                    "user_message": f"❌ فشل إنشاء الحساب: {error_msg}",
-                    "technical": error_msg
-                })
+            raise HTTPException(status_code=500, detail={
+                "user_message": f"❌ فشل إنشاء الحساب: {error_msg}"
+            })
     
-    # Step 3: Check if blocked
+    # Step 3: CAPTURE DEVICE METADATA
+    fingerprint = request.headers.get("X-Fingerprint")
+    device_meta = request.headers.get("X-Device-Metadata")
+    
+    update_data = {}
+    if fingerprint and not profile_data.get("device_fingerprint"):
+        update_data["device_fingerprint"] = fingerprint
+        profile_data["device_fingerprint"] = fingerprint
+    
+    if device_meta:
+        update_data["device_metadata"] = device_meta
+        profile_data["device_metadata"] = device_meta
+        
+    if update_data:
+        try:
+            supabase.table("profiles").update(update_data).eq("id", profile_data["id"]).execute()
+        except Exception as e:
+            logger.error(f"❌ Failed to update device tracking info: {e}")
+
+    # Step 4: Check if blocked
     if profile_data.get("is_blocked"):
         raise HTTPException(status_code=403, detail={
             "user_message": "🚫 تم حظر حسابك. يرجى التواصل مع الدعم الفني."
@@ -95,39 +95,90 @@ async def get_user_profile(user=Depends(verify_token)):
     return profile_data
 
 
-async def check_quota(profile=Depends(get_user_profile)):
-    """Verify user has remaining quota before processing."""
+async def check_quota(request: Request, profile=Depends(get_user_profile)):
+    """Verify user has remaining quota and prevent device-level trial abuse."""
+    supabase = get_supabase()
     quota = profile.get("quota_remaining", 0)
+    fingerprint = profile.get("device_fingerprint") # Already updated by get_user_profile
     
-    if quota <= 0:
-        supabase = get_supabase()
-        try:
-            active_sub = supabase.table("user_subscriptions") \
-                .select("*, subscription_plans(*)") \
-                .eq("user_id", profile["id"]) \
-                .eq("status", "active") \
-                .gte("expires_at", datetime.now(timezone.utc).isoformat()) \
-                .order("created_at", desc=True) \
-                .limit(1) \
-                .execute()
-        except Exception as e:
-            logger.error(f"❌ خطأ في فحص الاشتراك: {str(e)}")
+    # 2. Check for active subscription first (Paid users bypass blocks)
+    active_sub = None
+    try:
+        sub_result = supabase.table("user_subscriptions") \
+            .select("*, subscription_plans(*)") \
+            .eq("user_id", profile["id"]) \
+            .eq("status", "active") \
+            .gte("expires_at", datetime.now(timezone.utc).isoformat()) \
+            .order("created_at", desc=True) \
+            .limit(1) \
+            .execute()
+        active_sub = sub_result.data[0] if sub_result.data else None
+    except Exception as e:
+        logger.error(f"❌ Error checking subscription: {str(e)}")
+
+    # 3. DEVICE & PHONE TRIAL PROTECTION
+    # Paid users bypass these checks
+    if not active_sub:
+        # A) Fingerprint Check
+        if fingerprint:
+            try:
+                others = supabase.table("profiles") \
+                    .select("id") \
+                    .eq("device_fingerprint", fingerprint) \
+                    .neq("id", profile["id"]) \
+                    .execute()
+                
+                if others.data:
+                    logger.warning(f"🚫 Device abuse: User {profile['id']} using fingerprint {fingerprint} (already used by {others.data[0]['id']})")
+                    raise HTTPException(status_code=403, detail={
+                        "user_message": "🚫 عذراً! تم استخدام التجربة المجانية بالفعل على هذا الجهاز بحساب آخر. يرجى الاشتراك للاستمرار. 🚀",
+                        "type": "device_abuse"
+                    })
+            except HTTPException: raise
+            except Exception as e: logger.error(f"Fingerprint check error: {e}")
+
+        # B) Phone Number Check
+        phone = profile.get("phone_number")
+        if not phone:
+            # If they are trying to use the free trial quota without a phone number, we block them
+            # This forces them to add a phone number (which is UNIQUE in the DB) to get the trial.
             raise HTTPException(status_code=403, detail={
-                "user_message": "📦 لا يوجد اشتراك نشط.",
-                "type": "no_quota",
-                "technical": str(e)
+                "user_message": "📱 لتفعيل التجربة المجانية وحماية النظام، يرجى إضافة رقم هاتفك أولاً في صفحة الحساب. ✅",
+                "type": "phone_required"
             })
-        
-        if not active_sub.data:
+        else:
+            # Check if this phone number was used by another account (Safety check)
+            try:
+                others_phone = supabase.table("profiles") \
+                    .select("id") \
+                    .eq("phone_number", phone) \
+                    .neq("id", profile["id"]) \
+                    .execute()
+                if others_phone.data:
+                    raise HTTPException(status_code=403, detail={
+                        "user_message": "🚫 رقم الهاتف هذا مرتبط بحساب آخر استخدم التجربة المجانية بالفعل.",
+                        "type": "phone_abuse"
+                    })
+            except HTTPException: raise
+            except Exception: pass # DB Unique constraint might also catch this
+
+    # 4. Quota enforcement
+    if quota <= 0:
+        if not active_sub:
             raise HTTPException(status_code=403, detail={
                 "user_message": "📦 لا يوجد لديك اشتراك نشط أو نفدت حصتك. يرجى شراء أو تجديد باقتك.",
                 "type": "no_quota"
             })
         
-        sub = active_sub.data[0]
-        plan = sub.get("subscription_plans", {})
+        plan = active_sub.get("subscription_plans", {})
+        used = active_sub.get("lectures_used", 0) or 0
+        quota_total = plan.get("lecture_quota", 0)
+        
+        if used < quota_total:
+            return profile
+            
         raise HTTPException(status_code=403, detail={
-            "user_message": f"📊 استخدمت كل محاضراتك ({plan.get('lecture_quota', 0)}). يرجى الترقية.",
+            "user_message": f"📊 استخدمت كل محاضراتك في باقة ({plan.get('name', 'الحالية')}). يرجى الترقية أو التجديد.",
             "type": "quota_exceeded"
         })
     

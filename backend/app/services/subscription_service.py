@@ -135,6 +135,22 @@ def use_lecture_quota(user_id: str, metadata: dict = None):
     return True
 
 
+def log_usage_failure(user_id: str, error_message: str):
+    """Logs a failed attempt without deducting any quota."""
+    try:
+        supabase = get_supabase()
+        log_data = {
+            "user_id": user_id,
+            "action_type": "lecture_process",
+            "status": "failed",
+            "metadata": {"error": error_message}
+        }
+        supabase.table("usage_logs").insert(log_data).execute()
+        logger.info(f"[FAILURE_LOGGED] تم تسجيل فشل العملية للمستخدم {user_id} - لم يتم خصم رصيد.")
+    except Exception as e:
+        logger.error(f"[ERROR] فشل تسجيل سجل الخطأ للمستخدم {user_id}: {str(e)}")
+
+
 def get_user_subscription_info(user_id: str):
     """Get complete subscription info for a user."""
     supabase = get_supabase()

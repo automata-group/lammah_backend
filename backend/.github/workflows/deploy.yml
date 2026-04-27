@@ -1,0 +1,91 @@
+name: Build and Deploy Backend
+
+on:
+  push:
+    branches: [ main ]
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: automata-group/lammah_backend
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Log in to the Container registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GHCR_PAT }}
+
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          push: true
+          tags: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Deploy to Server via SSH
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.SERVER_IP }}
+          username: ${{ secrets.SERVER_USER }}
+          key: ${{ secrets.SSH_PRIVATE_SERVER }}
+          script: |
+            mkdir -p ~/lammah_backend
+            cd ~/lammah_backend
+            
+            # Create docker-compose with environment variables
+            cat <<EOF > docker-compose.yml
+            services:
+              backend:
+                image: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest
+                restart: unless-stopped
+                ports:
+                  - "8000:8000"
+                environment:
+                  - SUPABASE_URL=${{ secrets.SUPABASE_URL }}
+                  - SUPABASE_KEY=${{ secrets.SUPABASE_KEY }}
+                  - SUPABASE_SERVICE_KEY=${{ secrets.SUPABASE_SERVICE_KEY }}
+                  - SECRET_KEY=${{ secrets.SECRET_KEY }}
+                  - GEMINI_API_KEY=${{ secrets.GEMINI_API_KEY }}
+                  - GROQ_API_KEY=${{ secrets.GROQ_API_KEY }}
+                  - OPENROUTER_API_KEY=${{ secrets.OPENROUTER_API_KEY }}
+                healthcheck:
+                  test: ["CMD", "curl", "-f", "http://localhost:8000/api/v1/health"]
+                  interval: 30s
+                  timeout: 10s
+                  retries: 3
+            EOF
+            
+            echo ${{ secrets.GHCR_PAT }} | docker login ${{ env.REGISTRY }} -u ${{ github.actor }} --password-stdin
+            docker compose pull
+            docker compose up -d
+
+      - name: Evaluate Health
+        run: |
+          echo "Waiting for service to be healthy..."
+          MAX_RETRIES=15
+          COUNT=0
+          until $(curl --output /dev/null --silent --fail http://${{ secrets.SERVER_IP }}:8000/api/v1/health); do
+            if [ $COUNT -eq $MAX_RETRIES ]; then
+              echo "Timeout: Service is not healthy!"
+              exit 1
+            fi
+            echo "Retrying health check ($COUNT/$MAX_RETRIES)..."
+            sleep 10
+            COUNT=$((COUNT+1))
+          done
+          echo "Service is healthy and live!"

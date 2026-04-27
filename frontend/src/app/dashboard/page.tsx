@@ -4,6 +4,7 @@ import { useState, useRef, useEffect, Suspense } from "react";
 import { useAuth } from "@/context/AuthContext";
 import { useRouter, useSearchParams } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
+import { getFingerprint as getThumbmark } from '@thumbmarkjs/thumbmarkjs';
 import { Upload, FileAudio, FileText, CheckCircle, Loader2, BookOpen, AlertCircle, Quote, Eye, Clock, User, Package, History, LogOut, Target, Lightbulb, BrainCircuit, ListTodo, ChevronLeft, Check, X, MessageCircle, Send, Lock, Crown } from "lucide-react";
 
 function DashboardContent() {
@@ -24,8 +25,14 @@ function DashboardContent() {
   const [quota, setQuota] = useState<number | null>(null);
   const [timeLeft, setTimeLeft] = useState<number | null>(null);
   const [planName, setPlanName] = useState<string>("مجاني");
+  const [chatCount, setChatCount] = useState<number>(0);
+  const [showLimitModal, setShowLimitModal] = useState(false);
 
   const isBasicPlan = planName.includes("طالب") || planName.includes("أساسي") || planName === "مجاني";
+  
+  const subscriptionLimit = planName.includes("متقدم") ? 40 : 
+                           (planName.includes("برو") || planName.includes("VIP")) ? 100 : 
+                           15; // Default for Basic/Student
 
   // UI States for Expansion
   const [activeTab, setActiveTab] = useState("notes");
@@ -37,10 +44,50 @@ function DashboardContent() {
   const [chatMessages, setChatMessages] = useState<Array<{role: string, content: string}>>([]);
   const [chatInput, setChatInput] = useState("");
   const [isChatLoading, setIsChatLoading] = useState(false);
-  const chatEndRef = useRef<HTMLDivElement>(null);
-  const [pdfPage, setPdfPage] = useState<number | null>(null);
-
+  const [pdfPage, setPdfPage] = useState(1);
   const summaryRef = useRef<HTMLDivElement>(null);
+  const chatEndRef = useRef<HTMLDivElement>(null);
+
+  // -- FINGERPRINTING LOGIC --
+  const getFingerprint = async () => {
+    if (typeof window === "undefined") return "";
+    let fp = localStorage.getItem("device_id_v3");
+    if (!fp) {
+      try {
+        fp = await getThumbmark();
+        localStorage.setItem("device_id_v3", fp);
+      } catch (e) {
+        console.error("Device ID generation failed:", e);
+        // Fallback
+        fp = `fallback_${Math.random().toString(36).substring(7)}`;
+      }
+    }
+    return fp;
+  };
+
+  const getDeviceMetadata = async () => {
+    if (typeof window === "undefined") return "";
+    const fp = await getFingerprint();
+    const metadata = {
+      fingerprint: fp,
+      userAgent: navigator.userAgent,
+      language: navigator.language,
+      platform: navigator.platform,
+      screen: `${window.screen.width}x${window.screen.height}`,
+      battery: null as any
+    };
+
+    if ('getBattery' in navigator) {
+      try {
+        const battery = await (navigator as any).getBattery();
+        metadata.battery = {
+          level: Math.round(battery.level * 100),
+          charging: battery.charging
+        };
+      } catch (e) {}
+    }
+    return JSON.stringify(metadata);
+  };
 
   // Progress Countdown Timer
   useEffect(() => {
@@ -57,80 +104,89 @@ function DashboardContent() {
   }, [user, loading]);
 
   useEffect(() => {
-    if (typeof window !== "undefined" && session) {
-      const params = new URLSearchParams(window.location.search);
-      const historyId = params.get("history_id");
-      
-      if (historyId) {
-        setIsProcessing(true);
-        setProgressStep("جاري استرجاع المحاضرة والتظليلات من الأرشيف...");
+    const fetchHistory = async () => {
+      if (typeof window !== "undefined" && session) {
+        const params = new URLSearchParams(window.location.search);
+        const historyId = params.get("history_id");
         
-        // Remove query param to prevent loop on subsequent re-renders
-        window.history.replaceState({}, document.title, window.location.pathname);
-        setCurrentHistoryId(historyId);
+        if (historyId) {
+          setIsProcessing(true);
+          setProgressStep("جاري استرجاع المحاضرة والتظليلات من الأرشيف...");
+          
+          // Remove query param to prevent loop on subsequent re-renders
+          window.history.replaceState({}, document.title, window.location.pathname);
+          setCurrentHistoryId(historyId);
 
-        fetch(`${process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8500"}/api/v1/subscription/history/${historyId}`, {
-          headers: { "Authorization": `Bearer ${session.access_token}` }
-        })
-        .then(async r => {
-          if (!r.ok) throw new Error("التلخيص غير موجود أو محذوف");
-          const data = await r.json();
-          if (data?.metadata?.job_id) {
-            setResult({
-              transcript: data.metadata.transcript || "",
-              downloadUrl: `/api/v1/summarize/download/${data.metadata.job_id}.pdf`,
-              annotations: data.metadata.annotations
-            });
-          } else {
-            throw new Error("هذا التلخيص قديم جداً ولا يحتوي على أرشيف محفوظ.");
-          }
-        })
-        .catch(err => setError(err.message))
-        .finally(() => {
-          setIsProcessing(false);
-          setProgressStep("");
-        });
+          const fp = await getFingerprint();
+          const meta = await getDeviceMetadata();
+          fetch(`${process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8500"}/api/v1/subscription/history/${historyId}`, {
+            headers: { 
+              "Authorization": `Bearer ${session.access_token}`,
+              "X-Fingerprint": fp,
+              "X-Device-Metadata": meta
+            }
+          })
+          .then(async r => {
+            if (!r.ok) throw new Error("التلخيص غير موجود أو محذوف");
+            const data = await r.json();
+            if (data?.metadata?.job_id) {
+              setChatCount(data.chat_count || 0);
+              setResult({
+                transcript: data.metadata.transcript || "",
+                downloadUrl: `/api/v1/summarize/download/${data.metadata.job_id}.pdf`,
+                annotations: data.metadata.annotations
+              });
+            } else {
+              throw new Error("هذا التلخيص قديم جداً ولا يحتوي على أرشيف محفوظ.");
+            }
+          })
+          .catch(err => setError(err.message))
+          .finally(() => {
+            setIsProcessing(false);
+            setProgressStep("");
+          });
+        }
       }
-    }
+    };
+    fetchHistory();
   }, [session]);
 
   // Fetch quota on load - SHOW ERRORS
   useEffect(() => {
-    if (session) {
-      fetch(`${process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8500"}/api/v1/subscription/quota`, {
-        headers: { "Authorization": `Bearer ${session.access_token}` }
-      }).then(async r => {
-        const data = await r.json();
-        if (!r.ok) {
-          const msg = data.detail?.user_message || data.detail?.technical || JSON.stringify(data);
-          setError(`⚠️ خطأ من الخادم: ${msg}`);
-          console.error("Backend error:", data);
-        } else {
-          setQuota(data.quota_remaining);
-          setPlanName(data.plan_name);
-          setError(null);
-        }
-      }).catch(e => {
-        setError(`❌ فشل الاتصال بالخادم: ${e.message}`);
-        console.error("Network error:", e);
-      });
-    }
-  }, [session, result]);
+    const fetchQuota = async () => {
+      if (session) {
+        const fp = await getFingerprint();
+        const meta = await getDeviceMetadata();
+        fetch(`${process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8500"}/api/v1/subscription/quota`, {
+          headers: { 
+            "Authorization": `Bearer ${session.access_token}`,
+            "X-Fingerprint": fp,
+            "X-Device-Metadata": meta
+          }
+        }).then(async r => {
+          const data = await r.json();
+          if (!r.ok) {
+            const msg = data.detail?.user_message || data.detail?.technical || JSON.stringify(data);
+            setError(`⚠️ خطأ من الخادم: ${msg}`);
+            console.error("Backend error:", data);
+          } else {
+            setQuota(data.quota_remaining);
+            setPlanName(data.plan_name);
+            setError(null);
+          }
+        }).catch(e => {
+          setError(`❌ فشل الاتصال بالخادم: ${e.message}`);
+          console.error("Network error:", e);
+        });
+      }
+    };
+    fetchQuota();
+  }, [session]);
 
   const handleProcess = async () => {
     if (!audioFile) { setError("يرجى إرفاق الملف الصوتي أولاً."); return; }
     if (!session) { router.replace("/login"); return; }
     
-    // -- LOCAL FINGERPRINT CHECK FOR FREE TRIALS --
-    const isFreeTrial = planName === "مجاني";
-    if (isFreeTrial) {
-      const trialUsed = localStorage.getItem("device_trial_used");
-      if (trialUsed === "true") {
-        setError("عذراً! لقد استهلكت بالفعل المحاضرة المجانية التجريبية الخاصة بهذا الجهاز. لدعم المنصة والاستمرار بخدمتك المتميزة، يرجى الاشتراك في إحدى الباقات 🚀");
-        return;
-      }
-    }
-
     setIsProcessing(true); setError(null); setResult(null);
     setIsStreaming(false); setQueuePosition(0); setProgressStep("");
 
@@ -139,9 +195,15 @@ function DashboardContent() {
     if (pdfFile) formData.append("pdf_file", pdfFile);
 
     try {
+      const fp = await getFingerprint();
+      const meta = await getDeviceMetadata();
       const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8500"}/api/v1/summarize/process-lecture`, {
         method: "POST", body: formData,
-        headers: { "Authorization": `Bearer ${session.access_token}` },
+        headers: { 
+          "Authorization": `Bearer ${session.access_token}`,
+          "X-Fingerprint": fp,
+          "X-Device-Metadata": meta
+        },
       });
 
       if (!response.ok) {
@@ -160,10 +222,7 @@ function DashboardContent() {
         } catch (parseErr: any) { if (parseErr.message) throw parseErr; throw new Error("خطأ غير متوقع."); }
       }
 
-      // -- SET LOCAL FINGERPRINT ON SUCCESS --
-      if (isFreeTrial) {
-        localStorage.setItem("device_trial_used", "true");
-      }
+      // -- Local fingerprint set moved to success stream event --
 
       const reader = response.body?.getReader();
       const decoder = new TextDecoder("utf-8");
@@ -205,6 +264,7 @@ function DashboardContent() {
                   setShowExplanation({});
                   break;
                 case "done":
+                  setChatCount(0);
                   setResult({ transcript: metadata?.transcript || "", downloadUrl: p.download_url, annotations: metadata?.annotations });
                   if (p.history_id) {
                     setCurrentHistoryId(p.history_id);
@@ -230,11 +290,15 @@ function DashboardContent() {
     setIsChatLoading(true);
 
     try {
+      const fp = await getFingerprint();
+      const meta = await getDeviceMetadata();
       const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8500"}/api/v1/chat/`, {
         method: "POST",
         headers: { 
           "Authorization": `Bearer ${session.access_token}`,
-          "Content-Type": "application/json" 
+          "Content-Type": "application/json",
+          "X-Fingerprint": fp,
+          "X-Device-Metadata": meta
         },
         body: JSON.stringify({
           history_id: currentHistoryId,
@@ -243,7 +307,16 @@ function DashboardContent() {
         }),
       });
 
-      if (!response.ok) throw new Error("فشل الاتصال بالخادم");
+      if (!response.ok) {
+        const errData = await response.json();
+        if (errData.detail?.type === "limit_reached") {
+          setShowLimitModal(true);
+          throw new Error(errData.detail.user_message);
+        }
+        throw new Error("فشل الاتصال بالخادم");
+      }
+
+      setChatCount(prev => prev + 1);
 
       const reader = response.body?.getReader();
       const decoder = new TextDecoder("utf-8");
@@ -432,6 +505,21 @@ function DashboardContent() {
         <AnimatePresence>
           {showResults && (
             <motion.div initial={{ opacity: 0, y: 50 }} animate={{ opacity: 1, y: 0 }} className="w-full max-w-6xl grid grid-cols-1 lg:grid-cols-3 gap-8 pb-20">
+              
+              {/* WARNING BANNER FOR TRIMMED AUDIO */}
+              {result?.annotations?.is_audio_trimmed && planName === "مجاني" && (
+                <div className="lg:col-span-3 bg-amber-500/10 border border-amber-500/50 p-5 rounded-2xl flex items-center gap-4 shadow-lg">
+                  <AlertCircle className="w-8 h-8 text-amber-500 shrink-0" />
+                  <div>
+                    <h4 className="text-amber-400 font-bold text-lg mb-1">تنبيه: تم تحليل جزء من المحاضرة فقط</h4>
+                    <p className="text-amber-200/90 text-sm">أنت تستخدم التجربة المجانية، لذلك تم استخراج وتحليل أول 15 دقيقة فقط من المحاضرة بدلاً من كامل المحتوى. للوصول إلى تفريغ وتلخيص كامل لأي محاضرة مهما كان طولها، اشترك الآن.</p>
+                  </div>
+                  <button onClick={() => router.push("/plans")} className="mr-auto bg-amber-500 hover:bg-amber-600 text-slate-900 px-4 py-2 rounded-xl font-bold text-sm shrink-0 transition-colors">
+                    الترقية الآن
+                  </button>
+                </div>
+              )}
+
               <div className="lg:col-span-2 space-y-8">
                 {result?.downloadUrl && (
                   <div className="bg-slate-800/60 border border-indigo-500/50 p-6 rounded-[2rem] shadow-2xl relative">
@@ -439,10 +527,17 @@ function DashboardContent() {
                       <h2 className="text-2xl font-bold flex items-center text-indigo-300">
                         <BookOpen className="w-7 h-7 ml-3 text-indigo-400" />الملزمة الذكية
                       </h2>
-                      <a href={`${process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8500"}${result.downloadUrl}`} download target="_blank"
-                         className="bg-gradient-to-l from-indigo-600 to-purple-600 hover:opacity-90 text-white px-6 py-2.5 rounded-xl font-bold transition flex items-center shadow-lg">
-                         تحميل الملف المخطط الذكي
-                      </a>
+                      {isBasicPlan ? (
+                        <button onClick={() => router.push("/plans")}
+                         className="bg-slate-800 hover:bg-slate-700 text-slate-300 px-6 py-2.5 rounded-xl font-bold transition flex items-center shadow-lg border border-slate-600">
+                         <Lock className="w-4 h-4 ml-2 text-amber-400" /> تنزيل الملزمة (للمشتركين)
+                        </button>
+                      ) : (
+                        <a href={`${process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8500"}${result.downloadUrl}`} download target="_blank"
+                           className="bg-gradient-to-l from-indigo-600 to-purple-600 hover:opacity-90 text-white px-6 py-2.5 rounded-xl font-bold transition flex items-center shadow-lg">
+                           تحميل الملف المخطط الذكي
+                        </a>
+                      )}
                     </div>
                     <iframe 
                        key={pdfPage || 'default'}
@@ -667,12 +762,29 @@ function DashboardContent() {
                   {/* TAB CONTENT: CHAT */}
                   {activeTab === "chat" && (
                     <motion.div key="chat" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, scale: 0.95 }} className="flex flex-col h-[700px] bg-slate-800/80 border border-slate-700 rounded-[2rem] shadow-xl overflow-hidden relative">
-                      <div className="bg-gradient-to-r from-blue-900/40 to-indigo-900/40 p-5 px-6 border-b border-slate-700/50 flex flex-col">
-                        <h3 className="text-xl font-bold flex items-center text-blue-300">
-                          <MessageCircle className="w-6 h-6 ml-2 text-blue-400" /> تحدث مع المحاضرة
-                        </h3>
-                        <p className="text-sm text-slate-400 pr-8 mt-1">يستند الرد لمعالجة سؤالك باحترافية، مع توضيح ما ذكره الدكتور في المحاضرة.</p>
-                      </div>
+                      
+                      {isBasicPlan && (
+                        <div className="absolute inset-0 z-30 flex flex-col items-center justify-center bg-slate-900/60 backdrop-blur-md rounded-[2rem] p-8 text-center border border-blue-500/30 shadow-2xl">
+                          <div className="w-20 h-20 bg-blue-500/20 rounded-full flex items-center justify-center mb-6 shadow-[0_0_50px_rgba(59,130,246,0.4)] border border-blue-400/50">
+                            <Lock className="w-10 h-10 text-blue-400" />
+                          </div>
+                          <h3 className="text-3xl font-bold bg-clip-text text-transparent bg-gradient-to-l from-blue-200 to-cyan-400 mb-4">تحدث مع المحاضرة بذكاء!</h3>
+                          <p className="text-lg text-slate-200 max-w-lg mb-8 leading-relaxed font-medium">
+                            ميزة <strong>المحادثة الذكية (Chat)</strong> حصرية لاشتراكات الباقات المتقدمة والـ VIP. <br/><span className="text-slate-400 text-sm mt-2 block">رقي باقتك الآن لتتمكن من طرح أي سؤال على المحاضرة وسيجيبك النظام بدقة!</span>
+                          </p>
+                          <button onClick={() => router.push("/plans")} className="bg-gradient-to-l from-blue-500 to-cyan-600 hover:from-blue-400 hover:to-cyan-500 text-slate-900 font-extrabold px-10 py-4 rounded-xl shadow-xl transition-all flex items-center text-lg">
+                            <Crown className="w-6 h-6 ml-2" /> ترقية الباقة الآن لفك القفل
+                          </button>
+                        </div>
+                      )}
+                      
+                      <div className={`flex flex-col h-full ${isBasicPlan ? "opacity-20 pointer-events-none select-none blur-[6px] transition-all" : ""}`}>
+                        <div className="bg-gradient-to-r from-blue-900/40 to-indigo-900/40 p-5 px-6 border-b border-slate-700/50 flex flex-col">
+                          <h3 className="text-xl font-bold flex items-center text-blue-300">
+                            <MessageCircle className="w-6 h-6 ml-2 text-blue-400" /> تحدث مع المحاضرة
+                          </h3>
+                          <p className="text-sm text-slate-400 pr-8 mt-1">يستند الرد لمعالجة سؤالك باحترافية، مع توضيح ما ذكره الدكتور في المحاضرة.</p>
+                        </div>
                       
                       <div className="flex-1 overflow-y-auto p-6 space-y-6 custom-scrollbar bg-slate-900/50">
                         {chatMessages.length === 0 && (
@@ -699,24 +811,41 @@ function DashboardContent() {
                         <div ref={chatEndRef} />
                       </div>
 
-                      <div className="p-4 bg-slate-800 border-t border-slate-700">
-                        <form onSubmit={handleChatSubmit} className="flex space-x-2 space-x-reverse">
-                          <input 
-                            type="text" 
-                            className="flex-1 bg-slate-900 border border-slate-700 text-slate-200 p-4 rounded-xl focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all placeholder-slate-500 shadow-inner"
-                            placeholder="مثال: كيف شرح الدكتور الفرق بين DOS و DDOS؟"
-                            value={chatInput}
-                            onChange={(e) => setChatInput(e.target.value)}
-                            disabled={isChatLoading}
-                          />
-                          <button 
-                            type="submit" 
-                            disabled={isChatLoading || !chatInput.trim()}
-                            className="bg-blue-600 hover:bg-blue-500 disabled:opacity-50 disabled:hover:bg-blue-600 text-white p-4 rounded-xl font-bold flex items-center justify-center transition-all shadow-md active:scale-95"
-                          >
-                            <Send className="w-5 h-5 rtl:-scale-x-100" />
-                          </button>
-                        </form>
+                        <div className="p-4 bg-slate-800 border-t border-slate-700">
+                          {/* Chat Usage Indicator */}
+                          {subscriptionLimit > 0 && (
+                            <div className="flex justify-between items-center mb-2 px-1">
+                              <span className="text-[10px] md:text-xs font-bold text-slate-500">
+                                {chatCount >= subscriptionLimit ? "⚠️ انتهى رصيد المحادثة لهذه المحاضرة" : `متبقي ${subscriptionLimit - chatCount} من ${subscriptionLimit} سؤالاً`}
+                              </span>
+                              <div className="flex-1 mx-3 h-1 bg-slate-700 rounded-full overflow-hidden">
+                                <div 
+                                  className={`h-full transition-all ${chatCount >= subscriptionLimit ? "bg-red-500" : "bg-blue-500"}`} 
+                                  style={{ width: `${Math.min(100, (chatCount / subscriptionLimit) * 100)}%` }}
+                                />
+                              </div>
+                            </div>
+                          )}
+
+                          <form onSubmit={handleChatSubmit} className="flex space-x-2 space-x-reverse">
+                            <input 
+                              type="text" 
+                              maxLength={500}
+                              className="flex-1 bg-slate-900 border border-slate-700 text-slate-200 p-4 rounded-xl focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all placeholder-slate-500 shadow-inner"
+                              placeholder="مثال: كيف شرح الدكتور الفرق بين DOS و DDOS؟"
+                              value={chatInput}
+                              onChange={(e) => setChatInput(e.target.value)}
+                              disabled={isChatLoading || (subscriptionLimit > 0 && chatCount >= subscriptionLimit)}
+                            />
+                            <button 
+                              type="submit" 
+                              disabled={isChatLoading || !chatInput.trim() || (subscriptionLimit > 0 && chatCount >= subscriptionLimit)}
+                              className="bg-blue-600 hover:bg-blue-500 disabled:opacity-50 disabled:hover:bg-blue-600 text-white p-4 rounded-xl font-bold flex items-center justify-center transition-all shadow-md active:scale-95"
+                            >
+                              <Send className="w-5 h-5 rtl:-scale-x-100" />
+                            </button>
+                          </form>
+                        </div>
                       </div>
                     </motion.div>
                   )}
@@ -742,6 +871,30 @@ function DashboardContent() {
           </p>
         </div>
       </footer>
+      {/* Limit Reached Modal */}
+      <AnimatePresence>
+        {showLimitModal && (
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-[60] flex items-center justify-center bg-slate-950/80 backdrop-blur-sm p-4">
+            <motion.div initial={{ scale: 0.9, y: 20 }} animate={{ scale: 1, y: 0 }} className="bg-slate-900 border border-amber-500/30 rounded-[2rem] p-8 max-w-md w-full shadow-2xl text-center">
+              <div className="w-16 h-16 bg-amber-500/20 rounded-full flex items-center justify-center mx-auto mb-6">
+                <Lock className="w-8 h-8 text-amber-500" />
+              </div>
+              <h3 className="text-2xl font-bold text-amber-400 mb-4">انتهى رصيد المحادثة! 🔒</h3>
+              <p className="text-slate-300 mb-8 leading-relaxed">
+                لقد استهلكت جميع الرسائل المتاحة لهذه المحاضرة بناءً على باقتك الحالية. رقية باقتك الآن للحصول على حدود أعلى والدردشة دون قيود!
+              </p>
+              <div className="space-y-3">
+                <button onClick={() => { setShowLimitModal(false); router.push("/plans"); }} className="w-full py-4 bg-gradient-to-l from-amber-500 to-orange-600 hover:from-amber-400 hover:to-orange-500 text-slate-900 font-bold rounded-xl shadow-lg transition-all">
+                  ترقية الباقة الآن
+                </button>
+                <button onClick={() => setShowLimitModal(false)} className="w-full py-3 bg-slate-800 text-slate-400 hover:text-slate-200 font-medium rounded-xl transition-all">
+                  سأكتفي بالملخص حالياً
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </main>
   );
 }

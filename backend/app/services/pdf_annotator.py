@@ -4,7 +4,7 @@ import logging
 
 logger = logging.getLogger(__name__)
 
-def annotate_pdf(input_path: str, output_path: str, annotations: dict) -> str:
+def annotate_pdf(input_path: str, output_path: str, annotations: dict, is_free_trial: bool = False) -> str:
     """
     Applies highlights and text annotations to a PDF using PyMuPDF.
     annotations format:
@@ -20,6 +20,19 @@ def annotate_pdf(input_path: str, output_path: str, annotations: dict) -> str:
         if len(doc) > 0:
             doc[0].insert_text(fitz.Point(10, 20), "Smart Note Mode Active", fontsize=12, color=(0.4, 0.2, 0.8))
             
+        if is_free_trial:
+            for page_num in range(len(doc)):
+                page = doc.load_page(page_num)
+                rect = page.rect
+                # Insert watermark across the page
+                page.insert_text(
+                    fitz.Point(50, rect.height / 2),
+                    "Created by Free Trial - اشترك للحصول على الملزمة كاملة وبدون علامة",
+                    fontsize=20,
+                    color=(0.8, 0.8, 0.8),
+                    fill_opacity=0.3
+                )
+                
         # --- HELPER FUNCTION FOR ROBUST TEXT NORMALIZATION ---
         def normalize_text(text_val):
             import re

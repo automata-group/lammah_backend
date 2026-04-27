@@ -4,18 +4,16 @@ from typing import List, Optional
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
-import google.generativeai as genai
+from langchain_core.messages import SystemMessage, HumanMessage, AIMessage
 from app.core.config import settings
 from app.core.auth_guard import get_user_profile
 from app.services.rag_service import query_relevant_context
+from app.services.llm_factory import get_llm_for_user
 from app.db.supabase_client import get_supabase
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter()
-
-if settings.GEMINI_API_KEY:
-    genai.configure(api_key=settings.GEMINI_API_KEY)
 
 class ChatMessage(BaseModel):
     role: str
@@ -30,7 +28,7 @@ class ChatRequest(BaseModel):
 async def chat_with_lecture(request: ChatRequest, user: dict = Depends(get_user_profile)):
     """
     Takes a question about a specific lecture (history_id), retrieves the PDF context via RAG
-    and the Audio transcript from Supabase, and queries Gemini 2.5 Flash.
+    and the Audio transcript from Supabase, and queries the LLM with sliding window memory and plan limits.
     """
     try:
         supabase = get_supabase()
@@ -38,7 +36,43 @@ async def chat_with_lecture(request: ChatRequest, user: dict = Depends(get_user_
         
         if not log_result.data:
             raise HTTPException(status_code=404, detail="Lecture not found or unauthorized")
+
+        # 1. Plan Verification & Limits
+        from datetime import datetime, timezone
+        sub_check = supabase.table("user_subscriptions") \
+            .select("*, subscription_plans(*)") \
+            .eq("user_id", user["id"]) \
+            .eq("status", "active") \
+            .gte("expires_at", datetime.now(timezone.utc).isoformat()) \
+            .limit(1) \
+            .execute()
+        
+        if not sub_check.data:
+            raise HTTPException(status_code=403, detail={
+                "user_message": "هذه الميزة متاحة للمشتركين فقط. قم بالترقية للاستمتاع بالمحادثة الذكية مع محاضراتك!",
+                "type": "upgrade_required"
+            })
             
+        subscription = sub_check.data[0]
+        plan_name = subscription["subscription_plans"]["name"]
+        
+        # Determine Limits
+        limit = 15 # Default/Basic
+        if "متقدم" in plan_name:
+            limit = 40
+        elif "برو" in plan_name or "VIP" in plan_name:
+            limit = 100
+            
+        current_count = log_result.data.get("chat_count", 0)
+        
+        if current_count >= limit:
+            raise HTTPException(status_code=403, detail={
+                "user_message": f"لقد وصلت للحد الأقصى للمحادثة في هذه المحاضرة ({limit} رسالة) حسب باقتك الحالية. يمكنك الترقية للحصول على حدود أعلى!",
+                "type": "limit_reached",
+                "limit": limit
+            })
+
+        # 2. Context Retrieval (RAG)
         metadata = log_result.data.get("metadata", {})
         transcript = metadata.get("transcript", "")
         document_id = metadata.get("document_id", None)
@@ -46,50 +80,51 @@ async def chat_with_lecture(request: ChatRequest, user: dict = Depends(get_user_
         if not transcript and not document_id:
             raise HTTPException(status_code=400, detail="Lecture data is missing (no transcript or pdf)")
 
-        # Retrieve Context from ChromaDB
         rag_context_snippets = []
         if document_id:
+            # RAG to pull only relevant sections
             rag_context_snippets = query_relevant_context(request.question, n_results=4, document_id=document_id)
             
-        rag_text = "\n".join(rag_context_snippets) if rag_context_snippets else "لا يوجد سياق من الشرائح المرئية."
+        rag_text = "\n".join(rag_context_snippets) if rag_context_snippets else "لا يوجد سياق إضافي من الشرائح."
 
-        # Build System Instruction
+        # 3. Sliding Window Memory (Last 4 turns = 8 messages)
+        full_history = request.chat_history or []
+        window_size = 8
+        history_window = full_history[-window_size:] if len(full_history) > window_size else full_history
+
+        # 4. System Prompt Optimization
         system_instruction = (
-            "أنت مساعد دراسي ذكي وخبير في الشرح الأكاديمي. مهمتك الإجابة على أسئلة الطالب بدقة وتوسع وتوضيح.\n"
-            f"--- النص الصوتي (تفريغ الدكتور) ---\n{transcript}\n"
-            f"--- محتوى الشرائح ذي الصلة المباشرة ---\n{rag_text}\n"
-            "---\n"
-            "التعليمات:\n"
-            "- أجب باللغة العربية الواضحة والمبسطة وبأسلوب أكاديمي مشجع.\n"
-            "- إجابتك ليست محصورة في المحاضرة فقط؛ يحق لك الإجابة على أي سؤال بناءً على معرفتك الشاملة خارج المنهج إذا لزم الأمر.\n"
-            "- إذا كان السؤال يتعلق بجزئية تم شرحها في المحاضرة، اشرحها من عندك أولاً وبشكل وافٍ، ثم أضف فقرة تقول: 'وقد ذكر الدكتور في المحاضرة بخصوص هذه الجزئية كذا وكذا...'.\n"
-            "- كن مباشراً ومنظّماً واستخدم النقاط (Bullet points) لتسهيل الفهم.\n"
+            "أنت مساعد دراسي ذكي. أجب على أسئلة الطالب بناءً على نص المحاضرة المرفق فقط. "
+            "قدم إجابات دقيقة، مباشرة، ومختصرة قدر الإمكان. لا تقم بتوليد شروحات طويلة أو إضافية إلا إذا طلب منك الطالب ذلك صراحة.\n\n"
+            f"--- نص المحاضرة ---\n{transcript[:2000]}\n\n" # Truncated for token safety
+            f"--- سياق الشرائح ذي الصلة ---\n{rag_text}\n"
         )
 
-        model = genai.GenerativeModel("gemini-2.5-flash", system_instruction=system_instruction)
+        model = get_llm_for_user(user_id=user["id"], streaming=True)
+        if not model:
+            raise HTTPException(status_code=500, detail="AI Model not configured")
 
-        # Build Conversation History List
-        gemini_history = []
-        for msg in (request.chat_history or []):
-            # map 'user' or 'model' to gemini format
-            gemini_role = "user" if msg.role == "user" else "model"
-            gemini_history.append({"role": gemini_role, "parts": [msg.content]})
+        # Build Messages
+        messages = [SystemMessage(content=system_instruction)]
+        for msg in history_window:
+            if msg.role == "user":
+                messages.append(HumanMessage(content=msg.content))
+            else:
+                messages.append(AIMessage(content=msg.content))
+        
+        messages.append(HumanMessage(content=request.question))
 
-        gemini_history.append({"role": "user", "parts": [request.question]})
-
-        def generate():
+        async def generate():
             try:
-                response = model.generate_content(
-                    contents=gemini_history,
-                    stream=True,
-                    generation_config=genai.types.GenerationConfig(temperature=0.3)
-                )
-                for chunk in response:
-                    if chunk.text:
-                        yield chunk.text
+                # Increment count in DB
+                supabase.table("usage_logs").update({"chat_count": current_count + 1}).eq("id", request.history_id).execute()
+                
+                async for chunk in model.astream(messages):
+                    if chunk.content:
+                        yield chunk.content
             except Exception as e:
-                logger.error(f"Chat generation stream error: {str(e)}", exc_info=True)
-                yield f"\n\n[عذراً، حدث خطأ أثناء توليد الرد: {str(e)}]"
+                logger.error(f"Chat error: {str(e)}")
+                yield f"\n\n[خطأ: {str(e)}]"
 
         return StreamingResponse(generate(), media_type="text/plain")
         

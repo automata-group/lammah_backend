@@ -80,7 +80,7 @@ class QueueManager:
         self._job_events: Dict[str, asyncio.Event] = {}  # Notify SSE listeners
         self._total_processed = 0
         self._total_failed = 0
-        logger.info("🏗️ تم تهيئة نظام الطابور الذكي")
+        logger.info("[INIT] تم تهيئة نظام الطابور الذكي")
     
     async def start_workers(self):
         """Start background worker tasks."""
@@ -90,7 +90,7 @@ class QueueManager:
         for i in range(self.MAX_CONCURRENT_JOBS):
             asyncio.create_task(self._worker(f"worker-{i+1}"))
         asyncio.create_task(self._cleanup_worker())
-        logger.info(f"⚙️ تم تشغيل {self.MAX_CONCURRENT_JOBS} عمال معالجة + عامل تنظيف")
+        logger.info(f"[CONFIG] تم تشغيل {self.MAX_CONCURRENT_JOBS} عمال معالجة + عامل تنظيف")
     
     def get_priority_for_plan(self, plan_name: str) -> Priority:
         """Map subscription plan name to queue priority."""
@@ -137,7 +137,7 @@ class QueueManager:
             self._update_positions()
         
         logger.info(
-            f"📥 مهمة جديدة: {job.job_id[:8]}... | "
+            f"[INCOMING] مهمة جديدة: {job.job_id[:8]}... | "
             f"المستخدم: {user_id[:8]}... | "
             f"الأولوية: {priority.name} | "
             f"الموقع: #{job.position}"
@@ -195,7 +195,7 @@ class QueueManager:
     
     async def _worker(self, worker_name: str):
         """Background worker that processes jobs from the queue."""
-        logger.info(f"🔧 العامل {worker_name} جاهز للعمل")
+        logger.info(f"[WORKER] العامل {worker_name} جاهز للعمل")
         
         while True:
             try:
@@ -214,7 +214,7 @@ class QueueManager:
                     self._update_positions()
                     self._notify_job(job.job_id)
                 
-                logger.info(f"⚡ {worker_name} يعالج: {job.job_id[:8]}...")
+                logger.info(f"[PROCESSING] {worker_name} يعالج: {job.job_id[:8]}...")
                 
                 try:
                     # Execute the actual processing
@@ -230,7 +230,7 @@ class QueueManager:
                         self._notify_job(job.job_id)
                     
                     duration = job.completed_at - job.started_at
-                    logger.info(f"✅ {worker_name} أكمل: {job.job_id[:8]}... ({duration:.1f}s)")
+                    logger.info(f"[SUCCESS] {worker_name} أكمل: {job.job_id[:8]}... ({duration:.1f}s)")
                     
                 except Exception as e:
                     await self._handle_failure(job, str(e), worker_name)
@@ -245,7 +245,7 @@ class QueueManager:
                     self._queue.task_done()
                     
             except Exception as e:
-                logger.error(f"❌ خطأ في {worker_name}: {str(e)}", exc_info=True)
+                logger.error(f"[ERROR] خطأ في {worker_name}: {str(e)}", exc_info=True)
                 await asyncio.sleep(1)
     
     async def _handle_failure(self, job: Job, error: str, worker_name: str):
@@ -260,7 +260,7 @@ class QueueManager:
                 self._notify_job(job.job_id)
                 
                 logger.warning(
-                    f"🔄 {worker_name} يعيد المحاولة: {job.job_id[:8]}... "
+                    f"[RETRY] {worker_name} يعيد المحاولة: {job.job_id[:8]}... "
                     f"({job.retry_count}/{job.max_retries}) بعد {delay}s"
                 )
                 
@@ -274,7 +274,7 @@ class QueueManager:
                 self._total_failed += 1
                 self._notify_job(job.job_id)
                 
-                logger.error(f"💀 {worker_name} فشل نهائي: {job.job_id[:8]}... - {error}")
+                logger.error(f"[FATAL] {worker_name} فشل نهائي: {job.job_id[:8]}... - {error}")
     
     def _notify_job(self, job_id: str):
         """Signal SSE listeners that job status changed."""
@@ -309,7 +309,7 @@ class QueueManager:
             self._update_positions()
             self._notify_job(job_id)
         
-        logger.info(f"🚫 تم إلغاء المهمة: {job_id[:8]}...")
+        logger.info(f"[CANCEL] تم إلغاء المهمة: {job_id[:8]}...")
         return True
     
     async def _cleanup_worker(self):
@@ -329,7 +329,7 @@ class QueueManager:
                     self._job_events.pop(jid, None)
                 
                 if expired:
-                    logger.info(f"🧹 تم تنظيف {len(expired)} مهمة منتهية")
+                    logger.info(f"[CLEANUP] تم تنظيف {len(expired)} مهمة منتهية")
 
 
 # Singleton instance

@@ -25,7 +25,15 @@ file_handler = RotatingFileHandler(
 )
 file_handler.setFormatter(log_format)
 
+# حفظ الأخطاء الجسيمة (Errors) فقط في ملف منفصل
+error_handler = RotatingFileHandler(
+    "logs/error.log", maxBytes=5*1024*1024, backupCount=5, encoding="utf-8"
+)
+error_handler.setFormatter(log_format)
+error_handler.setLevel(logging.ERROR)
+
 # إضافة المُعالجات فقط إذا لم تكن موجودة لتجنب التكرار
 if not logger.handlers:
     logger.addHandler(console_handler)
     logger.addHandler(file_handler)
+    logger.addHandler(error_handler)
