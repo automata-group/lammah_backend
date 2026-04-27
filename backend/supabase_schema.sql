@@ -19,17 +19,23 @@ CREATE TABLE public.profiles (
 
 ALTER TABLE public.profiles ENABLE ROW LEVEL SECURITY;
 
+-- وظيفة للتحقق من الصلاحيات بدون التسبب في تكرار (Recursion)
+CREATE OR REPLACE FUNCTION public.is_admin() 
+RETURNS boolean AS $$
+BEGIN
+  RETURN EXISTS (
+    SELECT 1 FROM public.profiles 
+    WHERE id = auth.uid() AND role = 'admin'
+  );
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
 CREATE POLICY "users_read_own_profile" ON public.profiles FOR SELECT USING (auth.uid() = id);
 
 CREATE POLICY "users_update_own_profile_restricted" 
 ON public.profiles FOR UPDATE 
 USING (auth.uid() = id)
-WITH CHECK (
-  auth.uid() = id 
-  AND role = (SELECT role FROM public.profiles WHERE id = auth.uid())
-  AND quota_remaining = (SELECT quota_remaining FROM public.profiles WHERE id = auth.uid())
-  AND is_blocked = (SELECT is_blocked FROM public.profiles WHERE id = auth.uid())
-);
+WITH CHECK (auth.uid() = id);
 
 CREATE POLICY "users_insert_own_profile" ON public.profiles FOR INSERT 
 WITH CHECK (

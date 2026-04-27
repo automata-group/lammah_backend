@@ -30,28 +30,37 @@ ALTER TABLE public.lectures ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.transactions ENABLE ROW LEVEL SECURITY;
 
 -- 5. Secure Profiles (Prevent self-upgrading quota/role)
-DROP POLICY IF EXISTS "users_update_own_profile" ON public.profiles;
+-- Function to check admin status without recursion
+CREATE OR REPLACE FUNCTION public.is_admin() 
+RETURNS boolean AS $$
+BEGIN
+  RETURN EXISTS (
+    SELECT 1 FROM public.profiles 
+    WHERE id = auth.uid() AND role = 'admin'
+  );
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+DROP POLICY IF EXISTS "users_read_own_profile" ON public.profiles;
+CREATE POLICY "users_read_own_profile" ON public.profiles 
+FOR SELECT USING (auth.uid() = id);
+
 DROP POLICY IF EXISTS "users_update_own_profile_restricted" ON public.profiles;
 CREATE POLICY "users_update_own_profile_restricted" 
 ON public.profiles FOR UPDATE 
 USING (auth.uid() = id)
-WITH CHECK (
-  auth.uid() = id 
-  AND role = (SELECT role FROM public.profiles WHERE id = auth.uid())
-  AND quota_remaining = (SELECT quota_remaining FROM public.profiles WHERE id = auth.uid())
-  AND is_blocked = (SELECT is_blocked FROM public.profiles WHERE id = auth.uid())
-);
+WITH CHECK (auth.uid() = id); -- Restrictions handled by GRANT below
 
-DROP POLICY IF EXISTS "users_insert_own_profile" ON public.profiles;
+DROP POLICY IF EXISTS "users_insert_own_profile_safe" ON public.profiles;
 CREATE POLICY "users_insert_own_profile_safe"
 ON public.profiles FOR INSERT
 WITH CHECK (
   auth.uid() = id 
-  AND role = 'user' -- Force user role on creation
-  AND quota_remaining <= 1 -- Limit initial quota
+  AND role = 'user' 
+  AND quota_remaining <= 1
 );
 
--- 6. Secure Subscription Plans (Anyone can read, only admin can write)
+-- 6. Secure Subscription Plans
 DROP POLICY IF EXISTS "anyone_can_read_plans" ON public.subscription_plans;
 CREATE POLICY "anyone_can_read_plans" ON public.subscription_plans
 FOR SELECT USING (true);
@@ -61,32 +70,25 @@ DROP POLICY IF EXISTS "users_read_own_transactions" ON public.transactions;
 CREATE POLICY "users_read_own_transactions" ON public.transactions
 FOR SELECT USING (auth.uid() = user_id);
 
-DROP POLICY IF EXISTS "users_insert_own_transactions" ON public.transactions;
+DROP POLICY IF EXISTS "users_insert_own_transactions_safe" ON public.transactions;
 CREATE POLICY "users_insert_own_transactions_safe" ON public.transactions
 FOR INSERT WITH CHECK (
   auth.uid() = user_id 
-  AND status = 'pending' -- Force pending status
+  AND status = 'pending'
 );
 
--- 8. Fix Permissions (Revoke excessive grants)
-REVOKE ALL ON public.subscription_plans FROM authenticated, anon;
-GRANT SELECT ON public.subscription_plans TO authenticated, anon;
-
+-- 8. Fix Permissions (CRITICAL: This is what actually prevents field tampering)
 REVOKE ALL ON public.profiles FROM authenticated;
 GRANT SELECT ON public.profiles TO authenticated;
-GRANT UPDATE (full_name, phone_number) ON public.profiles TO authenticated;
-GRANT INSERT ON public.profiles TO authenticated; -- For auto-creation
+GRANT INSERT ON public.profiles TO authenticated;
+-- Only allow updating specific fields
+GRANT UPDATE (full_name, phone_number, phone_verified) ON public.profiles TO authenticated;
 
--- 9. Add Admin Policies (Only for users with role='admin')
+-- 9. Admin Policies (Using the non-recursive function)
+DROP POLICY IF EXISTS "admins_manage_all_transactions" ON public.transactions;
 CREATE POLICY "admins_manage_all_transactions" ON public.transactions
-FOR ALL USING (
-  EXISTS (SELECT 1 FROM public.profiles WHERE id = auth.uid() AND role = 'admin')
-);
+FOR ALL USING (is_admin());
 
+DROP POLICY IF EXISTS "admins_manage_all_profiles" ON public.profiles;
 CREATE POLICY "admins_manage_all_profiles" ON public.profiles
-FOR ALL USING (
-  EXISTS (SELECT 1 FROM public.profiles WHERE id = auth.uid() AND role = 'admin')
-);
-
--- 10. Audit: Verify that service_role is the only one with full access
--- (Supabase handles service_role automatically, but we ensure authenticated is restricted)
+FOR ALL USING (is_admin());
