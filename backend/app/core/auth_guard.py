@@ -95,6 +95,25 @@ async def get_user_profile(request: Request, user=Depends(verify_token)):
     return profile_data
 
 
+async def verify_phone_active(profile=Depends(get_user_profile)):
+    """
+    Fast dependency to check phone verification status.
+    Ensures that unverified users are blocked early.
+    """
+    if profile.get("is_blocked"):
+        raise HTTPException(status_code=403, detail={
+            "user_message": "🚫 تم حظر حسابك. يرجى التواصل مع الدعم الفني."
+        })
+        
+    if not profile.get("phone_verified"):
+        raise HTTPException(status_code=403, detail={
+            "user_message": "⚠️ رقم هاتفك غير مفعل! يرجى إتمام عملية التحقق لتتمكن من المتابعة. 📲",
+            "type": "phone_not_verified"
+        })
+        
+    return profile
+
+
 async def check_quota(request: Request, profile=Depends(get_user_profile)):
     """Verify user has remaining quota and prevent device-level trial abuse."""
     supabase = get_supabase()
@@ -137,14 +156,20 @@ async def check_quota(request: Request, profile=Depends(get_user_profile)):
             except HTTPException: raise
             except Exception as e: logger.error(f"Fingerprint check error: {e}")
 
-        # B) Phone Number Check
+        # B) Phone Verification Check (CRITICAL)
         phone = profile.get("phone_number")
+        is_verified = profile.get("phone_verified", False)
+        
         if not phone:
-            # If they are trying to use the free trial quota without a phone number, we block them
-            # This forces them to add a phone number (which is UNIQUE in the DB) to get the trial.
             raise HTTPException(status_code=403, detail={
                 "user_message": "📱 لتفعيل التجربة المجانية وحماية النظام، يرجى إضافة رقم هاتفك أولاً في صفحة الحساب. ✅",
                 "type": "phone_required"
+            })
+            
+        if not is_verified:
+            raise HTTPException(status_code=403, detail={
+                "user_message": "⚠️ رقم هاتفك غير مفعل! يرجى إتمام عملية التحقق من خلال الكود المرسل إليك لتتمكن من استخدام النظام. 📲",
+                "type": "phone_not_verified"
             })
         else:
             # Check if this phone number was used by another account (Safety check)

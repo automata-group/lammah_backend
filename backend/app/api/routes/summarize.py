@@ -6,7 +6,7 @@ from app.services.pdf_service import extract_pages_from_pdf
 from app.services.rag_service import process_and_store_document, query_relevant_context
 from app.services.summarizer_service import generate_smart_annotations
 from app.services.subscription_service import use_lecture_quota, log_usage_failure
-from app.core.auth_guard import check_quota
+from app.core.auth_guard import check_quota, verify_phone_active
 from app.core.queue_manager import queue_manager, JobStatus
 from app.core.logger import logger
 import shutil
@@ -21,7 +21,7 @@ router = APIRouter()
 
 
 # ====== المسار الرئيسي: معالجة محاضرة مع طابور + حماية ======
-@router.post("/process-lecture")
+@router.post("/process-lecture", dependencies=[Depends(verify_phone_active)])
 async def process_lecture(
     audio_file: UploadFile = File(...),
     pdf_file: Optional[UploadFile] = File(None),

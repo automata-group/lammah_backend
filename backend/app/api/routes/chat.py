@@ -6,7 +6,7 @@ from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 from langchain_core.messages import SystemMessage, HumanMessage, AIMessage
 from app.core.config import settings
-from app.core.auth_guard import get_user_profile
+from app.core.auth_guard import get_user_profile, verify_phone_active
 from app.services.rag_service import query_relevant_context
 from app.services.llm_factory import get_llm_for_user
 from app.db.supabase_client import get_supabase
@@ -24,7 +24,7 @@ class ChatRequest(BaseModel):
     question: str
     chat_history: Optional[List[ChatMessage]] = []
 
-@router.post("/")
+@router.post("/", dependencies=[Depends(verify_phone_active)])
 async def chat_with_lecture(request: ChatRequest, user: dict = Depends(get_user_profile)):
     """
     Takes a question about a specific lecture (history_id), retrieves the PDF context via RAG
