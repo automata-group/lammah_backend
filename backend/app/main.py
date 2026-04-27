@@ -29,6 +29,57 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# ====== Early Security Middleware (Pre-Upload Check) ======
+@app.middleware("http")
+async def early_security_middleware(request: Request, call_next):
+    """
+    Intersects heavy requests BEFORE multipart parsing.
+    If the user is blocked or not verified, reject immediately.
+    """
+    # Only check heavy processing routes
+    if request.url.path == "/api/v1/summarize/process-lecture":
+        auth_header = request.headers.get("Authorization")
+        if not auth_header or not auth_header.startswith("Bearer "):
+            return JSONResponse(
+                status_code=401, 
+                content={"detail": {"user_message": "🔒 غير مصرح بالوصول."}}
+            )
+        
+        token = auth_header.split(" ")[1]
+        try:
+            from app.db.supabase_client import get_supabase, get_auth_client
+            auth_client = get_auth_client()
+            user_response = auth_client.auth.get_user(token)
+            
+            if not user_response or not user_response.user:
+                return JSONResponse(status_code=401, content={"detail": {"user_message": "🔒 الجلسة منتهية."}})
+            
+            user_id = user_response.user.id
+            supabase = get_supabase()
+            profile_res = supabase.table("profiles").select("is_blocked, phone_verified").eq("id", user_id).execute()
+            
+            if not profile_res.data:
+                return JSONResponse(status_code=403, content={"detail": {"user_message": "🚫 لم يتم العثور على ملف شخصي."}})
+            
+            profile = profile_res.data[0]
+            if profile.get("is_blocked"):
+                return JSONResponse(status_code=403, content={"detail": {"user_message": "🚫 حسابك محظور."}})
+            
+            if not profile.get("phone_verified"):
+                return JSONResponse(status_code=403, content={"detail": {
+                    "user_message": "⚠️ الهاتف غير مفعل! يرجى التفعيل للمتابعة.",
+                    "type": "phone_not_verified"
+                }})
+                
+        except Exception as e:
+            logger.error(f"Early security check failed: {e}")
+            # We let it pass to the normal dependency handler if there's a technical error here
+            # to avoid false positives, but usually this will catch invalid users.
+            pass
+
+    return await call_next(request)
+
+
 # ====== Routes ======
 app.include_router(summarize.router, prefix="/api/v1/summarize", tags=["summarize"])
 app.include_router(subscription.router, prefix="/api/v1/subscription", tags=["subscription"])
