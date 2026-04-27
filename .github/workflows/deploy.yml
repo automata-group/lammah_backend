@@ -79,7 +79,7 @@ jobs:
           echo "Waiting for service to be healthy..."
           MAX_RETRIES=15
           COUNT=0
-          until $(curl --output /dev/null --silent --head --fail http://${{ secrets.SERVER_IP }}:8000/api/v1/health); do
+          until $(curl --output /dev/null --silent --fail http://${{ secrets.SERVER_IP }}:8000/api/v1/health); do
             if [ $COUNT -eq $MAX_RETRIES ]; then
               echo "Timeout: Service is not healthy!"
               exit 1
