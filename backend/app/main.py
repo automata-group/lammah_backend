@@ -64,14 +64,9 @@ async def early_security_middleware(request: Request, call_next):
             profile = profile_res.data[0]
             if profile.get("is_blocked"):
                 return JSONResponse(status_code=403, content={"detail": {"user_message": "🚫 حسابك محظور."}})
-            
-            if not profile.get("phone_verified"):
-                return JSONResponse(status_code=403, content={"detail": {
-                    "user_message": "⚠️ الهاتف غير مفعل! يرجى التفعيل للمتابعة.",
-                    "type": "phone_not_verified"
-                }})
                 
         except Exception as e:
+
             logger.error(f"Early security check failed: {e}")
             # We let it pass to the normal dependency handler if there's a technical error here
             # to avoid false positives, but usually this will catch invalid users.
