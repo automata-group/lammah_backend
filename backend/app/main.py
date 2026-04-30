@@ -15,25 +15,15 @@ app = FastAPI(
     openapi_url=f"{settings.API_V1_STR}/openapi.json"
 )
 
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=settings.BACKEND_CORS_ORIGINS,
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
 
 # ====== Early Security Middleware (Pre-Upload Check) ======
 @app.middleware("http")
 async def early_security_middleware(request: Request, call_next):
-    """
-    Intersects heavy requests BEFORE multipart parsing.
-    If the user is blocked or not verified, reject immediately.
-    """
-    # Only check heavy processing routes
+    # 1. Allow CORS Preflight
     if request.method == "OPTIONS":
         return await call_next(request)
 
+    # 2. Check heavy routes
     if request.url.path == "/api/v1/summarize/process-lecture":
         auth_header = request.headers.get("Authorization")
         if not auth_header or not auth_header.startswith("Bearer "):
@@ -63,13 +53,19 @@ async def early_security_middleware(request: Request, call_next):
                 return JSONResponse(status_code=403, content={"detail": {"user_message": "🚫 حسابك محظور."}})
                 
         except Exception as e:
-
             logger.error(f"Early security check failed: {e}")
-            # We let it pass to the normal dependency handler if there's a technical error here
-            # to avoid false positives, but usually this will catch invalid users.
             pass
 
     return await call_next(request)
+
+# Add CORS last to ensure it's the outermost middleware
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=settings.BACKEND_CORS_ORIGINS,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 
 # ====== Routes ======
