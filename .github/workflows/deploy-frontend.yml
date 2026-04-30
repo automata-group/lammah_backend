@@ -3,6 +3,8 @@ name: Build and Deploy Frontend
 on:
   push:
     branches: [ main ]
+    paths:
+      - 'frontend/**'
 
 env:
   REGISTRY: ghcr.io
@@ -29,7 +31,7 @@ jobs:
       - name: Build and push Docker image
         uses: docker/build-push-action@v5
         with:
-          context: .
+          context: ./frontend
           push: true
           tags: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest
           build-args: |
