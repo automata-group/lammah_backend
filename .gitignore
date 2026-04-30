@@ -53,3 +53,20 @@ Thumbs.db
 # Keys
 server_key.pub
 *.pub
+
+legacy_backup/
+*.log
+.venv/
+node_modules/
+.next/
+
+
+legacy_backup/
+*.log
+.venv/
+node_modules/
+.next/
+
+
+legacy_backup/
+

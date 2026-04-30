@@ -1,5 +1,9 @@
 {
-    email your-email@example.com
+    email omar@lammah.site
+}
+
+lammah.site, www.lammah.site {
+    reverse_proxy frontend:3000
 }
 
 api.lammah.site {
