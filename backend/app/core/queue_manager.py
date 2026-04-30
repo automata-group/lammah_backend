@@ -20,7 +20,7 @@ from collections import OrderedDict
 from app.core.logger import logger
 
 
-class Priority(IntEnum):
+class JobPriority(IntEnum):
     """Lower number = higher priority (processed first)."""
     VIP = 1          # أسبوعي/شهري VIP
     ADVANCED = 2     # أسبوعي/شهري متقدم
@@ -92,16 +92,16 @@ class QueueManager:
         asyncio.create_task(self._cleanup_worker())
         logger.info(f"[CONFIG] تم تشغيل {self.MAX_CONCURRENT_JOBS} عمال معالجة + عامل تنظيف")
     
-    def get_priority_for_plan(self, plan_name: str) -> Priority:
+    def get_priority_for_plan(self, plan_name: str) -> JobPriority:
         """Map subscription plan name to queue priority."""
         name_lower = plan_name.lower() if plan_name else ""
         if "vip" in name_lower or "غير محدود" in plan_name:
-            return Priority.VIP
+            return JobPriority.VIP
         elif "متقدم" in plan_name or "advanced" in name_lower:
-            return Priority.ADVANCED
+            return JobPriority.ADVANCED
         elif "طالب" in plan_name or "أساسي" in plan_name or "basic" in name_lower or "student" in name_lower:
-            return Priority.BASIC
-        return Priority.FREE_TRIAL
+            return JobPriority.BASIC
+        return JobPriority.FREE_TRIAL
     
     async def enqueue(
         self, 
@@ -173,7 +173,7 @@ class QueueManager:
             "position": job.position,
             "progress": job.progress,
             "estimated_wait_seconds": job.estimated_wait_seconds,
-            "priority": Priority(job.priority).name,
+            "priority": JobPriority(job.priority).name,
             "retry_count": job.retry_count,
             "error": job.error,
             "created_at": datetime.fromtimestamp(job.created_at, tz=timezone.utc).isoformat(),

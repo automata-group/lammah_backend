@@ -47,12 +47,26 @@ def generate_smart_annotations(transcript: str, pdf_context: list[str], user_id:
     if not llm:
         return {"highlights": [], "sticky_notes": []}
 
-    # Limit sizes to stay under Groq's 6000 TPM limit
-    # Arabic text ≈ 2 tokens/char, system prompt ≈ 700 tokens
-    # Budget: 6000 - 700 (prompt) - 500 (response) = 4800 for content
-    # Split: ~2800 transcript + ~2000 PDF = 4800 tokens ≈ 1400 + 1000 chars
-    MAX_TRANSCRIPT_CHARS = 2800   # ~1400 tokens for Arabic
-    MAX_PDF_CONTEXT_CHARS = 2000  # ~1000 tokens for Arabic
+    # Default limits for free users (to stay under Groq TPM limits)
+    MAX_TRANSCRIPT_CHARS = 3000
+    MAX_PDF_CONTEXT_CHARS = 2000
+    
+    # Check if user is paid to give them full context
+    is_paid = False
+    if user_id:
+        from app.services.subscription_service import get_user_subscription_info
+        try:
+            sub_info = get_user_subscription_info(user_id)
+            if sub_info.get("active_subscription"):
+                is_paid = True
+        except Exception:
+            pass
+
+    if is_paid:
+        # Paid users get massive context window (MiniMax supports huge contexts)
+        # 250k chars is ~40k words, enough for a 2.5 hour fast-paced lecture.
+        MAX_TRANSCRIPT_CHARS = 250000
+        MAX_PDF_CONTEXT_CHARS = 150000
 
     transcript_truncated = _truncate_text(transcript, MAX_TRANSCRIPT_CHARS)
     if len(transcript_truncated) < len(transcript):
@@ -97,6 +111,14 @@ def generate_smart_annotations(transcript: str, pdf_context: list[str], user_id:
                 clean_json = re.sub(r'}\s*{', '}, {', clean_json)
                 # Fix missing commas between arrays: ] [ -> ], [
                 clean_json = re.sub(r']\s*\[', '], [', clean_json)
+                
+                # Fix missing commas between properties (string followed by string key)
+                clean_json = re.sub(r'"\s*\n*\s*"', '", "', clean_json)
+                # Fix missing commas after arrays or objects before a new key
+                clean_json = re.sub(r']\s*\n*\s*"', '], "', clean_json)
+                clean_json = re.sub(r'}\s*\n*\s*"', '}, "', clean_json)
+                # Fix missing commas after booleans or numbers before a new key
+                clean_json = re.sub(r'(true|false|null|\d)\s*\n*\s*"', r'\1, "', clean_json)
                 
                 # strict=False allows literal newlines and control characters inside JSON strings
                 try:

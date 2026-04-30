@@ -17,16 +17,12 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Copy application files
 COPY . .
 
-# Copy entrypoint script and make it executable
-COPY entrypoint.sh /usr/local/bin/
-RUN chmod +x /usr/local/bin/entrypoint.sh
-
 # Environment variables
 ENV PORT=8000
 
-# Health check using the wait/evaluate logic
-HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
+# Health check
+HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
     CMD curl -f http://localhost:${PORT}/api/v1/health || exit 1
 
-# Start using entrypoint
-ENTRYPOINT ["entrypoint.sh"]
+# Start uvicorn directly (no entrypoint.sh needed)
+CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]

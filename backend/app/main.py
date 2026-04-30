@@ -17,13 +17,7 @@ app = FastAPI(
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "https://lammah.com",
-        "https://www.lammah.com",
-        "http://localhost:3000",
-        "http://127.0.0.1:3000",
-        "http://192.168.1.3:8003" # Added based on .env.local
-    ],
+    allow_origins=settings.BACKEND_CORS_ORIGINS,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -37,6 +31,9 @@ async def early_security_middleware(request: Request, call_next):
     If the user is blocked or not verified, reject immediately.
     """
     # Only check heavy processing routes
+    if request.method == "OPTIONS":
+        return await call_next(request)
+
     if request.url.path == "/api/v1/summarize/process-lecture":
         auth_header = request.headers.get("Authorization")
         if not auth_header or not auth_header.startswith("Bearer "):

@@ -3,7 +3,7 @@ import { useAuth } from "@/context/AuthContext";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
-import { Loader2, User, Phone, Package, Calendar, LogOut, Shield } from "lucide-react";
+import { Loader2, User, Package, Calendar, LogOut, Shield, Fingerprint } from "lucide-react";
 
 export default function ProfilePage() {
   const { user, session, loading, signOut } = useAuth();
@@ -11,20 +11,14 @@ export default function ProfilePage() {
   const [info, setInfo] = useState<any>(null);
   const [loadingInfo, setLoadingInfo] = useState(true);
 
-  const [verifying, setVerifying] = useState(false);
-  const [phoneNumber, setPhoneNumber] = useState("");
-  const [verificationStep, setVerificationStep] = useState<"none" | "phone" | "code">("none");
-  const [otp, setOtp] = useState("");
-
   const refreshInfo = () => {
     if (session) {
       setLoadingInfo(true);
       fetch(`${process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8500"}/api/v1/subscription/me`, {
         headers: { "Authorization": `Bearer ${session.access_token}` }
-      }).then(r => r.json()).then(data => { 
-        setInfo(data); 
-        setLoadingInfo(false); 
-        if (data.profile?.phone_number) setPhoneNumber(data.profile.phone_number);
+      }).then(r => r.json()).then(data => {
+        setInfo(data);
+        setLoadingInfo(false);
       }).catch(() => setLoadingInfo(false));
     }
   };
@@ -36,42 +30,6 @@ export default function ProfilePage() {
   const handleSignOut = async () => {
     await signOut();
     router.replace("/login");
-  };
-
-  const startVerification = () => setVerificationStep("phone");
-
-  const submitPhone = async () => {
-    if (!phoneNumber) return;
-    setVerifying(true);
-    // In a real app, send OTP here. For now, simulate.
-    setTimeout(() => {
-      setVerificationStep("code");
-      setVerifying(false);
-    }, 1000);
-  };
-
-  const submitOtp = async () => {
-    if (otp !== "1234") { // Dummy OTP
-      alert("كود التحقق غير صحيح (استخدم 1234)");
-      return;
-    }
-    setVerifying(true);
-    try {
-      const { createClient } = await import("@/lib/supabase");
-      const supabase = createClient();
-      const { error } = await supabase
-        .from("profiles")
-        .update({ phone_number: phoneNumber, phone_verified: true })
-        .eq("id", user?.id);
-
-      if (error) throw error;
-      setVerificationStep("none");
-      refreshInfo();
-    } catch (err: any) {
-      alert("حدث خطأ أثناء التوثيق: " + err.message);
-    } finally {
-      setVerifying(false);
-    }
   };
 
   if (loading || !user) return <div className="min-h-screen bg-gradient-to-br from-slate-900 via-indigo-950 to-slate-900 flex items-center justify-center"><Loader2 className="w-10 h-10 text-indigo-400 animate-spin" /></div>;
@@ -97,7 +55,7 @@ export default function ProfilePage() {
             <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}
               className="bg-slate-800/40 border border-slate-700/50 rounded-[2.5rem] p-8 backdrop-blur-xl shadow-2xl relative overflow-hidden group">
               <div className="absolute top-0 right-0 w-32 h-32 bg-indigo-500/10 blur-3xl -mr-16 -mt-16 rounded-full group-hover:bg-indigo-500/20 transition-colors" />
-              
+
               <div className="flex items-center mb-8 relative z-10">
                 <div className="w-20 h-20 bg-gradient-to-br from-indigo-500/30 to-purple-500/30 rounded-3xl flex items-center justify-center ml-6 border border-indigo-500/20 shadow-inner">
                   <User className="w-10 h-10 text-indigo-300" />
@@ -108,71 +66,42 @@ export default function ProfilePage() {
                 </div>
               </div>
 
+              {/* Device Fingerprint Status */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4 relative z-10">
                 <div className="bg-slate-900/60 rounded-2xl p-5 border border-slate-700/50 hover:border-indigo-500/30 transition-colors">
-                  <div className="flex items-center text-slate-400 text-xs font-bold uppercase tracking-widest mb-3"><Phone className="w-4 h-4 ml-2 text-indigo-400" />رقم الهاتف</div>
-                  <div className="flex justify-between items-center">
-                    <p className="font-mono text-lg text-white" dir="ltr">{profile?.phone_number || "—"}</p>
-                    {!profile?.phone_verified && (
-                      <button onClick={startVerification} className="text-xs bg-indigo-500/20 text-indigo-300 px-3 py-1 rounded-full hover:bg-indigo-500/30 transition-all">تعديل</button>
-                    )}
+                  <div className="flex items-center text-slate-400 text-xs font-bold uppercase tracking-widest mb-3">
+                    <Fingerprint className="w-4 h-4 ml-2 text-indigo-400" />البصمة الرقمية
                   </div>
+                  <p className="font-mono text-sm text-slate-300 truncate dir-ltr">
+                    {profile?.device_fingerprint
+                      ? profile.device_fingerprint.slice(0, 20) + "..."
+                      : "—"}
+                  </p>
                 </div>
                 <div className="bg-slate-900/60 rounded-2xl p-5 border border-slate-700/50 hover:border-indigo-500/30 transition-colors">
-                  <div className="flex items-center text-slate-400 text-xs font-bold uppercase tracking-widest mb-3"><Shield className="w-4 h-4 ml-2 text-indigo-400" />حالة التوثيق</div>
+                  <div className="flex items-center text-slate-400 text-xs font-bold uppercase tracking-widest mb-3">
+                    <Shield className="w-4 h-4 ml-2 text-indigo-400" />حالة الحساب
+                  </div>
                   <div className="flex items-center">
-                    {profile?.phone_verified ? (
+                    {profile?.device_fingerprint ? (
                       <div className="flex items-center text-green-400 font-bold bg-green-400/10 px-4 py-1 rounded-full border border-green-400/20 shadow-[0_0_15px_rgba(74,222,128,0.1)]">
-                        <span className="ml-2">✓</span> موثق بالهاتف
+                        <span className="ml-2">✓</span> موثق بالبصمة
                       </div>
                     ) : (
-                      <button onClick={startVerification} className="flex items-center text-amber-400 font-bold bg-amber-400/10 px-4 py-1 rounded-full border border-amber-400/20 hover:bg-amber-400/20 transition-all">
-                        <span className="ml-2">⚠</span> غير موثق - وثق الآن
-                      </button>
+                      <div className="flex items-center text-amber-400 font-bold bg-amber-400/10 px-4 py-1 rounded-full border border-amber-400/20">
+                        <span className="ml-2">⚠</span> في انتظار البصمة
+                      </div>
                     )}
                   </div>
                 </div>
               </div>
-
-              {/* Verification Form */}
-              {verificationStep !== "none" && (
-                <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: "auto", opacity: 1 }} className="mt-8 pt-8 border-t border-slate-700/50">
-                  {verificationStep === "phone" ? (
-                    <div className="space-y-4">
-                      <label className="block text-sm text-slate-400 mb-2">أدخل رقم هاتفك للتوثيق:</label>
-                      <div className="flex gap-2">
-                        <input type="tel" value={phoneNumber} onChange={(e) => setPhoneNumber(e.target.value)}
-                          placeholder="059xxxxxxx" dir="ltr"
-                          className="flex-1 bg-slate-900 border border-slate-700 rounded-xl px-4 py-3 text-white focus:ring-2 focus:ring-indigo-500 outline-none" />
-                        <button onClick={submitPhone} disabled={verifying} className="bg-indigo-600 px-6 py-3 rounded-xl font-bold hover:bg-indigo-500 disabled:opacity-50 transition-all">
-                          {verifying ? <Loader2 className="w-5 h-5 animate-spin" /> : "إرسال كود"}
-                        </button>
-                      </div>
-                    </div>
-                  ) : (
-                    <div className="space-y-4 text-center">
-                      <label className="block text-sm text-slate-400 mb-2">أدخل الكود المرسل (1234):</label>
-                      <div className="flex flex-col gap-4 max-w-xs mx-auto">
-                        <input type="text" value={otp} onChange={(e) => setOtp(e.target.value)} maxLength={4}
-                          placeholder="× × × ×" className="bg-slate-900 border border-slate-700 rounded-xl px-4 py-4 text-center text-2xl font-black tracking-[1em] text-white focus:ring-2 focus:ring-indigo-500 outline-none" />
-                        <div className="flex gap-2">
-                          <button onClick={submitOtp} disabled={verifying} className="flex-1 bg-green-600 py-3 rounded-xl font-bold hover:bg-green-500 disabled:opacity-50 transition-all">
-                            {verifying ? <Loader2 className="w-5 h-5 animate-spin mx-auto" /> : "تأكيد التحقق"}
-                          </button>
-                          <button onClick={() => setVerificationStep("phone")} className="bg-slate-700 px-4 py-3 rounded-xl font-bold hover:bg-slate-600 transition-all text-xs">تغيير الرقم</button>
-                        </div>
-                      </div>
-                    </div>
-                  )}
-                </motion.div>
-              )}
             </motion.div>
 
             {/* Subscription Card */}
             <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }}
               className="bg-slate-800/40 border border-indigo-500/20 rounded-[2.5rem] p-8 backdrop-blur-xl relative overflow-hidden group">
               <div className="absolute -bottom-10 -left-10 w-40 h-40 bg-purple-500/10 blur-3xl rounded-full" />
-              
+
               <h3 className="text-xl font-bold flex items-center mb-8 text-indigo-300 relative z-10">
                 <div className="p-2 bg-indigo-500/20 rounded-lg ml-3"><Package className="w-5 h-5" /></div>
                 نظام الاشتراك والحصص
@@ -231,4 +160,3 @@ export default function ProfilePage() {
     </main>
   );
 }
-

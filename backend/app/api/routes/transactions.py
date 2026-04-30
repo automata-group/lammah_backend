@@ -28,6 +28,30 @@ async def create_checkout_transaction(
             raise HTTPException(status_code=404, detail={"user_message": "الباقة غير موجودة"})
             
         plan = plan_result.data[0]
+        
+        # Check if the user already has a pending transaction for this plan
+        existing_tx = supabase.table("transactions")\
+            .select("*")\
+            .eq("user_id", profile["id"])\
+            .eq("plan_id", plan_id)\
+            .eq("status", "pending")\
+            .execute()
+            
+        if existing_tx.data:
+            tx = existing_tx.data[0]
+            from datetime import datetime, timezone
+            # Bump the transaction to the top of the admin dashboard by updating created_at
+            supabase.table("transactions").update({
+                "created_at": datetime.now(timezone.utc).isoformat()
+            }).eq("id", tx["id"]).execute()
+            
+            return {
+                "order_id": tx["short_order_id"], 
+                "amount": plan["price_ils"],
+                "plan_name": plan["name"],
+                "payment_number": "0598298930" # Configured Reflect number
+            }
+            
         short_id = generate_short_id()
         
         new_tx = {
@@ -50,6 +74,21 @@ async def create_checkout_transaction(
     except Exception as e:
         logger.error(f"Failed to create transaction: {str(e)}")
         raise HTTPException(status_code=500, detail={"user_message": "فشل إنشاء الطلب. تأكد من تحديث قاعدة البيانات وإضافة جدول transactions."})
+
+@router.post("/update-name")
+async def update_user_name(payload: dict = Body(...), profile: dict = Depends(get_user_profile)):
+    """Updates the user's full name securely from the backend"""
+    full_name = payload.get("full_name")
+    if not full_name:
+        raise HTTPException(status_code=400, detail={"user_message": "يرجى توفير الاسم"})
+        
+    supabase = get_supabase()
+    try:
+        supabase.table("profiles").update({"full_name": full_name}).eq("id", profile["id"]).execute()
+        return {"status": "success"}
+    except Exception as e:
+        logger.error(f"Failed to update name: {str(e)}")
+        raise HTTPException(status_code=500, detail={"user_message": "فشل تحديث الاسم"})
 
 @router.get("/admin/pending")
 async def get_pending_transactions(profile: dict = Depends(verify_admin)):

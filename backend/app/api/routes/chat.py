@@ -56,18 +56,26 @@ async def chat_with_lecture(request: ChatRequest, user: dict = Depends(get_user_
         subscription = sub_check.data[0]
         plan_name = subscription["subscription_plans"]["name"]
         
-        # Determine Limits
-        limit = 15 # Default/Basic
-        if "متقدم" in plan_name:
-            limit = 40
-        elif "برو" in plan_name or "VIP" in plan_name:
-            limit = 100
+        # 1.1 Restriction for Basic Plans (User request)
+        if any(term in plan_name for term in ["أساسي", "اساسي", "Basic"]):
+            raise HTTPException(status_code=403, detail={
+                "user_message": "🔒 ميزة المحادثة مع المحاضر حصرية للباقات المتقدمة و VIP. يمكنك ترقية باقتك للاستمتاع بهذه الميزة!",
+                "type": "upgrade_required"
+            })
+        # User requested to keep basic monthly at 15 messages.
+        # Advanced/Pro/VIP plans get 100 messages.
+        limit = 15 # Default limit for Basic Monthly and Free Trial
+        
+        if sub_check.data:
+            # Check if it's a higher tier plan
+            if any(term in plan_name for term in ["متقدم", "برو", "VIP", "Advanced", "Pro"]):
+                limit = 100
             
         current_count = log_result.data.get("chat_count", 0)
         
         if current_count >= limit:
             raise HTTPException(status_code=403, detail={
-                "user_message": f"لقد وصلت للحد الأقصى للمحادثة في هذه المحاضرة ({limit} رسالة) حسب باقتك الحالية. يمكنك الترقية للحصول على حدود أعلى!",
+                "user_message": f"لقد وصلت للحد الأقصى للمحادثة في هذه المحاضرة ({limit} رسالة) حسب باقتك ({plan_name}). يمكنك الترقية للحصول على حدود أعلى!",
                 "type": "limit_reached",
                 "limit": limit
             })
@@ -93,10 +101,13 @@ async def chat_with_lecture(request: ChatRequest, user: dict = Depends(get_user_
         history_window = full_history[-window_size:] if len(full_history) > window_size else full_history
 
         # 4. System Prompt Optimization
+        # Increase context window for paid users in Chat
+        max_chars = 50000 if "متقدم" in plan_name or "VIP" in plan_name or "برو" in plan_name else 3000
+        
         system_instruction = (
             "أنت مساعد دراسي ذكي. أجب على أسئلة الطالب بناءً على نص المحاضرة المرفق فقط. "
             "قدم إجابات دقيقة، مباشرة، ومختصرة قدر الإمكان. لا تقم بتوليد شروحات طويلة أو إضافية إلا إذا طلب منك الطالب ذلك صراحة.\n\n"
-            f"--- نص المحاضرة ---\n{transcript[:2000]}\n\n" # Truncated for token safety
+            f"--- نص المحاضرة ---\n{transcript[:max_chars]}\n\n"
             f"--- سياق الشرائح ذي الصلة ---\n{rag_text}\n"
         )
 

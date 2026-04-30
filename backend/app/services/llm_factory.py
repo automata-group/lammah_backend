@@ -36,7 +36,7 @@ def get_llm_for_user(user_id: Optional[str] = None, streaming: bool = False):
                 temperature=0.3,
                 streaming=streaming,
                 default_headers={
-                    "HTTP-Referer": "https://lammah.com", # Required by OpenRouter
+                    "HTTP-Referer": "https://lammah.site", # Required by OpenRouter
                     "X-Title": "Lammah Platform"
                 }
             )
@@ -53,7 +53,7 @@ def get_llm_for_user(user_id: Optional[str] = None, streaming: bool = False):
             temperature=0.2,
             streaming=streaming,
             default_headers={
-                "HTTP-Referer": "https://lammah.com",
+                "HTTP-Referer": "https://lammah.site",
                 "X-Title": "Lammah Platform"
             }
         )
