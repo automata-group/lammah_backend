@@ -2,6 +2,19 @@
     email omar@lammah.site
 }
 
+# إعدادات التشغيل المحلي (على اللابتوب)
+localhost {
+    # توجيه طلبات الـ API إلى الباك-إند
+    handle /api/* {
+        reverse_proxy backend:8000
+    }
+    # توجيه باقي الطلبات إلى الفرونت-إند
+    handle {
+        reverse_proxy frontend:3000
+    }
+}
+
+# إعدادات الدومين (للسيرفر)
 lammah.site, www.lammah.site {
     reverse_proxy frontend:3000
 }

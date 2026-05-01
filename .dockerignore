@@ -1,0 +1,11 @@
+node_modules
+.next
+.git
+legacy_backup
+*.log
+.venv
+chroma_data
+uploads
+outputs
+brain
+scratch

@@ -1,0 +1,10 @@
+.venv
+__pycache__
+*.pyc
+.git
+.env
+chroma_data
+uploads
+outputs
+brain
+scratch
