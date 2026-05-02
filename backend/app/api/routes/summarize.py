@@ -127,10 +127,30 @@ async def process_lecture(
                 yield f"data: {json.dumps({'type': 'error', 'message': 'تم إلغاء المهمة.'}, ensure_ascii=False)}\n\n"
                 return
 
-            # --- Start Processing ---
             # 1. Transcribe
             yield f"data: {json.dumps({'type': 'progress', 'step': '1/5', 'time_estimate': 180, 'message': '🎧 1/5 جاري تفريغ الصوت آلياً... نعدك بدقة عالية!'}, ensure_ascii=False)}\n\n"
-            transcript = await asyncio.to_thread(transcribe_audio, audio_path)
+            
+            import queue
+            progress_q = queue.Queue()
+            def audio_progress_cb(msg):
+                progress_q.put(msg)
+                
+            transcription_task = asyncio.create_task(asyncio.to_thread(transcribe_audio, audio_path, audio_progress_cb))
+            
+            last_audio_msg = 'جاري تفريغ الصوت آلياً... نعدك بدقة عالية!'
+            while not transcription_task.done():
+                try:
+                    while True:
+                        last_audio_msg = progress_q.get_nowait()
+                        yield f"data: {json.dumps({'type': 'progress', 'step': '1/5', 'message': f'🎧 1/5 {last_audio_msg}'}, ensure_ascii=False)}\n\n"
+                except queue.Empty:
+                    pass
+                
+                # Ping every 3 seconds to keep connection alive for huge files (2.5+ hours)
+                yield f"data: {json.dumps({'type': 'progress', 'step': '1/5', 'message': f'🎧 1/5 {last_audio_msg}'}, ensure_ascii=False)}\n\n"
+                await asyncio.sleep(3)
+                
+            transcript = transcription_task.result()
             
             # 2. Document Handling
             pdf_context = []
@@ -149,7 +169,13 @@ async def process_lecture(
             
             # 3. AI Annotations
             yield f"data: {json.dumps({'type': 'progress', 'step': '4/5', 'time_estimate': 120, 'message': '🧠 4/5 لمّاح يعمل الآن! جاري استنتاج أهم النقاط والأسئلة المتوقعة...'}, ensure_ascii=False)}\n\n"
-            annotations = await asyncio.to_thread(generate_smart_annotations, transcript, pdf_context, profile["id"])
+            
+            anno_task = asyncio.create_task(asyncio.to_thread(generate_smart_annotations, transcript, pdf_context, profile["id"]))
+            while not anno_task.done():
+                yield f"data: {json.dumps({'type': 'progress', 'step': '4/5', 'message': '🧠 4/5 جاري صياغة الاستنتاجات الذكية... (عملية تحليل معمقة تأخذ بعض الوقت للنتائج الدقيقة)'}, ensure_ascii=False)}\n\n"
+                await asyncio.sleep(4)
+                
+            annotations = anno_task.result()
             
             # Apply Trial Limits
             if is_free_trial:

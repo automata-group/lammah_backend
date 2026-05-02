@@ -66,12 +66,12 @@ async def get_admin_stats(admin=Depends(verify_admin)):
                 "created_at": s.get("created_at")
             })
 
-        # 5. Recent Errors (Last 20 failed attempts)
+        # 5. Recent Errors (Last 100 failed attempts)
         errors_res = supabase.table("usage_logs") \
             .select("*, profiles(full_name, phone_number)") \
             .eq("status", "failed") \
             .order("created_at", desc=True) \
-            .limit(20) \
+            .limit(100) \
             .execute()
 
         return {

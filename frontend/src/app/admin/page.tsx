@@ -196,7 +196,7 @@ export default function AdminPage() {
               <div className="bg-red-900/20 rounded-2xl p-6 border border-red-500/30 shadow-lg relative overflow-hidden">
                 <h3 className="text-red-300 text-sm mb-2 font-medium">الأخطاء (طلاب واجهوا مشاكل)</h3>
                 <p className="text-3xl font-bold text-red-500">{stats.errors?.length || 0}</p>
-                <div className="mt-4 text-xs text-red-400/70">أخر 20 محاولة فاشلة في استخدام المنصة</div>
+                <div className="mt-4 text-xs text-red-400/70">أخر 100 محاولة فاشلة في استخدام المنصة</div>
                 <AlertCircle className="w-16 h-16 absolute -bottom-4 -left-4 text-red-500/10 pointer-events-none" />
               </div>
             </div>
