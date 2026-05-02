@@ -103,11 +103,12 @@ def _transcribe_large_audio(file_path: str, progress_callback=None) -> str:
             
         model_name = "openai/whisper-large-v3" if is_openrouter else "whisper-large-v3"
         
-        retries = 3
+        retries = 10
         success = False
         for attempt in range(retries):
             with open(chunk_path, "rb") as file:
                 try:
+                    logger.info(f"🎙️ لمّاح يحاول التفريغ (محاولة {attempt+1}/{retries})...")
                     transcription = client.audio.transcriptions.create(
                         file=(os.path.basename(chunk_path), file.read(), "audio/mpeg"),
                         model=model_name,
@@ -117,15 +118,23 @@ def _transcribe_large_audio(file_path: str, progress_callback=None) -> str:
                     success = True
                     break # Success
                 except Exception as e:
-                    logger.error(f"CHUNK {idx} FAILED (Attempt {attempt+1}): {str(e)}")
+                    err_msg = str(e)
+                    logger.error(f"❌ CHUNK {idx} FAILED (Attempt {attempt+1}): {err_msg}")
+                    
+                    # If we get a JSON parsing error (likely a 502/504 from OpenRouter), wait and retry
+                    if "No number after minus sign" in err_msg or "502" in err_msg or "504" in err_msg:
+                        import time
+                        time.sleep(5) # Wait longer between retries
+                        continue
+                    
                     if attempt < retries - 1:
                         import time
-                        time.sleep(3) # Wait before retry
+                        time.sleep(3)
                         continue
                     else:
-                        # Fallback to Groq if OpenRouter fails
+                        # Fallback to Groq if OpenRouter fails 10 times
                         if is_openrouter and settings.GROQ_API_KEY:
-                            logger.info("🚀 OpenRouter is under pressure. Switching to Lammah-Groq Fast Engine...")
+                            logger.info("🚀 محرك لمّاح الأساسي متوقف مؤقتاً... ننتقل للمحرك البديل الفائق...")
                             try:
                                 groq_client = Groq(api_key=settings.GROQ_API_KEY)
                                 file.seek(0)
@@ -135,19 +144,16 @@ def _transcribe_large_audio(file_path: str, progress_callback=None) -> str:
                                     timeout=300.0
                                 )
                                 full_transcript.append(transcription.text)
-                                # Switch permanently to Groq for the rest of the chunks to save time
                                 client = groq_client
                                 is_openrouter = False
                                 model_name = "whisper-large-v3"
                                 success = True
                                 break # Success with fallback
                             except Exception as fallback_e:
-                                logger.error(f"❌ Lammah-Groq fallback also failed: {str(fallback_e)}")
-                                raise RuntimeError("عذراً، لمّاح يواجه ضغطاً استثنائياً حالياً من جميع المزودين. يرجى المحاولة بعد دقائق.")
+                                logger.error(f"❌ Lammah-Groq fallback failed: {str(fallback_e)}")
+                                raise RuntimeError("⚠️ عذراً، محرك لمّاح يواجه ضغطاً استثنائياً حالياً. (REV-777)")
                         else:
-                            if "No number after minus sign" in str(e):
-                                raise RuntimeError("عذراً، محرك لمّاح يواجه ضغطاً شديداً حالياً. يرجى المحاولة مرة أخرى لاحقاً.")
-                            raise e
+                            raise RuntimeError(f"⚠️ عذراً، محرك لمّاح يواجه ضغطاً شديداً حالياً. (REV-777) الخطأ: {err_msg[:50]}")
         
         if not success:
             raise RuntimeError("فشل تفريغ أحد المقاطع بعد عدة محاولات.")
