@@ -56,6 +56,7 @@ async def get_admin_stats(admin=Depends(verify_admin)):
             quota = plan.get("lecture_quota", 0)
             
             detailed_subs.append({
+                "user_id": s.get("user_id"),
                 "user_name": profile.get("full_name") or profile.get("phone_number") or "مجهول",
                 "phone": profile.get("phone_number"),
                 "plan": plan.get("name"),
@@ -77,6 +78,7 @@ async def get_admin_stats(admin=Depends(verify_admin)):
         for p in (manual_res.data or []):
             if p["id"] not in subscriber_ids:
                 detailed_subs.append({
+                    "user_id": p.get("id"),
                     "user_name": p.get("full_name") or p.get("phone_number") or "مجهول (رصيد يدوي)",
                     "phone": p.get("phone_number"),
                     "plan": "⭐ رصيد يدوي / تجريبي",
@@ -106,3 +108,32 @@ async def get_admin_stats(admin=Depends(verify_admin)):
     except Exception as e:
         logger.error(f"❌ خطأ في جلب إحصائيات الأدمن: {str(e)}")
         raise HTTPException(status_code=500, detail="حدث خطأ أثناء جلب البيانات")
+
+@router.post("/users/{user_id}/cancel-plan")
+async def cancel_user_plan(user_id: str, admin=Depends(verify_admin)):
+    """Revoke a user's plan and reset them to free trial."""
+    try:
+        supabase = get_supabase()
+        
+        # 1. Cancel any active subscriptions
+        supabase.table("user_subscriptions") \
+            .update({"status": "cancelled"}) \
+            .eq("user_id", user_id) \
+            .eq("status", "active") \
+            .execute()
+            
+        # 2. Reset profile (Quota to 1, clear plan)
+        supabase.table("profiles") \
+            .update({
+                "quota_remaining": 1,
+                "current_plan_id": None
+            }) \
+            .eq("id", user_id) \
+            .execute()
+            
+        logger.info(f"✅ Admin {admin['id']} revoked plan for user {user_id}")
+        return {"status": "success", "message": "تم إلغاء الخطة بنجاح وإعادة المستخدم للتجربة المجانية."}
+        
+    except Exception as e:
+        logger.error(f"❌ Error revoking plan: {str(e)}")
+        raise HTTPException(status_code=500, detail="فشل إلغاء الخطة")

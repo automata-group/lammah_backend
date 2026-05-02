@@ -92,6 +92,27 @@ export default function AdminPage() {
     }
   };
 
+  const handleCancelPlan = async (userId: string, userName: string) => {
+    if (!confirm(`هل أنت متأكد من إلغاء خطة المستخدم (${userName})؟ سيتم تصفير حصته وإعادته للتجربة المجانية.`)) return;
+    setProcessing(userId);
+    try {
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8500"}/api/v1/admin/users/${userId}/cancel-plan`, {
+         method: "POST",
+         headers: { "Authorization": `Bearer ${session?.access_token}` }
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.detail || "فشل إلغاء الخطة");
+      
+      alert(data.message || "تم إلغاء الخطة بنجاح!");
+      // Refresh stats
+      fetchTransactions();
+    } catch (e: any) {
+      alert(`خطأ: ${e.message}`);
+    } finally {
+      setProcessing(null);
+    }
+  };
+
   if (loading || fetching) return <div className="min-h-screen bg-slate-900 flex items-center justify-center"><Loader2 className="w-10 h-10 text-indigo-400 animate-spin" /></div>;
 
   if (error) {
@@ -286,6 +307,7 @@ export default function AdminPage() {
                       <th className="p-4 font-semibold">الاستهلاك</th>
                       <th className="p-4 font-semibold text-center">المتبقي</th>
                       <th className="p-4 font-semibold text-center">بصمة الجهاز (Fingerprint)</th>
+                      <th className="p-4 font-semibold text-center">إدارة</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-700/50 text-sm">
@@ -315,6 +337,15 @@ export default function AdminPage() {
                            <div className="text-[10px] font-mono text-slate-500 truncate w-32 mx-auto bg-slate-900 p-1 rounded border border-slate-700" title={sub.fingerprint}>
                               {sub.fingerprint || '---'}
                            </div>
+                        </td>
+                        <td className="p-4 text-center">
+                          <button 
+                            onClick={() => handleCancelPlan(sub.user_id, sub.user_name)}
+                            disabled={processing === sub.user_id}
+                            className="text-red-500 hover:text-red-400 font-bold text-xs p-2 hover:bg-red-500/10 rounded-lg transition-colors border border-transparent hover:border-red-500/20"
+                          >
+                            {processing === sub.user_id ? <Loader2 className="w-3 h-3 animate-spin" /> : "إلغاء الخطة"}
+                          </button>
                         </td>
                       </tr>
                     ))}
