@@ -52,7 +52,7 @@ def transcribe_audio(file_path: str, progress_callback=None) -> str:
         transcription = client.audio.transcriptions.create(
             file=(os.path.basename(file_path), file.read()),
             model=model_name,
-            timeout=120.0 # OpenRouter might be slower than Groq
+            timeout=300.0 # Increased timeout for reliability
         )
     return transcription.text
 
@@ -73,12 +73,14 @@ def _transcribe_large_audio(file_path: str, progress_callback=None) -> str:
         subprocess.run([
             "ffmpeg", "-y", "-i", file_path,
             "-f", "segment", "-segment_time", "600",
-            "-c", "copy", f"{chunk_dir}/chunk_%03d{ext}"
+            "-c:a", "libmp3lame", "-b:a", "48k", "-ac", "1", # Re-encode to small mono MP3 for high reliability
+            f"{chunk_dir}/chunk_%03d.mp3"
         ], check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     except subprocess.CalledProcessError as e:
-        raise RuntimeError("فشل تقسيم الملف الصوتي. يرجى التأكد من تثبيت ffmpeg.")
+        logger.error(f"FFMPEG SPLIT FAILED: {e}")
+        raise RuntimeError("فشل تقسيم وتجهيز الملف الصوتي. يرجى التأكد من أن الملف غير تالف.")
         
-    chunks = sorted(glob.glob(f"{chunk_dir}/chunk_*{ext}"))
+    chunks = sorted(glob.glob(f"{chunk_dir}/chunk_*.mp3"))
     if not chunks:
         raise RuntimeError("لم يتم إنتاج أي مقاطع من عملية التقسيم.")
         
@@ -91,12 +93,19 @@ def _transcribe_large_audio(file_path: str, progress_callback=None) -> str:
         model_name = "openai/whisper-large-v3" if is_openrouter else "whisper-large-v3"
         
         with open(chunk_path, "rb") as file:
-            transcription = client.audio.transcriptions.create(
-                file=(os.path.basename(chunk_path), file.read()),
-                model=model_name,
-                timeout=120.0
-            )
-            full_transcript.append(transcription.text)
+            try:
+                transcription = client.audio.transcriptions.create(
+                    file=(os.path.basename(chunk_path), file.read()),
+                    model=model_name,
+                    timeout=300.0
+                )
+                full_transcript.append(transcription.text)
+            except Exception as e:
+                logger.error(f"CHUNK {idx} FAILED: {str(e)}")
+                # If one chunk fails, we try to continue or raise a clearer error
+                if "No number after minus sign" in str(e):
+                    raise RuntimeError("عذراً، محرك التفريغ يواجه ضغطاً حالياً. يرجى المحاولة مرة أخرى لاحقاً.")
+                raise e
             
         # Cleanup chunk
         os.remove(chunk_path)
