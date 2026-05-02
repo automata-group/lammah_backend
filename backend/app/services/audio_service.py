@@ -124,12 +124,15 @@ def _transcribe_large_audio(file_path: str, progress_callback=None) -> str:
                     err_msg = str(e)
                     logger.error(f"❌ CHUNK {idx} FAILED (Attempt {attempt+1}): {err_msg}")
                     
+                    # If we get a JSON parsing error (likely a 502/504 from OpenRouter), wait and retry
+                    if "No number after minus sign" in err_msg or "502" in err_msg or "504" in err_msg:
+                        import time
+                        time.sleep(5) # Wait longer between retries
+                        continue
+                    
                     if attempt < retries - 1:
                         import time
-                        if "No number after minus sign" in err_msg or "502" in err_msg or "504" in err_msg:
-                            time.sleep(5) # Wait longer between retries for server pressure
-                        else:
-                            time.sleep(3)
+                        time.sleep(3)
                         continue
                     else:
                         # Fallback to Groq if OpenRouter fails 10 times
