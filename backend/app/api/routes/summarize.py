@@ -137,17 +137,17 @@ async def process_lecture(
                 
             transcription_task = asyncio.create_task(asyncio.to_thread(transcribe_audio, audio_path, audio_progress_cb))
             
-            last_audio_msg = 'جاري تفريغ الصوت آلياً... نعدك بدقة عالية!'
+            last_audio_msg = 'لمّاح يستمع بتركيز... جاري تحويل الكلام لنص بدقة عالية!'
             while not transcription_task.done():
                 try:
                     while True:
                         last_audio_msg = progress_q.get_nowait()
-                        yield f"data: {json.dumps({'type': 'progress', 'step': '1/5', 'message': f'🎧 1/5 {last_audio_msg}'}, ensure_ascii=False)}\n\n"
+                        yield f"data: {json.dumps({'type': 'progress', 'step': '1/5', 'message': f'🎧 1/5 لمّاح يستمع... {last_audio_msg}'}, ensure_ascii=False)}\n\n"
                 except queue.Empty:
                     pass
                 
                 # Ping every 3 seconds to keep connection alive for huge files (2.5+ hours)
-                yield f"data: {json.dumps({'type': 'progress', 'step': '1/5', 'message': f'🎧 1/5 {last_audio_msg}'}, ensure_ascii=False)}\n\n"
+                yield f"data: {json.dumps({'type': 'progress', 'step': '1/5', 'message': f'🎧 1/5 لمّاح يعمل... {last_audio_msg}'}, ensure_ascii=False)}\n\n"
                 await asyncio.sleep(3)
                 
             transcript = transcription_task.result()
@@ -172,7 +172,7 @@ async def process_lecture(
             
             anno_task = asyncio.create_task(asyncio.to_thread(generate_smart_annotations, transcript, pdf_context, profile["id"]))
             while not anno_task.done():
-                yield f"data: {json.dumps({'type': 'progress', 'step': '4/5', 'message': '🧠 4/5 جاري صياغة الاستنتاجات الذكية... (عملية تحليل معمقة تأخذ بعض الوقت للنتائج الدقيقة)'}, ensure_ascii=False)}\n\n"
+                yield f"data: {json.dumps({'type': 'progress', 'step': '4/5', 'message': '🧠 4/5 لمّاح يفكّر الآن... جاري استنتاج أهم النقاط والأسئلة المتوقعة بكل ذكاء...'}, ensure_ascii=False)}\n\n"
                 await asyncio.sleep(4)
                 
             annotations = anno_task.result()

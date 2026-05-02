@@ -5,9 +5,7 @@ from app.core.config import settings
 
 import glob
 import subprocess
-import logging
-
-logger = logging.getLogger(__name__)
+from app.core.logger import logger
 
 # Initialize Transcription Client
 client = None
@@ -90,8 +88,8 @@ def _transcribe_large_audio(file_path: str, progress_callback=None) -> str:
             f"{chunk_dir}/chunk_%03d.mp3"
         ], check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     except subprocess.CalledProcessError as e:
-        logger.error(f"FFMPEG SPLIT FAILED: {e}")
-        raise RuntimeError("فشل تقسيم وتجهيز الملف الصوتي. يرجى التأكد من أن الملف غير تالف.")
+        logger.error(f"❌ FFMPEG SPLIT FAILED: {e}")
+        raise RuntimeError("فشل لمّاح في تجهيز الملف الصوتي. يرجى التأكد من أن الملف سليم وغير تالف.")
         
     chunks = sorted(glob.glob(f"{chunk_dir}/chunk_*.mp3"))
     if not chunks:
@@ -127,7 +125,7 @@ def _transcribe_large_audio(file_path: str, progress_callback=None) -> str:
                     else:
                         # Fallback to Groq if OpenRouter fails
                         if is_openrouter and settings.GROQ_API_KEY:
-                            logger.info("Falling back to Groq for transcription...")
+                            logger.info("🚀 OpenRouter is under pressure. Switching to Lammah-Groq Fast Engine...")
                             try:
                                 groq_client = Groq(api_key=settings.GROQ_API_KEY)
                                 file.seek(0)
@@ -144,11 +142,11 @@ def _transcribe_large_audio(file_path: str, progress_callback=None) -> str:
                                 success = True
                                 break # Success with fallback
                             except Exception as fallback_e:
-                                logger.error(f"Groq fallback also failed: {str(fallback_e)}")
-                                raise RuntimeError("عذراً، محركات التفريغ جميعها تواجه ضغطاً حالياً. يرجى المحاولة مرة أخرى لاحقاً.")
+                                logger.error(f"❌ Lammah-Groq fallback also failed: {str(fallback_e)}")
+                                raise RuntimeError("عذراً، لمّاح يواجه ضغطاً استثنائياً حالياً من جميع المزودين. يرجى المحاولة بعد دقائق.")
                         else:
                             if "No number after minus sign" in str(e):
-                                raise RuntimeError("عذراً، محرك التفريغ يواجه ضغطاً شديداً. يرجى الانتظار والمحاولة لاحقاً.")
+                                raise RuntimeError("عذراً، محرك لمّاح يواجه ضغطاً شديداً حالياً. يرجى المحاولة مرة أخرى لاحقاً.")
                             raise e
         
         if not success:
