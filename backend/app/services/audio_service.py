@@ -28,7 +28,6 @@ def transcribe_audio(file_path: str, progress_callback=None) -> str:
     Transcribes audio file using Groq's high-speed Whisper-large-v3 API.
     Handles extra-large files by chunking them gracefully via ffmpeg if > 25MB.
     """
-    global client, is_openrouter
     if not os.path.exists(file_path):
         raise FileNotFoundError(f"Audio file not found: {file_path}")
     
@@ -70,8 +69,12 @@ def transcribe_audio(file_path: str, progress_callback=None) -> str:
 
 def _transcribe_large_audio(file_path: str, progress_callback=None) -> str:
     """Splits large audio into 10-minute chunks and concatenates the transcriptions."""
-    global client, is_openrouter
     assert client is not None, "Groq client must be initialized"
+    
+    # Use local state to avoid global mutation issues (UnboundLocalError)
+    active_client = client
+    active_is_openrouter = is_openrouter
+    active_model = "openai/whisper-large-v3" if is_openrouter else "whisper-large-v3"
     
     chunk_dir = f"{file_path}_chunks"
     os.makedirs(chunk_dir, exist_ok=True)
@@ -103,17 +106,15 @@ def _transcribe_large_audio(file_path: str, progress_callback=None) -> str:
         if progress_callback:
             progress_callback(f"🎧 جاري تفريغ المقطع {idx+1} من {len(chunks)}...")
             
-        model_name = "openai/whisper-large-v3" if is_openrouter else "whisper-large-v3"
-        
         retries = 10
         success = False
         for attempt in range(retries):
             with open(chunk_path, "rb") as file:
                 try:
                     logger.info(f"🎙️ لمّاح يحاول التفريغ (محاولة {attempt+1}/{retries})...")
-                    transcription = client.audio.transcriptions.create(
+                    transcription = active_client.audio.transcriptions.create(
                         file=(os.path.basename(chunk_path), file.read(), "audio/mpeg"),
-                        model=model_name,
+                        model=active_model,
                         timeout=300.0
                     )
                     full_transcript.append(transcription.text)
@@ -135,7 +136,7 @@ def _transcribe_large_audio(file_path: str, progress_callback=None) -> str:
                         continue
                     else:
                         # Fallback to Groq if OpenRouter fails 10 times
-                        if is_openrouter and settings.GROQ_API_KEY:
+                        if active_is_openrouter and settings.GROQ_API_KEY:
                             logger.info("🚀 محرك لمّاح الأساسي متوقف مؤقتاً... ننتقل للمحرك البديل الفائق...")
                             try:
                                 groq_client = Groq(api_key=settings.GROQ_API_KEY)
@@ -146,9 +147,10 @@ def _transcribe_large_audio(file_path: str, progress_callback=None) -> str:
                                     timeout=300.0
                                 )
                                 full_transcript.append(transcription.text)
-                                client = groq_client
-                                is_openrouter = False
-                                model_name = "whisper-large-v3"
+                                # Update local state for remaining chunks
+                                active_client = groq_client
+                                active_is_openrouter = False
+                                active_model = "whisper-large-v3"
                                 success = True
                                 break # Success with fallback
                             except Exception as fallback_e:
@@ -156,6 +158,7 @@ def _transcribe_large_audio(file_path: str, progress_callback=None) -> str:
                                 raise RuntimeError("⚠️ عذراً، محرك لمّاح يواجه ضغطاً استثنائياً حالياً. (REV-777)")
                         else:
                             raise RuntimeError(f"⚠️ عذراً، محرك لمّاح يواجه ضغطاً شديداً حالياً. (REV-777) الخطأ: {err_msg[:50]}")
+
         
         if not success:
             raise RuntimeError("فشل تفريغ أحد المقاطع بعد عدة محاولات.")
