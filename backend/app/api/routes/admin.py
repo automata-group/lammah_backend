@@ -66,6 +66,27 @@ async def get_admin_stats(admin=Depends(verify_admin)):
                 "created_at": s.get("created_at")
             })
 
+        # 4b. Find users with manual quota (not covered by active subscriptions)
+        # We look for quota_remaining > 1 because 1 is the default free trial
+        subscriber_ids = [s.get("user_id") for s in subs_res.data if s.get("user_id")]
+        manual_res = supabase.table("profiles") \
+            .select("id, full_name, phone_number, device_fingerprint, quota_remaining, created_at") \
+            .gt("quota_remaining", 1) \
+            .execute()
+            
+        for p in (manual_res.data or []):
+            if p["id"] not in subscriber_ids:
+                detailed_subs.append({
+                    "user_name": p.get("full_name") or p.get("phone_number") or "مجهول (رصيد يدوي)",
+                    "phone": p.get("phone_number"),
+                    "plan": "⭐ رصيد يدوي / تجريبي",
+                    "used": 0,
+                    "remaining": p.get("quota_remaining", 0),
+                    "quota": p.get("quota_remaining", 0),
+                    "fingerprint": p.get("device_fingerprint"),
+                    "created_at": p.get("created_at")
+                })
+
         # 5. Recent Errors (Last 100 failed attempts)
         errors_res = supabase.table("usage_logs") \
             .select("*, profiles(full_name, phone_number)") \
