@@ -49,12 +49,25 @@ def transcribe_audio(file_path: str, progress_callback=None) -> str:
     model_name = "openai/whisper-large-v3" if is_openrouter else "whisper-large-v3"
     
     with open(file_path, "rb") as file:
-        transcription = client.audio.transcriptions.create(
-            file=(os.path.basename(file_path), file.read()),
-            model=model_name,
-            timeout=300.0 # Increased timeout for reliability
-        )
-    return transcription.text
+        try:
+            transcription = client.audio.transcriptions.create(
+                file=(os.path.basename(file_path), file.read(), "audio/mpeg"),
+                model=model_name,
+                timeout=300.0 # Increased timeout for reliability
+            )
+            return transcription.text
+        except Exception as e:
+            if is_openrouter and settings.GROQ_API_KEY:
+                logger.warning(f"OpenRouter failed, falling back to Groq: {e}")
+                groq_client = Groq(api_key=settings.GROQ_API_KEY)
+                file.seek(0)
+                transcription = groq_client.audio.transcriptions.create(
+                    file=(os.path.basename(file_path), file.read(), "audio/mpeg"),
+                    model="whisper-large-v3",
+                    timeout=300.0
+                )
+                return transcription.text
+            raise e
 
 def _transcribe_large_audio(file_path: str, progress_callback=None) -> str:
     """Splits large audio into 10-minute chunks and concatenates the transcriptions."""
@@ -92,20 +105,54 @@ def _transcribe_large_audio(file_path: str, progress_callback=None) -> str:
             
         model_name = "openai/whisper-large-v3" if is_openrouter else "whisper-large-v3"
         
-        with open(chunk_path, "rb") as file:
-            try:
-                transcription = client.audio.transcriptions.create(
-                    file=(os.path.basename(chunk_path), file.read()),
-                    model=model_name,
-                    timeout=300.0
-                )
-                full_transcript.append(transcription.text)
-            except Exception as e:
-                logger.error(f"CHUNK {idx} FAILED: {str(e)}")
-                # If one chunk fails, we try to continue or raise a clearer error
-                if "No number after minus sign" in str(e):
-                    raise RuntimeError("عذراً، محرك التفريغ يواجه ضغطاً حالياً. يرجى المحاولة مرة أخرى لاحقاً.")
-                raise e
+        retries = 3
+        success = False
+        for attempt in range(retries):
+            with open(chunk_path, "rb") as file:
+                try:
+                    transcription = client.audio.transcriptions.create(
+                        file=(os.path.basename(chunk_path), file.read(), "audio/mpeg"),
+                        model=model_name,
+                        timeout=300.0
+                    )
+                    full_transcript.append(transcription.text)
+                    success = True
+                    break # Success
+                except Exception as e:
+                    logger.error(f"CHUNK {idx} FAILED (Attempt {attempt+1}): {str(e)}")
+                    if attempt < retries - 1:
+                        import time
+                        time.sleep(3) # Wait before retry
+                        continue
+                    else:
+                        # Fallback to Groq if OpenRouter fails
+                        if is_openrouter and settings.GROQ_API_KEY:
+                            logger.info("Falling back to Groq for transcription...")
+                            try:
+                                groq_client = Groq(api_key=settings.GROQ_API_KEY)
+                                file.seek(0)
+                                transcription = groq_client.audio.transcriptions.create(
+                                    file=(os.path.basename(chunk_path), file.read(), "audio/mpeg"),
+                                    model="whisper-large-v3",
+                                    timeout=300.0
+                                )
+                                full_transcript.append(transcription.text)
+                                # Switch permanently to Groq for the rest of the chunks to save time
+                                client = groq_client
+                                is_openrouter = False
+                                model_name = "whisper-large-v3"
+                                success = True
+                                break # Success with fallback
+                            except Exception as fallback_e:
+                                logger.error(f"Groq fallback also failed: {str(fallback_e)}")
+                                raise RuntimeError("عذراً، محركات التفريغ جميعها تواجه ضغطاً حالياً. يرجى المحاولة مرة أخرى لاحقاً.")
+                        else:
+                            if "No number after minus sign" in str(e):
+                                raise RuntimeError("عذراً، محرك التفريغ يواجه ضغطاً شديداً. يرجى الانتظار والمحاولة لاحقاً.")
+                            raise e
+        
+        if not success:
+            raise RuntimeError("فشل تفريغ أحد المقاطع بعد عدة محاولات.")
             
         # Cleanup chunk
         os.remove(chunk_path)
