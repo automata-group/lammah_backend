@@ -125,17 +125,19 @@ def _transcribe_large_audio(file_path: str, progress_callback=None) -> str:
                     logger.error(f"❌ CHUNK {idx} FAILED (Attempt {attempt+1}): {err_msg}")
                     
                     # If we get a JSON parsing error (likely a 502/504 from OpenRouter), wait and retry
-                    if "No number after minus sign" in err_msg or "502" in err_msg or "504" in err_msg:
+                    is_server_error = "No number after minus sign" in err_msg or "502" in err_msg or "504" in err_msg
+                    
+                    if is_server_error and attempt < retries - 1:
                         import time
                         time.sleep(5) # Wait longer between retries
                         continue
                     
-                    if attempt < retries - 1:
+                    if attempt < retries - 1 and not is_server_error:
                         import time
                         time.sleep(3)
                         continue
                     else:
-                        # Fallback to Groq if OpenRouter fails 10 times
+                        # Fallback to Groq if OpenRouter fails (including after 10 attempts of 502/504)
                         if active_is_openrouter and settings.GROQ_API_KEY:
                             logger.info("🚀 محرك لمّاح الأساسي متوقف مؤقتاً... ننتقل للمحرك البديل الفائق...")
                             try:
@@ -152,16 +154,16 @@ def _transcribe_large_audio(file_path: str, progress_callback=None) -> str:
                                 active_is_openrouter = False
                                 active_model = "whisper-large-v3"
                                 success = True
-                                break # Success with fallback
+                                break 
                             except Exception as fallback_e:
                                 logger.error(f"❌ Lammah-Groq fallback failed: {str(fallback_e)}")
-                                raise RuntimeError("⚠️ عذراً، محرك لمّاح يواجه ضغطاً استثنائياً حالياً. (REV-777)")
+                                raise RuntimeError(f"⚠️ عذراً، محرك لمّاح يواجه ضغطاً استثنائياً حالياً. (REV-777) تفاصيل: {str(fallback_e)[:50]}")
                         else:
                             raise RuntimeError(f"⚠️ عذراً، محرك لمّاح يواجه ضغطاً شديداً حالياً. (REV-777) الخطأ: {err_msg[:50]}")
 
         
         if not success:
-            raise RuntimeError("فشل تفريغ أحد المقاطع بعد عدة محاولات.")
+            raise RuntimeError("فشل تفريغ أحد المقاطع بعد عدة محاولات مكثفة. يرجى المحاولة لاحقاً.")
             
         # Cleanup chunk
         os.remove(chunk_path)
