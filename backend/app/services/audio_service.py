@@ -28,6 +28,7 @@ def transcribe_audio(file_path: str, progress_callback=None) -> str:
     Transcribes audio file using Groq's high-speed Whisper-large-v3 API.
     Handles extra-large files by chunking them gracefully via ffmpeg if > 25MB.
     """
+    global client, is_openrouter
     if not os.path.exists(file_path):
         raise FileNotFoundError(f"Audio file not found: {file_path}")
     
@@ -69,6 +70,7 @@ def transcribe_audio(file_path: str, progress_callback=None) -> str:
 
 def _transcribe_large_audio(file_path: str, progress_callback=None) -> str:
     """Splits large audio into 10-minute chunks and concatenates the transcriptions."""
+    global client, is_openrouter
     assert client is not None, "Groq client must be initialized"
     
     chunk_dir = f"{file_path}_chunks"
