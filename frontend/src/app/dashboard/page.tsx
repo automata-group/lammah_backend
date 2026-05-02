@@ -6,6 +6,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import { getFingerprint as getThumbmark } from '@thumbmarkjs/thumbmarkjs';
 import { Loader2, Upload, FileAudio, FileText, CheckCircle, AlertCircle, Sparkles, ChevronLeft, History, User, Package, Crown, Lock, ChevronRight, Menu, X, Info, Download, Share2, Printer, Copy, Check, MessageCircle, Home, LogOut, Clock, Target, BrainCircuit, BookOpen, Lightbulb, ListTodo, Quote, Eye, Send } from "lucide-react";
+import ResultSkeleton from "@/components/ResultSkeleton";
 
 function DashboardContent() {
   const { user, session, loading, signOut } = useAuth();
@@ -27,6 +28,14 @@ function DashboardContent() {
   const [planName, setPlanName] = useState<string>("مجاني");
   const [chatCount, setChatCount] = useState<number>(0);
   const [showLimitModal, setShowLimitModal] = useState(false);
+  
+  // Pre-upload States
+  const [audioUploadProgress, setAudioUploadProgress] = useState(0);
+  const [pdfUploadProgress, setPdfUploadProgress] = useState(0);
+  const [audioTempId, setAudioTempId] = useState<string | null>(null);
+  const [pdfTempId, setPdfTempId] = useState<string | null>(null);
+  const [isAudioUploading, setIsAudioUploading] = useState(false);
+  const [isPdfUploading, setIsPdfUploading] = useState(false);
 
   const isBasicPlan = planName.includes("طالب") || planName.includes("أساسي") || planName === "مجاني";
   
@@ -96,9 +105,55 @@ function DashboardContent() {
       const timer = setInterval(() => {
         setTimeLeft(prev => prev && prev > 0 ? prev - 1 : 0);
       }, 1000);
-      return () => clearInterval(timer);
     }
   }, [timeLeft]);
+
+  const uploadToTemp = (file: File, type: 'audio' | 'pdf') => {
+    const isAudio = type === 'audio';
+    if (isAudio) setIsAudioUploading(true);
+    else setIsPdfUploading(true);
+
+    const formData = new FormData();
+    formData.append('file', file);
+
+    const xhr = new XMLHttpRequest();
+    const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
+    
+    xhr.open('POST', `${apiUrl}/api/v1/summarize/upload-temp`, true);
+    
+    xhr.upload.onprogress = (event) => {
+      if (event.lengthComputable) {
+        const percent = Math.round((event.loaded / event.total) * 100);
+        if (isAudio) setAudioUploadProgress(percent);
+        else setPdfUploadProgress(percent);
+      }
+    };
+
+    xhr.onload = () => {
+      if (xhr.status === 200) {
+        const data = JSON.parse(xhr.responseText);
+        if (isAudio) {
+          setAudioTempId(data.temp_id);
+          setIsAudioUploading(false);
+        } else {
+          setPdfTempId(data.temp_id);
+          setIsPdfUploading(false);
+        }
+      } else {
+        setError(`فشل رفع الملف: ${xhr.statusText}`);
+        if (isAudio) setIsAudioUploading(false);
+        else setIsPdfUploading(false);
+      }
+    };
+
+    xhr.onerror = () => {
+      setError("حدث خطأ أثناء الاتصال بالسيرفر لرفع الملف.");
+      if (isAudio) setIsAudioUploading(false);
+      else setIsPdfUploading(false);
+    };
+
+    xhr.send(formData);
+  };
 
   useEffect(() => {
     if (!loading && !user) router.replace("/login");
@@ -194,8 +249,13 @@ function DashboardContent() {
     const endpoint = `${process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8500"}/api/v1/summarize/process-lecture`;
 
     const formData = new FormData();
-    formData.append("audio_file", audioFile);
-    if (pdfFile) formData.append("pdf_file", pdfFile);
+    formData.append("metadata", await getDeviceMetadata());
+    
+    if (audioTempId) formData.append("audio_temp_id", audioTempId);
+    else if (audioFile) formData.append("audio_file", audioFile);
+    
+    if (pdfTempId) formData.append("pdf_temp_id", pdfTempId);
+    else if (pdfFile) formData.append("pdf_file", pdfFile);
 
     try {
       const fp = await getFingerprint();
@@ -258,6 +318,9 @@ function DashboardContent() {
                   setQueuePosition(0); 
                   setProgressStep(`${p.message}`); 
                   if (p.time_estimate) setTimeLeft(p.time_estimate);
+                  break;
+                case "transcript":
+                  setResult((prev: any) => ({ ...prev, transcript: p.text }));
                   break;
                 case "metadata": 
                   metadata = p; 
@@ -379,7 +442,7 @@ function DashboardContent() {
 
   if (loading || !user) return <div className="min-h-screen bg-gradient-to-br from-slate-900 via-indigo-950 to-slate-900 flex items-center justify-center"><Loader2 className="w-10 h-10 text-indigo-400 animate-spin" /></div>;
 
-  const showResults = !!result;
+  const showResults = !!result || isStreaming || isProcessing;
 
   return (
     <main className="min-h-screen bg-gradient-to-br from-slate-900 via-indigo-950 to-slate-900 text-slate-100 flex flex-col" dir="rtl">
@@ -418,54 +481,34 @@ function DashboardContent() {
       </nav>
 
       <div className="flex-1 flex flex-col items-center p-8 overflow-x-hidden relative">
-        {/* Full Page Processing Overlay */}
+        {/* Parallel Loading Progress Indicator */}
         <AnimatePresence>
-          {(isProcessing || isStreaming) && (
-            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/90 backdrop-blur-xl p-4">
-              <div className="bg-slate-900 border border-indigo-500/30 rounded-[2.5rem] p-10 max-w-lg w-full shadow-[0_0_80px_rgba(99,102,241,0.2)] text-center relative overflow-hidden">
-                {/* Decorative background gradients */}
-                <div className="absolute top-0 left-0 w-full h-1/2 bg-gradient-to-b from-indigo-500/10 to-transparent pointer-events-none"></div>
-                
-                <div className="mx-auto w-24 h-24 mb-8 relative">
-                  <div className="absolute inset-0 border-4 border-slate-700/50 rounded-full"></div>
-                  <div className="absolute inset-0 border-4 border-indigo-500 rounded-full border-t-transparent animate-spin"></div>
-                  {queuePosition > 0 ? (
-                    <Clock className="w-10 h-10 text-indigo-400 absolute inset-0 m-auto animate-pulse" />
-                  ) : (
-                    <Loader2 className="w-10 h-10 text-indigo-400 absolute inset-0 m-auto animate-[spin_2s_linear_infinite]" />
-                  )}
+          {(isStreaming || isProcessing) && !result?.annotations && (
+            <motion.div 
+              initial={{ opacity: 0, y: -50 }} 
+              animate={{ opacity: 1, y: 0 }} 
+              exit={{ opacity: 0, y: -50 }} 
+              className="fixed top-24 left-1/2 -translate-x-1/2 z-40 w-full max-w-md px-4"
+            >
+              <div className="bg-slate-900/90 backdrop-blur-xl border border-indigo-500/30 rounded-2xl p-4 shadow-2xl flex items-center gap-4">
+                <div className="w-10 h-10 bg-indigo-500/20 rounded-xl flex items-center justify-center border border-indigo-500/30">
+                  <Loader2 className="w-5 h-5 text-indigo-400 animate-spin" />
                 </div>
-                
-                <h3 className="text-3xl font-extrabold text-transparent bg-clip-text bg-gradient-to-l from-indigo-300 to-purple-400 mb-4">
-                  {queuePosition > 0 ? "أنت في قائمة الانتظار" : "لمّاح يعمل ✨"}
-                </h3>
-                
-                <p className="text-lg text-slate-300 leading-relaxed font-medium mb-4">
-                  {queuePosition > 0 
-                    ? `دورك في الطابور: ${queuePosition}` 
-                    : (progressStep || "جاري الاتصال والتحضير...")}
-                </p>
-                
-                {timeLeft !== null && progressStep && queuePosition === 0 && (
-                  <div className="flex justify-center items-center gap-2 mb-8 bg-indigo-500/10 py-2 px-6 rounded-full w-max mx-auto border border-indigo-500/20">
-                    <Clock className="w-4 h-4 text-indigo-400 animate-pulse" />
-                    <span className="text-sm font-bold text-indigo-300">
-                      الوقت المتبقي تقريباً: {Math.floor(timeLeft / 60)}:{(timeLeft % 60).toString().padStart(2, '0')}
+                <div className="flex-1">
+                  <h4 className="text-sm font-bold text-indigo-300 mb-1">
+                    {queuePosition > 0 ? "أنت في قائمة الانتظار" : "لمّاح يعمل على محاضرتك ✨"}
+                  </h4>
+                  <p className="text-xs text-slate-400 font-medium truncate">
+                    {queuePosition > 0 ? `دورك: ${queuePosition}` : progressStep}
+                  </p>
+                </div>
+                {timeLeft !== null && queuePosition === 0 && (
+                  <div className="bg-indigo-500/10 px-3 py-1 rounded-lg border border-indigo-500/20">
+                    <span className="text-[10px] font-bold text-indigo-300">
+                      ~ {Math.floor(timeLeft / 60)}:{(timeLeft % 60).toString().padStart(2, '0')}
                     </span>
                   </div>
                 )}
-                {!timeLeft && progressStep && queuePosition === 0 && (
-                  <div className="mb-8 h-8"></div>
-                )}
-                
-                {/* Progress Bar Container */}
-                <div className="w-full bg-slate-950 rounded-full h-3 border border-slate-800 overflow-hidden p-0.5">
-                  <motion.div className="bg-gradient-to-r from-indigo-500 to-purple-500 h-full rounded-full relative overflow-hidden"
-                    animate={{ width: queuePosition > 0 ? "5%" : progressStep.includes("5/5") ? "95%" : progressStep.includes("4/5") ? "75%" : progressStep.includes("3/5") ? "55%" : progressStep.includes("2/5") ? "35%" : progressStep.includes("1/5") ? "15%" : "5%" }}
-                    transition={{ duration: 0.8, ease: "easeOut" }} 
-                  >
-                  </motion.div>
-                </div>
               </div>
             </motion.div>
           )}
@@ -487,8 +530,36 @@ function DashboardContent() {
             className="w-full max-w-3xl bg-slate-800/40 border border-slate-700/50 rounded-3xl p-8 shadow-2xl relative overflow-hidden backdrop-blur-xl">
             <div className="grid md:grid-cols-2 gap-6 mb-8">
               <div className={`relative group border-2 border-dashed rounded-3xl p-8 flex flex-col items-center justify-center transition-all ${audioFile ? 'border-indigo-500 bg-indigo-500/10' : 'border-slate-600 hover:border-indigo-400 cursor-pointer'}`}>
-                <input type="file" accept="audio/*" onChange={(e) => setAudioFile(e.target.files?.[0] || null)} className="absolute inset-0 opacity-0 cursor-pointer z-10" />
-                {audioFile ? (<><CheckCircle className="w-14 h-14 text-indigo-400 mb-4" /><p className="font-semibold text-indigo-200 truncate w-full text-center">{audioFile.name}</p></>) : (<><FileAudio className="w-10 h-10 text-indigo-400 mb-3" /><p className="text-slate-300 font-medium">تسجيل المحاضرة</p><p className="text-xs text-slate-500">MP3, WAV, M4A</p></>)}
+                <input type="file" accept="audio/*" onChange={(e) => {
+                  const file = e.target.files?.[0] || null;
+                  setAudioFile(file);
+                  if (file) {
+                    setAudioUploadProgress(0);
+                    setAudioTempId(null);
+                    uploadToTemp(file, 'audio');
+                  }
+                }} className="absolute inset-0 opacity-0 cursor-pointer z-10" />
+                {audioFile ? (
+                  <div className="text-center w-full">
+                    {isAudioUploading ? (
+                      <div className="relative w-16 h-16 mx-auto mb-4">
+                        <div className="absolute inset-0 border-4 border-slate-700/50 rounded-full"></div>
+                        <svg className="absolute inset-0 w-full h-full -rotate-90">
+                          <circle cx="32" cy="32" r="28" fill="transparent" stroke="currentColor" strokeWidth="4" 
+                            strokeDasharray={175.9} strokeDashoffset={175.9 - (175.9 * audioUploadProgress) / 100}
+                            className="text-indigo-500 transition-all duration-300" />
+                        </svg>
+                        <span className="absolute inset-0 flex items-center justify-center text-[10px] font-bold text-indigo-300">{audioUploadProgress}%</span>
+                      </div>
+                    ) : (
+                      <CheckCircle className="w-14 h-14 text-indigo-400 mb-4 mx-auto" />
+                    )}
+                    <p className="font-semibold text-indigo-200 truncate w-full">{audioFile.name}</p>
+                    {isAudioUploading && <p className="text-[10px] text-indigo-400 mt-1 animate-pulse">جاري الرفع المسبق...</p>}
+                  </div>
+                ) : (
+                  <><FileAudio className="w-10 h-10 text-indigo-400 mb-3" /><p className="text-slate-300 font-medium">تسجيل المحاضرة</p><p className="text-xs text-slate-500">MP3, WAV, M4A</p></>
+                )}
               </div>
               <div className={`relative group border-2 border-dashed rounded-3xl p-8 flex flex-col items-center justify-center transition-all ${pdfFile ? 'border-purple-500 bg-purple-500/10' : 'border-slate-600 hover:border-purple-400 cursor-pointer'}`}>
                 <input type="file" accept={isBasicPlan ? "application/pdf" : "application/pdf,application/vnd.openxmlformats-officedocument.presentationml.presentation,.pptx"} onChange={(e) => {
@@ -497,16 +568,39 @@ function DashboardContent() {
                      setError("رفع وتحويل ملفات الباوربوينت (PPTX) حصري للباقات المتقدمة و VIP 🎉 يرجى ترقية باقتك من صفحة الباقات.");
                      setPdfFile(null);
                      e.target.value = "";
-                  } else {
-                     setPdfFile(file || null);
+                  } else if (file) {
+                     setPdfFile(file);
+                     setPdfUploadProgress(0);
+                     setPdfTempId(null);
+                     uploadToTemp(file, 'pdf');
                   }
                 }} className="absolute inset-0 opacity-0 cursor-pointer z-10" />
-                {pdfFile ? (<><CheckCircle className="w-14 h-14 text-purple-400 mb-4" /><p className="font-semibold text-purple-200 truncate w-full text-center" dir="ltr">{pdfFile.name}</p></>) : (<><FileText className="w-10 h-10 text-purple-400 mb-3" /><p className="text-slate-300 font-medium">شرائح PDF { !isBasicPlan && <span>أو PPTX</span> } (اختياري)</p>
+                {pdfFile ? (
+                  <div className="text-center w-full">
+                    {isPdfUploading ? (
+                      <div className="relative w-16 h-16 mx-auto mb-4">
+                        <div className="absolute inset-0 border-4 border-slate-700/50 rounded-full"></div>
+                        <svg className="absolute inset-0 w-full h-full -rotate-90">
+                          <circle cx="32" cy="32" r="28" fill="transparent" stroke="currentColor" strokeWidth="4" 
+                            strokeDasharray={175.9} strokeDashoffset={175.9 - (175.9 * pdfUploadProgress) / 100}
+                            className="text-purple-500 transition-all duration-300" />
+                        </svg>
+                        <span className="absolute inset-0 flex items-center justify-center text-[10px] font-bold text-purple-300">{pdfUploadProgress}%</span>
+                      </div>
+                    ) : (
+                      <CheckCircle className="w-14 h-14 text-purple-400 mb-4 mx-auto" />
+                    )}
+                    <p className="font-semibold text-purple-200 truncate w-full" dir="ltr">{pdfFile.name}</p>
+                    {isPdfUploading && <p className="text-[10px] text-purple-400 mt-1 animate-pulse">جاري الرفع المسبق...</p>}
+                  </div>
+                ) : (
+                  <><FileText className="w-10 h-10 text-purple-400 mb-3" /><p className="text-slate-300 font-medium">شرائح PDF { !isBasicPlan && <span>أو PPTX</span> } (اختياري)</p>
                    {isBasicPlan ? (
                       <div className="flex items-center text-[11px] font-bold text-amber-400 mt-3 bg-amber-400/10 px-3 py-1.5 rounded-full border border-amber-500/20"><Lock className="w-3 h-3 ml-1.5" /> الـ PPTX المباشر متاح بالمتقدم</div>
                    ) : (
                       <p className="text-xs text-slate-500">لإنشاء ملزمة ملونة تفاعلية</p>
-                   )}</>)}
+                   )}</>
+                )}
               </div>
             </div>
             
@@ -540,9 +634,11 @@ function DashboardContent() {
               )}
             </AnimatePresence>
 
-            <button onClick={handleProcess} disabled={isProcessing || !audioFile}
+            <button onClick={handleProcess} disabled={isProcessing || !audioFile || isAudioUploading || isPdfUploading}
               className="w-full bg-gradient-to-r from-indigo-600 to-purple-600 text-white font-bold py-5 rounded-2xl shadow-xl hover:shadow-indigo-500/30 transition-all disabled:opacity-50">
-              {isProcessing ? <span className="flex items-center justify-center"><Loader2 className="w-6 h-6 ml-3 animate-spin" />جاري المعالجة...</span> : <span className="flex items-center justify-center"><Upload className="w-6 h-6 ml-3" />ابدأ التلخيص الذكي</span>}
+              {isProcessing ? <span className="flex items-center justify-center"><Loader2 className="w-6 h-6 ml-3 animate-spin" />جاري المعالجة...</span> : 
+               (isAudioUploading || isPdfUploading) ? <span className="flex items-center justify-center"><Loader2 className="w-6 h-6 ml-3 animate-spin" />جاري رفع الملفات...</span> :
+               <span className="flex items-center justify-center"><Upload className="w-6 h-6 ml-3" />ابدأ التلخيص الذكي</span>}
             </button>
           </motion.div>
         )}
@@ -550,7 +646,11 @@ function DashboardContent() {
         {/* Results */}
         <AnimatePresence>
           {showResults && (
-            <motion.div initial={{ opacity: 0, y: 50 }} animate={{ opacity: 1, y: 0 }} className="w-full max-w-6xl grid grid-cols-1 lg:grid-cols-3 gap-8 pb-20">
+            <motion.div initial={{ opacity: 0, y: 50 }} animate={{ opacity: 1, y: 0 }} className="w-full max-w-6xl">
+              {(isStreaming || isProcessing) && !result?.annotations ? (
+                <ResultSkeleton />
+              ) : (
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 pb-20">
               
               {/* Back to Home / New Summary Button */}
               <div className="lg:col-span-3 flex justify-start mb-2">
@@ -985,7 +1085,6 @@ function DashboardContent() {
                     </motion.div>
                   )}
                 </AnimatePresence>
-                
                 {result && (
                   <button onClick={() => { setResult(null); setProgressStep(""); }}
                     className="w-full py-4 bg-slate-800/50 hover:bg-slate-800 border-2 border-slate-600/50 rounded-2xl text-slate-300 font-semibold transition-all shadow-xl">
@@ -993,9 +1092,11 @@ function DashboardContent() {
                   </button>
                 )}
               </div>
-            </motion.div>
+            </div>
           )}
-        </AnimatePresence>
+        </motion.div>
+      )}
+    </AnimatePresence>
       </div>
 
       {/* Global Footer */}

@@ -19,11 +19,32 @@ import re
 
 router = APIRouter()
 
+@router.post("/upload-temp")
+async def upload_temp(file: UploadFile = File(...)):
+    """
+    Pre-upload endpoint to save files before the main processing starts.
+    Returns a unique ID that can be used later.
+    """
+    temp_dir = "uploads/temp"
+    os.makedirs(temp_dir, exist_ok=True)
+    
+    unique_id = str(uuid.uuid4())
+    ext = os.path.splitext(file.filename)[1]
+    temp_filename = f"{unique_id}{ext}"
+    temp_path = os.path.join(temp_dir, temp_filename)
+    
+    with open(temp_path, "wb") as buffer:
+        shutil.copyfileobj(file.file, buffer)
+    
+    return {"temp_id": temp_filename, "filename": file.filename}
+
 @router.post("/process-lecture", dependencies=[Depends(verify_phone_active)])
 async def process_lecture(
     request: Request,
-    audio_file: UploadFile = File(...),
+    audio_file: Optional[UploadFile] = File(None),
     pdf_file: Optional[UploadFile] = File(None),
+    audio_temp_id: Optional[str] = None,
+    pdf_temp_id: Optional[str] = None,
     profile=Depends(check_quota)
 ):
     """
@@ -41,23 +62,36 @@ async def process_lecture(
             await asyncio.sleep(0.1)
 
             # 1. Save Files
-            yield f"data: {json.dumps({'type': 'progress', 'step': '0/5', 'message': '📥 جاري استلام الملفات وحفظها بأمان...'}, ensure_ascii=False)}\n\n"
+            yield f"data: {json.dumps({'type': 'progress', 'step': '0/5', 'message': '📥 جاري استلام الملفات وتحضيرها...'}, ensure_ascii=False)}\n\n"
             upload_dir = "uploads"
+            temp_dir = "uploads/temp"
             os.makedirs(upload_dir, exist_ok=True)
             
-            audio_path = os.path.join(upload_dir, f"{unique_id}_{audio_file.filename}")
+            # Handle Audio (either direct upload or pre-uploaded temp id)
+            if audio_temp_id:
+                temp_path = os.path.join(temp_dir, audio_temp_id)
+                if not os.path.exists(temp_path):
+                    raise HTTPException(status_code=400, detail="Audio temp file not found")
+                audio_path = os.path.join(upload_dir, f"{unique_id}_{audio_temp_id}")
+                shutil.move(temp_path, audio_path)
+            elif audio_file:
+                audio_path = os.path.join(upload_dir, f"{unique_id}_{audio_file.filename}")
+                with open(audio_path, "wb") as buffer:
+                    shutil.copyfileobj(audio_file.file, buffer)
+            else:
+                raise HTTPException(status_code=400, detail="Missing audio file")
             
-            # Non-blocking file save
-            def save_sync(file_obj, path):
-                with open(path, "wb") as buffer:
-                    shutil.copyfileobj(file_obj.file, buffer)
-            
-            await asyncio.to_thread(save_sync, audio_file, audio_path)
-            
+            # Handle PDF
             pdf_path = None
-            if pdf_file:
+            if pdf_temp_id:
+                temp_path = os.path.join(temp_dir, pdf_temp_id)
+                if os.path.exists(temp_path):
+                    pdf_path = os.path.join(upload_dir, f"{unique_id}_{pdf_temp_id}")
+                    shutil.move(temp_path, pdf_path)
+            elif pdf_file:
                 pdf_path = os.path.join(upload_dir, f"{unique_id}_{pdf_file.filename}")
-                await asyncio.to_thread(save_sync, pdf_file, pdf_path)
+                with open(pdf_path, "wb") as buffer:
+                    shutil.copyfileobj(pdf_file.file, buffer)
                 yield f"data: {json.dumps({'type': 'progress', 'step': '0/5', 'message': '📑 تم حفظ البوربوينت/PDF بنجاح.'}, ensure_ascii=False)}\n\n"
 
             # 2. Quota Check & Trim
@@ -151,6 +185,7 @@ async def process_lecture(
                 await asyncio.sleep(3)
                 
             transcript = transcription_task.result()
+            yield f"data: {json.dumps({'type': 'transcript', 'text': transcript}, ensure_ascii=False)}\n\n"
             
             # 2. Document Handling
             pdf_context = []
