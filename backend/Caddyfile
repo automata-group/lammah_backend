@@ -1,7 +1,11 @@
 {
-    email your-email@example.com
+    servers {
+        protocols h1 h2
+    }
 }
 
 api.lammah.site {
-    reverse_proxy backend:8000
+    reverse_proxy backend:8000 {
+        flush_interval -1
+    }
 }

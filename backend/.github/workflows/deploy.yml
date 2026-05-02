@@ -44,6 +44,10 @@ jobs:
           username: ${{ secrets.SERVER_USER }}
           key: ${{ secrets.SSH_PRIVATE_SERVER }}
           script: |
+            # Aggressive cleanup to free space before deploy
+            docker system prune -a -f
+            docker image prune -af
+            
             mkdir -p ~/lammah_backend
             cd ~/lammah_backend
 
@@ -55,6 +59,8 @@ jobs:
                 restart: unless-stopped
                 ports:
                   - "8000:8000"
+                volumes:
+                  - ./outputs:/app/outputs
                 environment:
                   - SUPABASE_URL=$SUPABASE_URL
                   - SUPABASE_KEY=$SUPABASE_KEY
@@ -63,6 +69,7 @@ jobs:
                   - GEMINI_API_KEY=$GEMINI_API_KEY
                   - GROQ_API_KEY=$GROQ_API_KEY
                   - OPENROUTER_API_KEY=$OPENROUTER_API_KEY
+                  - WHISPER_API_KEY=$WHISPER_API_KEY
             COMPOSE_EOF
 
             # Write .env file for docker compose to pick up
@@ -74,6 +81,7 @@ jobs:
             GEMINI_API_KEY=${{ secrets.GEMINI_API_KEY }}
             GROQ_API_KEY=${{ secrets.GROQ_API_KEY }}
             OPENROUTER_API_KEY=${{ secrets.OPENROUTER_API_KEY }}
+            WHISPER_API_KEY=${{ secrets.WHISPER_API_KEY }}
             ENV_EOF
 
             echo ${{ secrets.GHCR_PAT }} | docker login ghcr.io -u ${{ github.actor }} --password-stdin

@@ -21,11 +21,11 @@ SUMMARY_SYSTEM_PROMPT = (
     '  "mcqs": [{{"question": "السؤال هنا؟", "options": ["خيار1", "خيار2", "خيار3", "خيار4"], "correct_answer": "خيار1", "explanation": "سبب الإجابة الصحيحة"}}],\n'
     '  "flashcards": [{{"front": "المصطلح بالانجليزي أو المفهوم", "back": "الشرح المبسط بالعربي"}}]\n'
     "}}\n"
-    "هام جداً: \n"
-    "- تأكد من أن المخرجات تمثل كائن JSON برمجي صالح 100% (Valid JSON).\n"
-    "- لا تقم بإرجاع مصفوفات فارغة [] أبداً! ابذل أقصى جهدك لاستخراج أكبر كمية ممكنة من التظليلات والملاحظات حتى لو بشكل تقريبي.\n"
-    "- يجب عمل Escape لأية علامات تنصيص (\") داخل النصوص باستخدام (\\\").\n"
-    "- هام: يجب أن تكون جميع الردود والشروحات باللغة العربية حصراً وبأسلوب أكاديمي مبسط."
+    "تنبيهات هامة جداً:\n"
+    "1. اللغة: يجب أن تكون جميع المخرجات (الملاحظات، الشروحات، الأسئلة) باللغة العربية الفصحى المبسطة فقط. ترجم أي محتوى إنجليزي للعربية فوراً.\n"
+    "2. التنسيق: تأكد من أن المخرجات تمثل كائن JSON برمجي صالح 100% (Valid JSON).\n"
+    "3. الهروب: يجب عمل Escape لأية علامات تنصيص (\") داخل النصوص باستخدام (\\\").\n"
+    "4. الكمية: لا تقم بإرجاع مصفوفات فارغة []، استخرج أكبر قدر ممكن من المعلومات الموثوقة."
 )
 
 def _truncate_text(text: str, max_chars: int) -> str:
@@ -102,35 +102,34 @@ def generate_smart_annotations(transcript: str, pdf_context: list[str], user_id:
         
         if start_idx != -1 and end_idx != -1:
             clean_json = content[start_idx:end_idx+1]
-            try:
+            
+            def repair_json(j_str: str) -> str:
                 import re
-                # Fix trailing commas common in LLM JSON output
-                clean_json = re.sub(r',\s*([\]}])', r'\1', clean_json)
-                
-                # Fix missing commas between objects in an array: } { -> }, {
-                clean_json = re.sub(r'}\s*{', '}, {', clean_json)
-                # Fix missing commas between arrays: ] [ -> ], [
-                clean_json = re.sub(r']\s*\[', '], [', clean_json)
-                
-                # Fix missing commas between properties (string followed by string key)
-                clean_json = re.sub(r'"\s*\n*\s*"', '", "', clean_json)
-                # Fix missing commas after arrays or objects before a new key
-                clean_json = re.sub(r']\s*\n*\s*"', '], "', clean_json)
-                clean_json = re.sub(r'}\s*\n*\s*"', '}, "', clean_json)
-                # Fix missing commas after booleans or numbers before a new key
-                clean_json = re.sub(r'(true|false|null|\d)\s*\n*\s*"', r'\1, "', clean_json)
-                
-                # strict=False allows literal newlines and control characters inside JSON strings
-                try:
-                    return json.loads(clean_json, strict=False)
-                except json.JSONDecodeError:
-                    # If it still fails, aggressively strip control characters
-                    clean_json = re.sub(r'[\x00-\x1F]+', ' ', clean_json)
-                    return json.loads(clean_json, strict=False)
+                # 1. Fix missing commas between properties: "value" "next_key" -> "value", "next_key"
+                j_str = re.sub(r'("\s*:\s*[^"]*")\s*("\s*)', r'\1, \2', j_str)
+                # 2. Fix missing commas between array items: } { -> }, {
+                j_str = re.sub(r'}\s*\n*\s*{', '}, {', j_str)
+                # 3. Fix missing commas between array items: ] [ -> ], [
+                j_str = re.sub(r']\s*\n*\s*\[', '], [', j_str)
+                # 4. Fix trailing commas: , } -> }
+                j_str = re.sub(r',\s*([\]}])', r'\1', j_str)
+                # 5. Fix common missing commas after values: "val" "key" -> "val", "key"
+                j_str = re.sub(r'([^\s,\[{])\s*\n*\s*"(?=[^"]*":)', r'\1, "', j_str)
+                return j_str
+
+            try:
+                # Try standard parsing first with strict=False
+                return json.loads(repair_json(clean_json), strict=False)
             except json.JSONDecodeError as e:
-                from app.core.logger import logger
-                logger.error(f"Final JSON parsing failed: {e}")
-                raise e
+                # Second attempt: even more aggressive cleanup
+                import re
+                aggressive_fix = repair_json(clean_json)
+                aggressive_fix = re.sub(r'[\x00-\x1F]+', ' ', aggressive_fix) # Remove control chars
+                try:
+                    return json.loads(aggressive_fix, strict=False)
+                except Exception:
+                    logger.error(f"Aggressive JSON fix failed: {e}")
+                    raise e
         else:
             from app.core.logger import logger
             logger.error("No JSON object found in Gemini response.")

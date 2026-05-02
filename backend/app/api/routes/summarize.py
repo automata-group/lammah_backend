@@ -87,30 +87,30 @@ async def process_lecture(
             # 3. Queue Job
             yield f"data: {json.dumps({'type': 'progress', 'step': '0/5', 'message': '🎟️ تم حجز مكان لك في طابور المعالجة...'}, ensure_ascii=False)}\n\n"
             
-            plan_name = ""
-            if profile.get("current_plan_id"):
+            # Get the plan name to determine priority in queue
+            plan_name = "مجاني"
+            if not is_free_trial and profile.get("current_plan_id"):
                 from app.services.subscription_service import get_plan_by_id
                 plan = get_plan_by_id(profile["current_plan_id"])
-                plan_name = plan.get("name", "") if plan else ""
-
+                plan_name = plan.get("name", "مجاني") if plan else "مجاني"
+            
             job = await queue_manager.enqueue(
                 user_id=profile["id"],
-                priority=JobPriority.HIGH if not is_free_trial else JobPriority.FREE_TRIAL,
+                plan_name=plan_name,
                 payload={
                     "audio_path": audio_path,
                     "pdf_path": pdf_path,
                     "unique_id": unique_id,
                     "is_audio_trimmed": is_audio_trimmed
-                },
-                plan_name=plan_name
+                }
             )
 
             # 4. Wait & Stream with dynamic queue messages
             queue_messages = [
-                "📋 أنت الآن في الطابور... نجهز لك محرك الذكاء الاصطناعي 🚀",
+                "📋 أنت الآن في الطابور... نجهز لك لمّاح 🚀",
                 "⚙️ جاري فحص جودة الملف الصوتي وتهيئته للمعالجة...",
                 "🛡️ يتم الآن تأمين مساحة معالجة خاصة لملفك...",
-                "⏳ ثوانٍ قليلة وسيبدأ المحرك بالعمل على محاضرتك...",
+                "⏳ ثوانٍ قليلة وسيبدأ لمّاح بالعمل على محاضرتك...",
                 "🌟 هل تعلم؟ المشتركون يحصلون على معالجة فورية بدون انتظار!"
             ]
             msg_idx = 0
@@ -129,7 +129,7 @@ async def process_lecture(
 
             # --- Start Processing ---
             # 1. Transcribe
-            yield f"data: {json.dumps({'type': 'progress', 'step': '1/5', 'time_estimate': 120, 'message': '🎧 1/5 جاري تفريغ الصوت آلياً... نعدك بدقة عالية!'}, ensure_ascii=False)}\n\n"
+            yield f"data: {json.dumps({'type': 'progress', 'step': '1/5', 'time_estimate': 180, 'message': '🎧 1/5 جاري تفريغ الصوت آلياً... نعدك بدقة عالية!'}, ensure_ascii=False)}\n\n"
             transcript = await asyncio.to_thread(transcribe_audio, audio_path)
             
             # 2. Document Handling
@@ -148,7 +148,7 @@ async def process_lecture(
                 pdf_context = [f"--- Page {p['page_number']} ---\n{p['text']}" for p in max_pages]
             
             # 3. AI Annotations
-            yield f"data: {json.dumps({'type': 'progress', 'step': '4/5', 'time_estimate': 60, 'message': '🧠 4/5 المحرك الذكي يعمل الآن! جاري استنتاج أهم النقاط والأسئلة المتوقعة...'}, ensure_ascii=False)}\n\n"
+            yield f"data: {json.dumps({'type': 'progress', 'step': '4/5', 'time_estimate': 120, 'message': '🧠 4/5 لمّاح يعمل الآن! جاري استنتاج أهم النقاط والأسئلة المتوقعة...'}, ensure_ascii=False)}\n\n"
             annotations = await asyncio.to_thread(generate_smart_annotations, transcript, pdf_context, profile["id"])
             
             # Apply Trial Limits

@@ -10,8 +10,8 @@ class Settings(BaseSettings):
         "https://lammah.site",
         "https://www.lammah.site",
         "https://api.lammah.site",
-        "https://lammah.com",
-        "https://www.lammah.com",
+        "https://lammah.site",
+        "https://www.lammah.site",
         "http://localhost:3000",
         "http://127.0.0.1:3000",
         "http://localhost:5173",
@@ -34,6 +34,7 @@ class Settings(BaseSettings):
     GEMINI_API_KEY: str | None = None
     OPENROUTER_API_KEY: str | None = None
     GROQ_API_KEY: str | None = None
+    WHISPER_API_KEY: str | None = None
 
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
 

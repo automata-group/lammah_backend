@@ -1,5 +1,6 @@
 import os
 from groq import Groq
+from openai import OpenAI
 from app.core.config import settings
 
 import glob
@@ -8,12 +9,26 @@ import logging
 
 logger = logging.getLogger(__name__)
 
-client = Groq(api_key=settings.GROQ_API_KEY) if settings.GROQ_API_KEY else None
+# Initialize Transcription Client
+client = None
+is_openrouter = False
 
-def transcribe_audio(file_path: str) -> str:
+if settings.WHISPER_API_KEY:
+    if settings.WHISPER_API_KEY.startswith("sk-or-"):
+        client = OpenAI(
+            api_key=settings.WHISPER_API_KEY,
+            base_url="https://openrouter.ai/api/v1"
+        )
+        is_openrouter = True
+    else:
+        client = Groq(api_key=settings.WHISPER_API_KEY)
+elif settings.GROQ_API_KEY:
+    client = Groq(api_key=settings.GROQ_API_KEY)
+
+def transcribe_audio(file_path: str, progress_callback=None) -> str:
     """
     Transcribes audio file using Groq's high-speed Whisper-large-v3 API.
-    Handles extra-large files by chunking them gracefully via ffmpeg if > 20MB.
+    Handles extra-large files by chunking them gracefully via ffmpeg if > 25MB.
     """
     if not os.path.exists(file_path):
         raise FileNotFoundError(f"Audio file not found: {file_path}")
@@ -22,19 +37,26 @@ def transcribe_audio(file_path: str) -> str:
         return "Groq API Key is missing. Cannot transcribe audio."
         
     file_size_mb = os.path.getsize(file_path) / (1024 * 1024)
+    if progress_callback:
+        progress_callback(f"📦 حجم الملف: {file_size_mb:.2f} ميجابايت")
     
-    if file_size_mb > 20.0:
-        logger.info(f"File size ({file_size_mb:.2f}MB) exceeds 20MB limit. Chunking audio...")
-        return _transcribe_large_audio(file_path)
+    if file_size_mb > 24.0: # Groq limit is 25MB
+        return _transcribe_large_audio(file_path, progress_callback)
+    
+    if progress_callback:
+        progress_callback("⚡ إرسال الملف لمحرك لمّاح الذكي...")
+    
+    model_name = "openai/whisper-large-v3" if is_openrouter else "whisper-large-v3"
     
     with open(file_path, "rb") as file:
         transcription = client.audio.transcriptions.create(
             file=(os.path.basename(file_path), file.read()),
-            model="whisper-large-v3",
+            model=model_name,
+            timeout=120.0 # OpenRouter might be slower than Groq
         )
     return transcription.text
 
-def _transcribe_large_audio(file_path: str) -> str:
+def _transcribe_large_audio(file_path: str, progress_callback=None) -> str:
     """Splits large audio into 10-minute chunks and concatenates the transcriptions."""
     assert client is not None, "Groq client must be initialized"
     
@@ -43,6 +65,9 @@ def _transcribe_large_audio(file_path: str) -> str:
     
     ext = os.path.splitext(file_path)[1]
     
+    if progress_callback:
+        progress_callback("✂️ الملف كبير، جاري تقسيمه لمقاطع (10 دقائق)...")
+        
     # Split into 10-minute segments using ffmpeg
     try:
         subprocess.run([
@@ -51,8 +76,7 @@ def _transcribe_large_audio(file_path: str) -> str:
             "-c", "copy", f"{chunk_dir}/chunk_%03d{ext}"
         ], check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     except subprocess.CalledProcessError as e:
-        logger.error(f"Failed to chunk audio with ffmpeg: {e}")
-        raise RuntimeError("فشل تقسيم الملف الصوتي. يرجى التأكد من تثبيت ffmpeg على الخادم، أو رفع ملفات أصغر من 20MB.")
+        raise RuntimeError("فشل تقسيم الملف الصوتي. يرجى التأكد من تثبيت ffmpeg.")
         
     chunks = sorted(glob.glob(f"{chunk_dir}/chunk_*{ext}"))
     if not chunks:
@@ -61,11 +85,16 @@ def _transcribe_large_audio(file_path: str) -> str:
     full_transcript = []
     
     for idx, chunk_path in enumerate(chunks):
-        logger.info(f"Transcribing chunk {idx+1}/{len(chunks)}...")
+        if progress_callback:
+            progress_callback(f"🎧 جاري تفريغ المقطع {idx+1} من {len(chunks)}...")
+            
+        model_name = "openai/whisper-large-v3" if is_openrouter else "whisper-large-v3"
+        
         with open(chunk_path, "rb") as file:
             transcription = client.audio.transcriptions.create(
                 file=(os.path.basename(chunk_path), file.read()),
-                model="whisper-large-v3",
+                model=model_name,
+                timeout=120.0
             )
             full_transcript.append(transcription.text)
             

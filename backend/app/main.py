@@ -5,7 +5,7 @@ from app.core.config import settings
 from app.api.routes import summarize
 from app.api.routes import subscription
 from app.api.routes import chat
-from app.api.routes import transactions
+from app.api.routes import transactions, admin
 from app.core.logger import logger
 import traceback
 
@@ -69,6 +69,7 @@ app.include_router(summarize.router, prefix="/api/v1/summarize", tags=["summariz
 app.include_router(subscription.router, prefix="/api/v1/subscription", tags=["subscription"])
 app.include_router(chat.router, prefix="/api/v1/chat", tags=["chat"])
 app.include_router(transactions.router, prefix="/api/v1/transactions", tags=["transactions"])
+app.include_router(admin.router, prefix="/api/v1/admin", tags=["admin"])
 
 # ====== Global Error Handler ======
 @app.exception_handler(Exception)

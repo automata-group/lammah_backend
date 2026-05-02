@@ -2,7 +2,7 @@
 import { useAuth } from "@/context/AuthContext";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
-import { Loader2, Check, AlertCircle, X, MessageCircle } from "lucide-react";
+import { Loader2, Check, AlertCircle, X, MessageCircle, Users, Zap, BarChart3, Activity, Package, ShieldAlert } from "lucide-react";
 
 export default function AdminPage() {
   const { user, session, loading } = useAuth();
@@ -13,6 +13,7 @@ export default function AdminPage() {
   const [error, setError] = useState("");
   const [processing, setProcessing] = useState<string | null>(null);
   const [stats, setStats] = useState<any>(null);
+  const [usageStats, setUsageStats] = useState<any>(null);
 
   useEffect(() => {
     if (!loading && !user) {
@@ -32,14 +33,17 @@ export default function AdminPage() {
       setTransactions(data);
 
       try {
-        const statsRes = await fetch(`${process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8500"}/api/v1/transactions/admin/stats`, {
+        const usageRes = await fetch(`${process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8500"}/api/v1/admin/stats`, {
            headers: { "Authorization": `Bearer ${session?.access_token}` }
         });
-        if (statsRes.ok) {
-          setStats(await statsRes.json());
+        const usageData = await usageRes.json();
+        if (usageRes.ok) {
+          setUsageStats(usageData);
+        } else {
+          setError(`خطأ في جلب الإحصائيات: ${usageData.detail || 'غير معروف'}`);
         }
       } catch (err) {
-        // ignore stats error
+        console.error("Failed to fetch usage stats:", err);
       }
     } catch (e: any) {
       setError(e.message);
@@ -236,6 +240,88 @@ export default function AdminPage() {
                 </div>
               </div>
             )}
+          </div>
+        )}
+        {/* New Usage & Security Monitoring Section */}
+        {usageStats && (
+          <div className="mt-16 space-y-8">
+            <h2 className="text-2xl font-bold text-indigo-300 mb-6 flex items-center">
+              <Check className="w-6 h-6 ml-2" />
+              مراقبة الاستخدام والأمان
+            </h2>
+
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              <div className="bg-slate-800/80 rounded-2xl p-6 border border-slate-700 shadow-xl">
+                <h3 className="text-slate-400 text-sm mb-2 font-medium">إجمالي المسجلين</h3>
+                <p className="text-3xl font-extrabold text-white">{usageStats.total_users}</p>
+                <div className="mt-4 text-xs text-slate-500">منذ انطلاق المنصة</div>
+              </div>
+              <div className="bg-slate-800/80 rounded-2xl p-6 border border-slate-700 shadow-xl">
+                <h3 className="text-slate-400 text-sm mb-2 font-medium">مستخدمي التجربة المجانية</h3>
+                <p className="text-3xl font-extrabold text-amber-400">{usageStats.free_users_count}</p>
+                <div className="mt-4 text-xs text-slate-500">حسابات لم تشترك بعد</div>
+              </div>
+              <div className="bg-indigo-900/20 rounded-2xl p-6 border border-indigo-500/30 shadow-xl">
+                <h3 className="text-indigo-300 text-sm mb-2 font-medium">إجمالي المحاضرات المعالجة</h3>
+                <p className="text-3xl font-extrabold text-indigo-400">{usageStats.total_lecture_usage}</p>
+                <div className="mt-4 text-xs text-indigo-400/60">تفريغ + تلخيص + أسئلة</div>
+              </div>
+            </div>
+
+            {/* Active Subscriptions Table */}
+            <div className="bg-slate-800 rounded-2xl border border-slate-700 shadow-2xl overflow-hidden mt-10">
+              <div className="p-6 border-b border-slate-700 bg-slate-900/50 flex justify-between items-center">
+                <h3 className="text-lg font-bold text-white flex items-center">
+                  <Package className="w-5 h-5 ml-2 text-indigo-400" />
+                  متابعة استهلاك المشتركين النشطين
+                </h3>
+                <span className="text-xs text-slate-500 font-mono">حماية البث والمشاركة</span>
+              </div>
+              <div className="overflow-x-auto">
+                <table className="w-full text-right border-collapse">
+                  <thead>
+                    <tr className="bg-slate-800/50 border-b border-slate-700 text-slate-300 text-sm">
+                      <th className="p-4 font-semibold">المشترك</th>
+                      <th className="p-4 font-semibold">الباقة</th>
+                      <th className="p-4 font-semibold">الاستهلاك</th>
+                      <th className="p-4 font-semibold text-center">المتبقي</th>
+                      <th className="p-4 font-semibold text-center">بصمة الجهاز (Fingerprint)</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-700/50 text-sm">
+                    {usageStats.active_subscriptions?.map((sub: any, idx: number) => (
+                      <tr key={idx} className="hover:bg-slate-700/30 transition-colors">
+                        <td className="p-4">
+                          <div className="font-bold text-white">{sub.user_name}</div>
+                          <div className="text-xs text-slate-500 font-mono">{sub.phone}</div>
+                        </td>
+                        <td className="p-4">
+                          <span className="bg-indigo-500/10 text-indigo-300 px-3 py-1 rounded-full text-xs font-bold border border-indigo-500/20">
+                            {sub.plan}
+                          </span>
+                        </td>
+                        <td className="p-4">
+                           <div className="flex flex-col gap-1">
+                              <div className="text-slate-300 font-medium">{sub.used} / {sub.quota}</div>
+                              <div className="w-24 h-1.5 bg-slate-950 rounded-full overflow-hidden">
+                                 <div className="bg-indigo-500 h-full" style={{ width: `${(sub.used / sub.quota) * 100}%` }}></div>
+                              </div>
+                           </div>
+                        </td>
+                        <td className="p-4 text-center font-bold text-green-400 text-lg">
+                           {sub.remaining}
+                        </td>
+                        <td className="p-4 text-center">
+                           <div className="text-[10px] font-mono text-slate-500 truncate w-32 mx-auto bg-slate-900 p-1 rounded border border-slate-700" title={sub.fingerprint}>
+                              {sub.fingerprint || '---'}
+                           </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
           </div>
         )}
       </div>

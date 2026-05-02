@@ -17,3 +17,6 @@ openai
 langchain-openai
 PyMuPDF
 numpy<2
+fpdf2
+arabic-reshaper
+python-bidi

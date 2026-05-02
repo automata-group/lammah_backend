@@ -5,7 +5,7 @@ import { useAuth } from "@/context/AuthContext";
 import { useRouter, useSearchParams } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import { getFingerprint as getThumbmark } from '@thumbmarkjs/thumbmarkjs';
-import { Upload, FileAudio, FileText, CheckCircle, Loader2, BookOpen, AlertCircle, Quote, Eye, Clock, User, Package, History, LogOut, Target, Lightbulb, BrainCircuit, ListTodo, ChevronLeft, Check, X, MessageCircle, Send, Lock, Crown } from "lucide-react";
+import { Loader2, Upload, FileAudio, FileText, CheckCircle, AlertCircle, Sparkles, ChevronLeft, History, User, Package, Crown, Lock, ChevronRight, Menu, X, Info, Download, Share2, Printer, Copy, Check, MessageCircle, Home, LogOut, Clock, Target, BrainCircuit, BookOpen, Lightbulb, ListTodo, Quote, Eye, Send } from "lucide-react";
 
 function DashboardContent() {
   const { user, session, loading, signOut } = useAuth();
@@ -188,7 +188,9 @@ function DashboardContent() {
     if (!session) { router.replace("/login"); return; }
     
     setIsProcessing(true); setError(null); setResult(null);
-    setIsStreaming(false); setQueuePosition(0); setProgressStep("");
+    setIsStreaming(false); setQueuePosition(0); setProgressStep("جاري المعالجة...");
+
+    const endpoint = `${process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8500"}/api/v1/summarize/process-lecture`;
 
     const formData = new FormData();
     formData.append("audio_file", audioFile);
@@ -197,7 +199,7 @@ function DashboardContent() {
     try {
       const fp = await getFingerprint();
       const meta = await getDeviceMetadata();
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8500"}/api/v1/summarize/process-lecture`, {
+      const response = await fetch(endpoint, {
         method: "POST", body: formData,
         headers: { 
           "Authorization": `Bearer ${session.access_token}`,
@@ -280,6 +282,37 @@ function DashboardContent() {
     } catch (err: any) { setError(err.message); setIsProcessing(false); setIsStreaming(false); }
   };
 
+  const handleDownloadTranscriptPDF = async () => {
+    if (!result?.transcript || !session) return;
+    
+    try {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8500"}/api/v1/transcript/export-pdf`, {
+        method: "POST",
+        headers: { 
+          "Authorization": `Bearer ${session.access_token}`,
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({ 
+          transcript: result.transcript,
+          title: "تفريغ محاضرة لمّاح"
+        })
+      });
+
+      if (!response.ok) throw new Error("فشل تصدير ملف PDF");
+
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `Lammah_Transcript_${new Date().getTime()}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+    } catch (err: any) {
+      setError(`❌ فشل تصدير PDF: ${err.message}`);
+    }
+  };
+
   const handleChatSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!chatInput.trim() || isChatLoading || !currentHistoryId || !session) return;
@@ -352,9 +385,20 @@ function DashboardContent() {
       {/* Top Nav */}
       <nav className="sticky top-0 z-50 bg-slate-900/80 backdrop-blur-xl border-b border-slate-800 px-6 py-3">
         <div className="max-w-6xl mx-auto flex items-center justify-between">
-          <div className="flex items-center">
-            <img src="/lammah-logo.png" alt="Lammah" className="w-8 h-8 ml-2 object-contain drop-shadow-md" />
-            <span className="font-bold text-lg bg-clip-text text-transparent bg-gradient-to-l from-indigo-300 to-purple-300">لمّاح</span>
+          <div className="flex items-center gap-4">
+            <div className="flex items-center cursor-pointer group" onClick={() => router.push("/")} title="العودة للصفحة الرئيسية">
+              <img src="/lammah-logo.png" alt="Lammah" className="w-8 h-8 ml-2 object-contain drop-shadow-md group-hover:scale-110 transition-transform" />
+              <span className="font-bold text-lg bg-clip-text text-transparent bg-gradient-to-l from-indigo-300 to-purple-300 group-hover:from-indigo-200 group-hover:to-purple-200 transition-all">لمّاح</span>
+            </div>
+            
+            {/* New Back to Home Button */}
+            <button 
+              onClick={() => router.push("/")} 
+              className="text-xs bg-slate-800 hover:bg-slate-700 text-slate-300 px-3 py-1.5 rounded-full border border-slate-700 transition-all flex items-center gap-1"
+            >
+              <Home className="w-3.5 h-3.5" />
+              الرئيسية
+            </button>
           </div>
           <div className="flex items-center gap-3">
             {quota !== null && (
@@ -392,7 +436,7 @@ function DashboardContent() {
                 </div>
                 
                 <h3 className="text-3xl font-extrabold text-transparent bg-clip-text bg-gradient-to-l from-indigo-300 to-purple-400 mb-4">
-                  {queuePosition > 0 ? "أنت في قائمة الانتظار" : "المحرك الذكي يعمل ✨"}
+                  {queuePosition > 0 ? "أنت في قائمة الانتظار" : "لمّاح يعمل ✨"}
                 </h3>
                 
                 <p className="text-lg text-slate-300 leading-relaxed font-medium mb-4">
@@ -464,6 +508,7 @@ function DashboardContent() {
                    )}</>)}
               </div>
             </div>
+            
 
             <AnimatePresence>
               {error && (
@@ -506,6 +551,24 @@ function DashboardContent() {
           {showResults && (
             <motion.div initial={{ opacity: 0, y: 50 }} animate={{ opacity: 1, y: 0 }} className="w-full max-w-6xl grid grid-cols-1 lg:grid-cols-3 gap-8 pb-20">
               
+              {/* Back to Home / New Summary Button */}
+              <div className="lg:col-span-3 flex justify-start mb-2">
+                <button 
+                  onClick={() => {
+                    setResult(null);
+                    setAudioFile(null);
+                    setPdfFile(null);
+                    setError(null);
+                    setCurrentHistoryId(null);
+                    router.push("/dashboard");
+                  }} 
+                  className="flex items-center gap-2 text-slate-400 hover:text-indigo-400 font-bold transition-all bg-slate-800/50 hover:bg-slate-800 px-5 py-2.5 rounded-2xl border border-slate-700 shadow-sm"
+                >
+                  <ChevronLeft className="w-5 h-5 rotate-180" />
+                  العودة للرئيسية (رفع جديد)
+                </button>
+              </div>
+
               {/* WARNING BANNER FOR TRIMMED AUDIO */}
               {result?.annotations?.is_audio_trimmed && planName === "مجاني" && (
                 <div className="lg:col-span-3 bg-amber-500/10 border border-amber-500/50 p-5 rounded-2xl flex items-center gap-4 shadow-lg">
@@ -547,10 +610,33 @@ function DashboardContent() {
                   </div>
                 )}
                 
-                {!result?.downloadUrl && result?.transcript && (
-                  <div className="bg-slate-800/60 p-8 rounded-3xl border border-slate-700 text-center text-slate-400">
-                     <AlertCircle className="w-12 h-12 mx-auto mb-4 text-slate-500" />
-                     <p>لم يتم إرفاق ملف PDF أو تعذر التعديل عليه. يمكنك مراجعة النص المفرغ فقط.</p>
+                {result?.transcript && (
+                  <div className="bg-slate-800/60 border border-slate-700 p-8 rounded-[2rem] shadow-2xl overflow-hidden relative group">
+                    <div className="flex flex-col md:flex-row md:items-center justify-between mb-8 gap-4">
+                      <div className="flex items-center">
+                        <div className="w-12 h-12 bg-indigo-500/20 rounded-2xl flex items-center justify-center ml-4 border border-indigo-400/30">
+                          <FileText className="w-6 h-6 text-indigo-400" />
+                        </div>
+                        <div>
+                          <h1 className="text-2xl font-black text-white mb-1">تفريغ لمّاح السريع</h1>
+                          <p className="text-sm text-slate-400">نص المحاضرة الكامل مفرغ بدقة عالية</p>
+                        </div>
+                      </div>
+                      
+                      <button 
+                        onClick={() => handleDownloadTranscriptPDF()}
+                        className="bg-indigo-600 hover:bg-indigo-500 text-white font-bold px-6 py-3 rounded-xl shadow-lg shadow-indigo-500/20 transition-all flex items-center justify-center active:scale-95"
+                      >
+                        <Download className="w-5 h-5 ml-2" /> تصدير PDF
+                      </button>
+                    </div>
+
+                    <div className="bg-slate-900/80 p-8 rounded-3xl border border-slate-700/50 shadow-inner relative overflow-hidden">
+                      <div className="absolute top-0 right-0 w-32 h-32 bg-indigo-500/5 blur-3xl rounded-full"></div>
+                      <pre className="text-slate-300 leading-relaxed whitespace-pre-wrap text-lg text-right font-['Inter',_sans-serif] selection:bg-indigo-500/30">
+                        {result.transcript}
+                      </pre>
+                    </div>
                   </div>
                 )}
               </div>

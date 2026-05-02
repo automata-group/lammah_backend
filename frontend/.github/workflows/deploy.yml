@@ -48,6 +48,9 @@ jobs:
           username: ${{ secrets.SERVER_USER }}
           key: ${{ secrets.SSH_PRIVATE_SERVER }}
           script: |
+            # Clean space
+            docker system prune -f
+            
             mkdir -p ~/lammah_frontend
             cd ~/lammah_frontend
             
