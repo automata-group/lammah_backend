@@ -3,15 +3,20 @@ import { useAuth } from "@/context/AuthContext";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
-import { Loader2, BookOpen, ShieldCheck } from "lucide-react";
+import { Loader2, BookOpen, ShieldCheck, Mail, Lock, UserPlus, LogIn } from "lucide-react";
 
 export default function LoginPage() {
-  const { user, loading, signInWithGoogle } = useAuth();
+  const { user, loading, signInWithGoogle, signInWithEmail, signUpWithEmail, isLocalDev } = useAuth();
   const router = useRouter();
   const [error, setError] = useState("");
   const [submitting, setSubmitting] = useState(false);
-
   const [rememberMe, setRememberMe] = useState(true);
+
+  // حالات النموذج المحلي
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [isSignUp, setIsSignUp] = useState(false);
+  const [localSuccess, setLocalSuccess] = useState("");
 
   useEffect(() => {
     if (!loading && user) router.replace("/dashboard");
@@ -25,6 +30,35 @@ export default function LoginPage() {
       setError(error.message || "فشل تسجيل الدخول عبر جوجل.");
       setSubmitting(false);
     }
+  };
+
+  const handleEmailLogin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setSubmitting(true);
+    setError("");
+    setLocalSuccess("");
+
+    if (!email || !password) {
+      setError("يرجى ملء جميع الحقول.");
+      setSubmitting(false);
+      return;
+    }
+
+    if (isSignUp) {
+      const { error } = await signUpWithEmail(email, password);
+      if (error) {
+        setError(error.message);
+      } else {
+        setLocalSuccess("✅ تم إنشاء الحساب! تحقق من بريدك الإلكتروني للتأكيد، أو سجّل دخول مباشرة.");
+        setIsSignUp(false);
+      }
+    } else {
+      const { error } = await signInWithEmail(email, password);
+      if (error) {
+        setError(error.message);
+      }
+    }
+    setSubmitting(false);
   };
 
   if (loading) return (
@@ -58,6 +92,11 @@ export default function LoginPage() {
             منصة لمّاح
           </h1>
           <p className="text-slate-400 text-base font-medium">مرحباً بك مجدداً في مستقبلك الدراسي</p>
+          {isLocalDev && (
+            <span className="inline-block mt-2 px-3 py-1 text-xs font-bold bg-amber-500/20 text-amber-300 border border-amber-500/30 rounded-full">
+              🛠️ وضع التطوير المحلي
+            </span>
+          )}
         </div>
 
         <div className="bg-slate-800/40 border border-slate-700/50 rounded-[2.5rem] p-10 backdrop-blur-2xl shadow-2xl relative overflow-hidden">
@@ -75,6 +114,67 @@ export default function LoginPage() {
               </motion.div>
             )}
 
+            {localSuccess && (
+              <motion.div initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} className="text-green-400 text-sm bg-green-500/10 border border-green-500/30 rounded-2xl p-4 text-center font-medium">
+                {localSuccess}
+              </motion.div>
+            )}
+
+            {/* ===== نموذج الإيميل/الباسوورد (محلي فقط) ===== */}
+            {isLocalDev && (
+              <form onSubmit={handleEmailLogin} className="space-y-4">
+                <div className="relative">
+                  <Mail className="absolute right-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-500" />
+                  <input
+                    type="email"
+                    placeholder="البريد الإلكتروني"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    className="w-full bg-slate-700/50 border border-slate-600/50 rounded-2xl py-4 pr-12 pl-4 text-slate-100 placeholder-slate-500 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition-all"
+                    dir="ltr"
+                  />
+                </div>
+                <div className="relative">
+                  <Lock className="absolute right-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-500" />
+                  <input
+                    type="password"
+                    placeholder="كلمة المرور"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    className="w-full bg-slate-700/50 border border-slate-600/50 rounded-2xl py-4 pr-12 pl-4 text-slate-100 placeholder-slate-500 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition-all"
+                    dir="ltr"
+                  />
+                </div>
+                <button 
+                  type="submit"
+                  disabled={submitting}
+                  className="w-full bg-indigo-600 hover:bg-indigo-500 text-white font-black py-4 rounded-2xl shadow-lg hover:shadow-indigo-500/25 transition-all disabled:opacity-50 flex items-center justify-center gap-3 active:scale-[0.98]"
+                >
+                  {submitting ? (
+                    <Loader2 className="w-5 h-5 animate-spin" />
+                  ) : isSignUp ? (
+                    <><UserPlus className="w-5 h-5" /> إنشاء حساب جديد</>
+                  ) : (
+                    <><LogIn className="w-5 h-5" /> تسجيل الدخول</>
+                  )}
+                </button>
+                <button 
+                  type="button"
+                  onClick={() => { setIsSignUp(!isSignUp); setError(""); setLocalSuccess(""); }}
+                  className="w-full text-sm text-indigo-400 hover:text-indigo-300 transition-colors font-bold py-2"
+                >
+                  {isSignUp ? "لديك حساب بالفعل؟ سجّل دخول" : "ليس لديك حساب؟ أنشئ واحداً"}
+                </button>
+
+                <div className="flex items-center gap-4 py-2">
+                  <div className="flex-1 h-px bg-slate-700/50"></div>
+                  <span className="text-xs text-slate-500 font-bold">أو</span>
+                  <div className="flex-1 h-px bg-slate-700/50"></div>
+                </div>
+              </form>
+            )}
+
+            {/* ===== زر جوجل (دائماً متاح) ===== */}
             <button 
               onClick={handleGoogleLogin} 
               disabled={submitting}

@@ -118,8 +118,12 @@ function DashboardContent() {
 
     const xhr = new XMLHttpRequest();
     const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
+    const uploaderUrl = process.env.NEXT_PUBLIC_UPLOADER_URL || apiUrl;
     
-    xhr.open('POST', `${apiUrl}/api/v1/summarize/upload-temp`, true);
+    xhr.open('POST', `${uploaderUrl}/api/v1/summarize/upload-temp`, true);
+    if (session?.access_token) {
+      xhr.setRequestHeader("Authorization", `Bearer ${session.access_token}`);
+    }
     
     xhr.upload.onprogress = (event) => {
       if (event.lengthComputable) {
@@ -239,7 +243,7 @@ function DashboardContent() {
     fetchQuota();
   }, [session]);
 
-  const handleProcess = async () => {
+  const handleProcess = async (forceRawFiles: boolean = false) => {
     if (!audioFile) { setError("يرجى إرفاق الملف الصوتي أولاً."); return; }
     if (!session) { router.replace("/login"); return; }
     
@@ -251,10 +255,10 @@ function DashboardContent() {
     const formData = new FormData();
     formData.append("metadata", await getDeviceMetadata());
     
-    if (audioTempId) formData.append("audio_temp_id", audioTempId);
+    if (!forceRawFiles && audioTempId) formData.append("audio_temp_id", audioTempId);
     else if (audioFile) formData.append("audio_file", audioFile);
     
-    if (pdfTempId) formData.append("pdf_temp_id", pdfTempId);
+    if (!forceRawFiles && pdfTempId) formData.append("pdf_temp_id", pdfTempId);
     else if (pdfFile) formData.append("pdf_file", pdfFile);
 
     try {
@@ -272,6 +276,13 @@ function DashboardContent() {
       if (!response.ok) {
         try {
           const errData = await response.json();
+          if (errData.detail === "temp_file_missing") {
+             console.warn("Temp file not found on server, retrying with raw file...");
+             setAudioTempId(null);
+             setPdfTempId(null);
+             handleProcess(true); // Retry with raw files
+             return;
+          }
           const userMsg = errData.detail?.user_message;
           if (userMsg) {
             if (errData.detail?.type === "no_quota" || errData.detail?.type === "quota_exceeded") {
@@ -634,7 +645,7 @@ function DashboardContent() {
               )}
             </AnimatePresence>
 
-            <button onClick={handleProcess} disabled={isProcessing || !audioFile || isAudioUploading || isPdfUploading}
+            <button onClick={() => handleProcess()} disabled={isProcessing || !audioFile || isAudioUploading || isPdfUploading}
               className="w-full bg-gradient-to-r from-indigo-600 to-purple-600 text-white font-bold py-5 rounded-2xl shadow-xl hover:shadow-indigo-500/30 transition-all disabled:opacity-50">
               {isProcessing ? <span className="flex items-center justify-center"><Loader2 className="w-6 h-6 ml-3 animate-spin" />جاري المعالجة...</span> : 
                (isAudioUploading || isPdfUploading) ? <span className="flex items-center justify-center"><Loader2 className="w-6 h-6 ml-3 animate-spin" />جاري رفع الملفات...</span> :
@@ -759,7 +770,7 @@ function DashboardContent() {
 
                     {/* Content Section */}
                     <div className="px-8 pb-8">
-                      <div className="bg-slate-900/60 p-8 md:p-10 rounded-[2rem] border border-slate-700/50 shadow-inner relative overflow-hidden min-h-[400px]">
+                      <div className="bg-slate-900/60 p-8 md:p-10 rounded-[2rem] border border-slate-700/50 shadow-inner relative overflow-hidden max-h-[700px] overflow-y-auto custom-scrollbar">
                         {/* Decorative elements */}
                         <div className="absolute top-0 right-0 w-64 h-64 bg-indigo-500/5 blur-[80px] rounded-full -mr-20 -mt-20"></div>
                         <div className="absolute bottom-0 left-0 w-64 h-64 bg-purple-500/5 blur-[80px] rounded-full -ml-20 -mb-20"></div>

@@ -4,11 +4,18 @@
 
 # إعدادات التشغيل المحلي (على اللابتوب)
 localhost {
-    # توجيه طلبات الـ API إلى الباك-إند
+    # 1. Route large uploads to Go service
+    handle /api/v1/summarize/upload-temp {
+        request_body_limit 200mb
+        reverse_proxy uploader:8080
+    }
+
+    # 2. Other API calls to Python backend
     handle /api/* {
         reverse_proxy backend:8000
     }
-    # توجيه باقي الطلبات إلى الفرونت-إند
+
+    # 3. Everything else to Frontend
     handle {
         reverse_proxy frontend:3000
     }
@@ -16,9 +23,19 @@ localhost {
 
 # إعدادات الدومين (للسيرفر)
 lammah.site, www.lammah.site {
+    request_body_limit 200mb
     reverse_proxy frontend:3000
 }
 
 api.lammah.site {
-    reverse_proxy backend:8000
+    # 1. Route large uploads to Go service
+    handle /api/v1/summarize/upload-temp {
+        request_body_limit 200mb
+        reverse_proxy uploader:8080
+    }
+
+    # 2. Other API calls to Python backend
+    handle /api/* {
+        reverse_proxy backend:8000
+    }
 }

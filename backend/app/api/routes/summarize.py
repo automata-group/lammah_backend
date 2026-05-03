@@ -1,4 +1,4 @@
-from fastapi import APIRouter, File, UploadFile, HTTPException, Depends, Request
+from fastapi import APIRouter, File, UploadFile, HTTPException, Depends, Request, Form, BackgroundTasks
 from fastapi.responses import StreamingResponse
 from typing import Optional
 from app.services.audio_service import transcribe_audio
@@ -6,7 +6,7 @@ from app.services.pdf_service import extract_pages_from_pdf
 from app.services.rag_service import process_and_store_document, query_relevant_context
 from app.services.summarizer_service import generate_smart_annotations
 from app.services.subscription_service import use_lecture_quota, log_usage_failure
-from app.core.auth_guard import check_quota, verify_phone_active, get_user_profile
+from app.core.auth_guard import check_quota, verify_phone_active, get_user_profile, verify_token
 from app.core.queue_manager import queue_manager, JobStatus, JobPriority
 from app.core.logger import logger
 import shutil
@@ -18,33 +18,16 @@ import asyncio
 import re
 
 router = APIRouter()
+ 
 
-@router.post("/upload-temp")
-async def upload_temp(file: UploadFile = File(...)):
-    """
-    Pre-upload endpoint to save files before the main processing starts.
-    Returns a unique ID that can be used later.
-    """
-    temp_dir = "uploads/temp"
-    os.makedirs(temp_dir, exist_ok=True)
-    
-    unique_id = str(uuid.uuid4())
-    ext = os.path.splitext(file.filename)[1]
-    temp_filename = f"{unique_id}{ext}"
-    temp_path = os.path.join(temp_dir, temp_filename)
-    
-    with open(temp_path, "wb") as buffer:
-        shutil.copyfileobj(file.file, buffer)
-    
-    return {"temp_id": temp_filename, "filename": file.filename}
 
 @router.post("/process-lecture", dependencies=[Depends(verify_phone_active)])
 async def process_lecture(
     request: Request,
     audio_file: Optional[UploadFile] = File(None),
     pdf_file: Optional[UploadFile] = File(None),
-    audio_temp_id: Optional[str] = None,
-    pdf_temp_id: Optional[str] = None,
+    audio_temp_id: Optional[str] = Form(None),
+    pdf_temp_id: Optional[str] = Form(None),
     profile=Depends(check_quota)
 ):
     """
@@ -52,6 +35,19 @@ async def process_lecture(
     Returns a StreamingResponse immediately to provide real-time background updates.
     """
     unique_id = str(uuid.uuid4())[:8]
+    upload_dir = os.getenv("UPLOAD_DIR", "uploads")
+    temp_dir = os.getenv("TEMP_DIR", "uploads/temp")
+    
+    # Pre-validate temp files before starting the stream
+    if audio_temp_id:
+        temp_path = os.path.join(temp_dir, audio_temp_id)
+        if not os.path.exists(temp_path):
+            raise HTTPException(status_code=400, detail="temp_file_missing")
+            
+    if pdf_temp_id:
+        temp_path = os.path.join(temp_dir, pdf_temp_id)
+        if not os.path.exists(temp_path):
+            raise HTTPException(status_code=400, detail="temp_file_missing")
 
     async def event_stream():
         try:
@@ -62,22 +58,20 @@ async def process_lecture(
             await asyncio.sleep(0.1)
 
             # 1. Save Files
-            yield f"data: {json.dumps({'type': 'progress', 'step': '0/5', 'message': '📥 جاري استلام الملفات وتحضيرها...'}, ensure_ascii=False)}\n\n"
-            upload_dir = "uploads"
-            temp_dir = "uploads/temp"
+            yield f"data: {json.dumps({'type': 'progress', 'step': '0/5', 'message': '📥 جاري تجهيز الملفات...'}, ensure_ascii=False)}\n\n"
             os.makedirs(upload_dir, exist_ok=True)
             
             # Handle Audio (either direct upload or pre-uploaded temp id)
             if audio_temp_id:
                 temp_path = os.path.join(temp_dir, audio_temp_id)
-                if not os.path.exists(temp_path):
-                    raise HTTPException(status_code=400, detail="Audio temp file not found")
                 audio_path = os.path.join(upload_dir, f"{unique_id}_{audio_temp_id}")
-                shutil.move(temp_path, audio_path)
+                await asyncio.to_thread(shutil.move, temp_path, audio_path)
             elif audio_file:
                 audio_path = os.path.join(upload_dir, f"{unique_id}_{audio_file.filename}")
-                with open(audio_path, "wb") as buffer:
-                    shutil.copyfileobj(audio_file.file, buffer)
+                def save_audio():
+                    with open(audio_path, "wb") as buffer:
+                        shutil.copyfileobj(audio_file.file, buffer)
+                await asyncio.to_thread(save_audio)
             else:
                 raise HTTPException(status_code=400, detail="Missing audio file")
             
@@ -85,13 +79,14 @@ async def process_lecture(
             pdf_path = None
             if pdf_temp_id:
                 temp_path = os.path.join(temp_dir, pdf_temp_id)
-                if os.path.exists(temp_path):
-                    pdf_path = os.path.join(upload_dir, f"{unique_id}_{pdf_temp_id}")
-                    shutil.move(temp_path, pdf_path)
+                pdf_path = os.path.join(upload_dir, f"{unique_id}_{pdf_temp_id}")
+                await asyncio.to_thread(shutil.move, temp_path, pdf_path)
             elif pdf_file:
                 pdf_path = os.path.join(upload_dir, f"{unique_id}_{pdf_file.filename}")
-                with open(pdf_path, "wb") as buffer:
-                    shutil.copyfileobj(pdf_file.file, buffer)
+                def save_pdf():
+                    with open(pdf_path, "wb") as buffer:
+                        shutil.copyfileobj(pdf_file.file, buffer)
+                await asyncio.to_thread(save_pdf)
                 yield f"data: {json.dumps({'type': 'progress', 'step': '0/5', 'message': '📑 تم حفظ البوربوينت/PDF بنجاح.'}, ensure_ascii=False)}\n\n"
 
             # 2. Quota Check & Trim

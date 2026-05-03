@@ -9,6 +9,7 @@ services:
       - ./backend/.env
     volumes:
       - ./backend:/app
+      - ./uploads:/app/uploads
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/api/v1/health"]
@@ -29,6 +30,24 @@ services:
     depends_on:
       backend:
         condition: service_healthy
+
+  uploader:
+    build:
+      context: ./uploader-go
+      dockerfile: Dockerfile
+    env_file:
+      - ./backend/.env
+    environment:
+      - TEMP_DIR=/app/uploads/temp
+      - UPLOADER_PORT=8080
+    volumes:
+      - ./uploads:/app/uploads
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
 
   caddy:
     image: caddy:latest
