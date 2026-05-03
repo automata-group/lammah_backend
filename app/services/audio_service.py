@@ -58,34 +58,55 @@ def transcribe_audio(file_path: str, progress_callback=None) -> str:
             if progress_callback:
                 progress_callback("⚡ إرسال الملف لمحرك لمّاح (OpenRouter)...")
             
-            with open(file_path, "rb") as f:
-                files = {"file": (os.path.basename(file_path), f, "audio/mpeg")}
-                response = requests.post(
-                    "https://openrouter.ai/api/v1/audio/transcriptions",
-                    headers={"Authorization": f"Bearer {settings.WHISPER_API_KEY.strip()}"},
-                    files=files,
-                    data={"model": model_name},
-                    timeout=300
-                )
+            headers = {
+                "Authorization": f"Bearer {settings.WHISPER_API_KEY.strip()}",
+                "HTTP-Referer": "https://lammah.site",
+                "X-Title": "Lammah AI"
+            }
             
-            if response.status_code == 200:
-                return response.json().get("text", "")
-            else:
-                logger.warning(f"OpenRouter direct failed ({response.status_code}): {response.text}")
-                # Fallback to Groq if direct request fails
-                if settings.GROQ_API_KEY:
-                    logger.info("🔄 Falling back to Groq...")
-                    groq_client = Groq(api_key=settings.GROQ_API_KEY.strip())
+            # Try primary model first, then fallback to turbo
+            models_to_try = ["openai/whisper-large-v3", "openai/whisper-large-v3-turbo"]
+            last_error = ""
+            
+            for m in models_to_try:
+                try:
+                    logger.info(f"🌐 [OR] Trying model: {m}")
                     with open(file_path, "rb") as f:
-                        transcription = groq_client.audio.transcriptions.create(
-                            file=(os.path.basename(file_path), f.read(), "audio/mpeg"),
-                            model="whisper-large-v3",
-                            timeout=300.0
+                        files = {"file": (os.path.basename(file_path), f, "audio/mpeg")}
+                        response = requests.post(
+                            "https://openrouter.ai/api/v1/audio/transcriptions",
+                            headers=headers,
+                            files=files,
+                            data={"model": m},
+                            timeout=300
                         )
-                        return transcription.text
-                raise RuntimeError(f"OpenRouter failed: {response.text}")
+                    
+                    if response.status_code == 200:
+                        return response.json().get("text", "")
+                    else:
+                        last_error = f"Model {m} failed ({response.status_code}): {response.text}"
+                        logger.warning(last_error)
+                        continue # Try next model
+                except Exception as inner_e:
+                    last_error = str(inner_e)
+                    logger.error(f"❌ Error with model {m}: {last_error}")
+                    continue
+
+            # If both OR models fail, try Groq as last resort
+            if settings.GROQ_API_KEY:
+                logger.info("🔄 [OR] Both OR models failed. Falling back to Groq...")
+                groq_client = Groq(api_key=settings.GROQ_API_KEY.strip())
+                with open(file_path, "rb") as f:
+                    transcription = groq_client.audio.transcriptions.create(
+                        file=(os.path.basename(file_path), f.read(), "audio/mpeg"),
+                        model="whisper-large-v3",
+                        timeout=300.0
+                    )
+                    return transcription.text
+            
+            raise RuntimeError(f"OpenRouter failed all models. Last error: {last_error}")
         except Exception as e:
-            logger.error(f"❌ OpenRouter error: {e}")
+            logger.error(f"❌ OpenRouter process error: {e}")
             if settings.GROQ_API_KEY:
                 # Last resort fallback
                 groq_client = Groq(api_key=settings.GROQ_API_KEY.strip())
@@ -155,22 +176,48 @@ def _transcribe_large_audio(file_path: str, progress_callback=None) -> str:
                 
                 if active_is_openrouter:
                     import requests
-                    with open(chunk_path, "rb") as f:
-                        files = {"file": (os.path.basename(chunk_path), f, "audio/mpeg")}
-                        response = requests.post(
-                            "https://openrouter.ai/api/v1/audio/transcriptions",
-                            headers={"Authorization": f"Bearer {settings.WHISPER_API_KEY.strip()}"},
-                            files=files,
-                            data={"model": active_model},
-                            timeout=300
-                        )
+                    headers = {
+                        "Authorization": f"Bearer {settings.WHISPER_API_KEY.strip()}",
+                        "HTTP-Referer": "https://lammah.site",
+                        "X-Title": "Lammah AI"
+                    }
                     
-                    if response.status_code == 200:
-                        full_transcript.append(response.json().get("text", ""))
-                        success = True
+                    # Try current active model (or start with v3 then turbo)
+                    models_to_try = [active_model]
+                    if active_model == "openai/whisper-large-v3":
+                        models_to_try.append("openai/whisper-large-v3-turbo")
+                    
+                    chunk_success = False
+                    for m in models_to_try:
+                        try:
+                            logger.info(f"🎙️ [OR] Transcribing chunk with model: {m}")
+                            with open(chunk_path, "rb") as f:
+                                files = {"file": (os.path.basename(chunk_path), f, "audio/mpeg")}
+                                response = requests.post(
+                                    "https://openrouter.ai/api/v1/audio/transcriptions",
+                                    headers=headers,
+                                    files=files,
+                                    data={"model": m},
+                                    timeout=300
+                                )
+                            
+                            if response.status_code == 200:
+                                full_transcript.append(response.json().get("text", ""))
+                                success = True
+                                chunk_success = True
+                                # If this model worked, stick with it for next chunks
+                                active_model = m
+                                break
+                            else:
+                                logger.warning(f"Chunk fail with {m} ({response.status_code}): {response.text}")
+                        except Exception as chunk_e:
+                            logger.error(f"Chunk error with {m}: {chunk_e}")
+                            continue
+                    
+                    if chunk_success:
                         break
                     else:
-                        raise RuntimeError(f"OpenRouter direct failed ({response.status_code}): {response.text}")
+                        raise RuntimeError(f"Both OR models failed for chunk {idx}")
                 else:
                     # Groq logic
                     with open(chunk_path, "rb") as file:
@@ -191,7 +238,7 @@ def _transcribe_large_audio(file_path: str, progress_callback=None) -> str:
                     time.sleep(5)
                     continue
                 else:
-                    # Fallback to Groq if OpenRouter fails
+                    # Fallback to Groq if OpenRouter fails completely
                     if active_is_openrouter and settings.GROQ_API_KEY:
                         logger.info("🚀 محرك لمّاح الأساسي متوقف مؤقتاً... ننتقل للمحرك البديل الفائق...")
                         try:
