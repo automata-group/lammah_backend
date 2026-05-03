@@ -2,6 +2,7 @@ import os
 from groq import Groq
 from openai import OpenAI
 from app.core.config import settings
+import base64
 
 import glob
 import subprocess
@@ -61,8 +62,16 @@ def transcribe_audio(file_path: str, progress_callback=None) -> str:
             headers = {
                 "Authorization": f"Bearer {settings.WHISPER_API_KEY.strip()}",
                 "HTTP-Referer": "https://lammah.site",
-                "X-Title": "Lammah AI"
+                "X-Title": "Lammah AI",
+                "Content-Type": "application/json"
             }
+            
+            # Helper to encode file to base64
+            with open(file_path, "rb") as f:
+                encoded_audio = base64.b64encode(f.read()).decode('utf-8')
+            
+            ext = os.path.splitext(file_path)[1].replace(".", "")
+            if ext == "m4a": ext = "mp4" # OpenRouter mapping
             
             # Try primary model first, then fallback to turbo
             models_to_try = ["openai/whisper-large-v3", "openai/whisper-large-v3-turbo"]
@@ -70,23 +79,25 @@ def transcribe_audio(file_path: str, progress_callback=None) -> str:
             
             for m in models_to_try:
                 try:
-                    logger.info(f"🌐 [OR] Trying model: {m}")
-                    with open(file_path, "rb") as f:
-                        files = {"file": (os.path.basename(file_path), f, "audio/mpeg")}
-                        response = requests.post(
-                            "https://openrouter.ai/api/v1/audio/transcriptions",
-                            headers=headers,
-                            files=files,
-                            data={"model": m},
-                            timeout=300
-                        )
+                    logger.info(f"🌐 [OR-JSON] Trying model: {m}")
+                    payload = {
+                        "model": m,
+                        "file": f"data:audio/{ext};base64,{encoded_audio}"
+                    }
+                    
+                    response = requests.post(
+                        "https://openrouter.ai/api/v1/audio/transcriptions",
+                        headers=headers,
+                        json=payload,
+                        timeout=300
+                    )
                     
                     if response.status_code == 200:
                         return response.json().get("text", "")
                     else:
                         last_error = f"Model {m} failed ({response.status_code}): {response.text}"
                         logger.warning(last_error)
-                        continue # Try next model
+                        continue 
                 except Exception as inner_e:
                     last_error = str(inner_e)
                     logger.error(f"❌ Error with model {m}: {last_error}")
@@ -179,8 +190,13 @@ def _transcribe_large_audio(file_path: str, progress_callback=None) -> str:
                     headers = {
                         "Authorization": f"Bearer {settings.WHISPER_API_KEY.strip()}",
                         "HTTP-Referer": "https://lammah.site",
-                        "X-Title": "Lammah AI"
+                        "X-Title": "Lammah AI",
+                        "Content-Type": "application/json"
                     }
+                    
+                    # Encode chunk to base64
+                    with open(chunk_path, "rb") as f:
+                        encoded_chunk = base64.b64encode(f.read()).decode('utf-8')
                     
                     # Try current active model (or start with v3 then turbo)
                     models_to_try = [active_model]
@@ -190,16 +206,18 @@ def _transcribe_large_audio(file_path: str, progress_callback=None) -> str:
                     chunk_success = False
                     for m in models_to_try:
                         try:
-                            logger.info(f"🎙️ [OR] Transcribing chunk with model: {m}")
-                            with open(chunk_path, "rb") as f:
-                                files = {"file": (os.path.basename(chunk_path), f, "audio/mpeg")}
-                                response = requests.post(
-                                    "https://openrouter.ai/api/v1/audio/transcriptions",
-                                    headers=headers,
-                                    files=files,
-                                    data={"model": m},
-                                    timeout=300
-                                )
+                            logger.info(f"🎙️ [OR-JSON] Transcribing chunk with model: {m}")
+                            payload = {
+                                "model": m,
+                                "file": f"data:audio/mp3;base64,{encoded_chunk}"
+                            }
+                            
+                            response = requests.post(
+                                "https://openrouter.ai/api/v1/audio/transcriptions",
+                                headers=headers,
+                                json=payload,
+                                timeout=300
+                            )
                             
                             if response.status_code == 200:
                                 full_transcript.append(response.json().get("text", ""))
