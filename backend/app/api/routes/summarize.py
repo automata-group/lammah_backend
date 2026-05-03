@@ -255,3 +255,43 @@ async def download_annotated_pdf(job_id: str):
         raise HTTPException(status_code=404, detail="File not found")
     from fastapi.responses import FileResponse
     return FileResponse(resolved_path, media_type="application/pdf")
+
+
+@router.post("/upload-temp")
+async def upload_temp(
+    file: UploadFile = File(...),
+    user=Depends(verify_token)
+):
+    """
+    Temporary file upload endpoint (Python fallback for Go Uploader).
+    Saves file to temp directory and returns a temp_id for later processing.
+    """
+    temp_dir = os.getenv("TEMP_DIR", "uploads/temp")
+    os.makedirs(temp_dir, exist_ok=True)
+    
+    # Validate extension
+    allowed_ext = {".mp3", ".wav", ".m4a", ".pdf", ".ogg", ".flac", ".pptx"}
+    ext = os.path.splitext(file.filename or "")[1].lower()
+    if ext not in allowed_ext:
+        raise HTTPException(status_code=400, detail="File extension not supported")
+    
+    # Generate unique filename
+    saved_filename = f"{uuid.uuid4()}{ext}"
+    final_path = os.path.join(temp_dir, saved_filename)
+    
+    # Save file
+    try:
+        with open(final_path, "wb") as buffer:
+            shutil.copyfileobj(file.file, buffer)
+    except Exception as e:
+        logger.error(f"Error saving temp file: {e}")
+        raise HTTPException(status_code=500, detail="Error saving file")
+    
+    logger.info(f"✅ Temp file saved: {saved_filename} ({os.path.getsize(final_path) / (1024*1024):.1f} MB)")
+    
+    return {
+        "temp_id": saved_filename,
+        "filename": file.filename,
+        "status": "Processing"
+    }
+

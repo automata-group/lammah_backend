@@ -7,21 +7,56 @@ env/
 venv/
 ENV/
 
+# Environment files (CRITICAL - contains secrets!)
+.env
+.env.local
+.env.production
+
 # Project folders to ignore
 uploads/
 outputs/
 logs/
 brain/
+scratch/
+chroma_data/
 .gemini/
-.DS_Store
 
-# Node/Frontend
+# Test/Debug files
+*.pdf
+*.m4a
+*.mp3
+*.wav
+startup.log
+user_logs_report.json
+test_*.py
+check_*.py
+debug_*.py
+trace_*.py
+final_run.py
+get_user_logs.py
+grant_1_vip.py
+update_admins.py
+
+# Keys
+*.pub
+server_key.pub
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Node/Frontend (if nested)
 node_modules/
 .next/
 dist/
 build/
-.env
-.env.local
 
 # Docker
 .docker_temp/
+
+# Binaries
+*.exe
+uploader-go/uploader
+uploader-go/uploader.exe
+uploader-go/uploader.exe.tmp
+

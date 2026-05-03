@@ -12,16 +12,22 @@ client = None
 is_openrouter = False
 
 if settings.WHISPER_API_KEY:
-    if settings.WHISPER_API_KEY.startswith("sk-or-"):
+    key = settings.WHISPER_API_KEY.strip()
+    if key.startswith("sk-or-"):
+        logger.info(f"🌐 [INIT] Using OpenRouter for Whisper (Key: {key[:10]}...)")
         client = OpenAI(
-            api_key=settings.WHISPER_API_KEY,
+            api_key=key,
             base_url="https://openrouter.ai/api/v1"
         )
         is_openrouter = True
     else:
-        client = Groq(api_key=settings.WHISPER_API_KEY)
+        logger.info(f"🏎️ [INIT] Using Direct Groq for Whisper (Key: {key[:10]}...)")
+        client = Groq(api_key=key)
 elif settings.GROQ_API_KEY:
-    client = Groq(api_key=settings.GROQ_API_KEY)
+    logger.info(f"🏎️ [INIT] Using Groq API Key for Whisper")
+    client = Groq(api_key=settings.GROQ_API_KEY.strip())
+else:
+    logger.error("❌ [INIT] No API Key found for transcription!")
 
 def transcribe_audio(file_path: str, progress_callback=None) -> str:
     """
@@ -46,26 +52,61 @@ def transcribe_audio(file_path: str, progress_callback=None) -> str:
     
     model_name = "openai/whisper-large-v3" if is_openrouter else "whisper-large-v3"
     
-    with open(file_path, "rb") as file:
+    if is_openrouter:
+        import requests
         try:
+            if progress_callback:
+                progress_callback("⚡ إرسال الملف لمحرك لمّاح (OpenRouter)...")
+            
+            with open(file_path, "rb") as f:
+                files = {"file": (os.path.basename(file_path), f, "audio/mpeg")}
+                response = requests.post(
+                    "https://openrouter.ai/api/v1/audio/transcriptions",
+                    headers={"Authorization": f"Bearer {settings.WHISPER_API_KEY.strip()}"},
+                    files=files,
+                    data={"model": model_name},
+                    timeout=300
+                )
+            
+            if response.status_code == 200:
+                return response.json().get("text", "")
+            else:
+                logger.warning(f"OpenRouter direct failed ({response.status_code}): {response.text}")
+                # Fallback to Groq if direct request fails
+                if settings.GROQ_API_KEY:
+                    logger.info("🔄 Falling back to Groq...")
+                    groq_client = Groq(api_key=settings.GROQ_API_KEY.strip())
+                    with open(file_path, "rb") as f:
+                        transcription = groq_client.audio.transcriptions.create(
+                            file=(os.path.basename(file_path), f.read(), "audio/mpeg"),
+                            model="whisper-large-v3",
+                            timeout=300.0
+                        )
+                        return transcription.text
+                raise RuntimeError(f"OpenRouter failed: {response.text}")
+        except Exception as e:
+            logger.error(f"❌ OpenRouter error: {e}")
+            if settings.GROQ_API_KEY:
+                # Last resort fallback
+                groq_client = Groq(api_key=settings.GROQ_API_KEY.strip())
+                with open(file_path, "rb") as f:
+                    transcription = groq_client.audio.transcriptions.create(
+                        file=(os.path.basename(file_path), f.read(), "audio/mpeg"),
+                        model="whisper-large-v3",
+                        timeout=300.0
+                    )
+                    return transcription.text
+            raise e
+    else:
+        # Standard Groq logic
+        with open(file_path, "rb") as file:
             transcription = client.audio.transcriptions.create(
                 file=(os.path.basename(file_path), file.read(), "audio/mpeg"),
                 model=model_name,
-                timeout=300.0 # Increased timeout for reliability
+                timeout=300.0
             )
             return transcription.text
-        except Exception as e:
-            if is_openrouter and settings.GROQ_API_KEY:
-                logger.warning(f"OpenRouter failed, falling back to Groq: {e}")
-                groq_client = Groq(api_key=settings.GROQ_API_KEY)
-                file.seek(0)
-                transcription = groq_client.audio.transcriptions.create(
-                    file=(os.path.basename(file_path), file.read(), "audio/mpeg"),
-                    model="whisper-large-v3",
-                    timeout=300.0
-                )
-                return transcription.text
-            raise e
+
 
 def _transcribe_large_audio(file_path: str, progress_callback=None) -> str:
     """Splits large audio into 10-minute chunks and concatenates the transcriptions."""
@@ -109,57 +150,70 @@ def _transcribe_large_audio(file_path: str, progress_callback=None) -> str:
         retries = 10
         success = False
         for attempt in range(retries):
-            with open(chunk_path, "rb") as file:
-                try:
-                    logger.info(f"🎙️ لمّاح يحاول التفريغ (محاولة {attempt+1}/{retries})...")
-                    transcription = active_client.audio.transcriptions.create(
-                        file=(os.path.basename(chunk_path), file.read(), "audio/mpeg"),
-                        model=active_model,
-                        timeout=300.0
-                    )
-                    full_transcript.append(transcription.text)
-                    success = True
-                    break # Success
-                except Exception as e:
-                    err_msg = str(e)
-                    logger.error(f"❌ CHUNK {idx} FAILED (Attempt {attempt+1}): {err_msg}")
+            try:
+                logger.info(f"🎙️ لمّاح يحاول التفريغ (محاولة {attempt+1}/{retries})...")
+                
+                if active_is_openrouter:
+                    import requests
+                    with open(chunk_path, "rb") as f:
+                        files = {"file": (os.path.basename(chunk_path), f, "audio/mpeg")}
+                        response = requests.post(
+                            "https://openrouter.ai/api/v1/audio/transcriptions",
+                            headers={"Authorization": f"Bearer {settings.WHISPER_API_KEY.strip()}"},
+                            files=files,
+                            data={"model": active_model},
+                            timeout=300
+                        )
                     
-                    # If we get a JSON parsing error (likely a 502/504 from OpenRouter), wait and retry
-                    is_server_error = "No number after minus sign" in err_msg or "502" in err_msg or "504" in err_msg
-                    
-                    if is_server_error and attempt < retries - 1:
-                        import time
-                        time.sleep(5) # Wait longer between retries
-                        continue
-                    
-                    if attempt < retries - 1 and not is_server_error:
-                        import time
-                        time.sleep(3)
-                        continue
+                    if response.status_code == 200:
+                        full_transcript.append(response.json().get("text", ""))
+                        success = True
+                        break
                     else:
-                        # Fallback to Groq if OpenRouter fails (including after 10 attempts of 502/504)
-                        if active_is_openrouter and settings.GROQ_API_KEY:
-                            logger.info("🚀 محرك لمّاح الأساسي متوقف مؤقتاً... ننتقل للمحرك البديل الفائق...")
-                            try:
-                                groq_client = Groq(api_key=settings.GROQ_API_KEY)
-                                file.seek(0)
+                        raise RuntimeError(f"OpenRouter direct failed ({response.status_code}): {response.text}")
+                else:
+                    # Groq logic
+                    with open(chunk_path, "rb") as file:
+                        transcription = active_client.audio.transcriptions.create(
+                            file=(os.path.basename(chunk_path), file.read(), "audio/mpeg"),
+                            model=active_model,
+                            timeout=300.0
+                        )
+                        full_transcript.append(transcription.text)
+                        success = True
+                        break
+            except Exception as e:
+                err_msg = str(e)
+                logger.error(f"❌ CHUNK {idx} FAILED (Attempt {attempt+1}): {err_msg}")
+                
+                if attempt < retries - 1:
+                    import time
+                    time.sleep(5)
+                    continue
+                else:
+                    # Fallback to Groq if OpenRouter fails
+                    if active_is_openrouter and settings.GROQ_API_KEY:
+                        logger.info("🚀 محرك لمّاح الأساسي متوقف مؤقتاً... ننتقل للمحرك البديل الفائق...")
+                        try:
+                            groq_client = Groq(api_key=settings.GROQ_API_KEY.strip())
+                            with open(chunk_path, "rb") as f:
                                 transcription = groq_client.audio.transcriptions.create(
-                                    file=(os.path.basename(chunk_path), file.read(), "audio/mpeg"),
+                                    file=(os.path.basename(chunk_path), f.read(), "audio/mpeg"),
                                     model="whisper-large-v3",
                                     timeout=300.0
                                 )
                                 full_transcript.append(transcription.text)
-                                # Update local state for remaining chunks
                                 active_client = groq_client
                                 active_is_openrouter = False
                                 active_model = "whisper-large-v3"
                                 success = True
                                 break 
-                            except Exception as fallback_e:
-                                logger.error(f"❌ Lammah-Groq fallback failed: {str(fallback_e)}")
-                                raise RuntimeError(f"⚠️ عذراً، محرك لمّاح يواجه ضغطاً استثنائياً حالياً. (REV-777) تفاصيل: {str(fallback_e)[:50]}")
-                        else:
-                            raise RuntimeError(f"⚠️ عذراً، محرك لمّاح يواجه ضغطاً شديداً حالياً. (REV-777) الخطأ: {err_msg[:50]}")
+                        except Exception as fallback_e:
+                            logger.error(f"❌ Lammah-Groq fallback failed: {str(fallback_e)}")
+                            raise RuntimeError(f"⚠️ عذراً، محرك لمّاح يواجه ضغطاً استثنائياً حالياً. (REV-777)")
+                    else:
+                        raise RuntimeError(f"⚠️ عذراً، محرك لمّاح يواجه ضغطاً شديداً حالياً. (REV-777)")
+
 
         
         if not success:

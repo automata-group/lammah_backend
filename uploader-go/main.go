@@ -100,7 +100,7 @@ func main() {
 	corsMiddleware := func(next http.HandlerFunc) http.HandlerFunc {
 		return func(w http.ResponseWriter, r *http.Request) {
 			origin := r.Header.Get("Origin")
-			
+
 			// قائمة الأصول المسموح بها (الهجينة)
 			allowedOrigins := []string{
 				"https://lammah.site",
@@ -129,7 +129,7 @@ func main() {
 				// في حالة عدم المطابقة، نسمح بطلب curl أو الطلبات التي لا تحتوي على origin
 				w.Header().Set("Access-Control-Allow-Origin", "https://lammah.site")
 			}
-			
+
 			w.Header().Set("Access-Control-Allow-Methods", "POST, GET, OPTIONS, PUT, DELETE")
 			w.Header().Set("Access-Control-Allow-Headers", "Accept, Content-Type, Content-Length, Accept-Encoding, X-CSRF-Token, Authorization")
 			w.Header().Set("Access-Control-Allow-Credentials", "true")
@@ -264,7 +264,7 @@ func processAudio(workerID int, filePath string, extension string) error {
 
 func handleUpload(w http.ResponseWriter, r *http.Request) {
 	log.Printf("📥 Received %s request for %s from %s", r.Method, r.URL.Path, r.RemoteAddr)
-	
+
 	if r.Method != http.MethodPost {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 		return

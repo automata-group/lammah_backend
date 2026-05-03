@@ -36,6 +36,7 @@ jobs:
             NEXT_PUBLIC_SUPABASE_URL=${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
             NEXT_PUBLIC_SUPABASE_ANON_KEY=${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
             NEXT_PUBLIC_API_URL=https://api.lammah.site
+            NEXT_PUBLIC_SITE_URL=https://lammah.site
 
   deploy:
     needs: build
