@@ -30,14 +30,14 @@ jobs:
       - name: Build and push Backend image
         uses: docker/build-push-action@v5
         with:
-          context: ./backend
+          context: .
           push: true
           tags: ${{ env.REGISTRY }}/${{ env.BACKEND_IMAGE }}:latest
 
       - name: Build and push Uploader image
         uses: docker/build-push-action@v5
         with:
-          context: ./backend/uploader-go
+          context: ./uploader-go
           push: true
           tags: ${{ env.REGISTRY }}/${{ env.UPLOADER_IMAGE }}:latest
 
@@ -137,5 +137,3 @@ jobs:
             docker compose up -d --force-recreate
             
             echo "Deployment successful!"
-
-
