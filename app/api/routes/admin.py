@@ -137,3 +137,100 @@ async def cancel_user_plan(user_id: str, admin=Depends(verify_admin)):
     except Exception as e:
         logger.error(f"❌ Error revoking plan: {str(e)}")
         raise HTTPException(status_code=500, detail="فشل إلغاء الخطة")
+
+@router.get("/users")
+async def get_all_users(admin=Depends(verify_admin)):
+    """Fetch all users for the admin dashboard."""
+    try:
+        supabase = get_supabase()
+        res = supabase.table("profiles").select("id, full_name, phone_number, is_blocked, role, created_at, quota_remaining, current_plan_id, subscription_plans(name)").order("created_at", desc=True).execute()
+        return res.data or []
+    except Exception as e:
+        logger.error(f"❌ Error fetching users: {str(e)}")
+        raise HTTPException(status_code=500, detail="فشل جلب المستخدمين")
+
+@router.post("/users/{user_id}/ban")
+async def ban_user(user_id: str, admin=Depends(verify_admin)):
+    """Block a user from using the platform."""
+    try:
+        supabase = get_supabase()
+        supabase.table("profiles").update({"is_blocked": True}).eq("id", user_id).execute()
+        return {"status": "success", "message": "تم حظر المستخدم بنجاح."}
+    except Exception as e:
+        logger.error(f"❌ Error banning user: {str(e)}")
+        raise HTTPException(status_code=500, detail="فشل حظر المستخدم")
+
+@router.post("/users/{user_id}/unban")
+async def unban_user(user_id: str, admin=Depends(verify_admin)):
+    """Unblock a user."""
+    try:
+        supabase = get_supabase()
+        supabase.table("profiles").update({"is_blocked": False}).eq("id", user_id).execute()
+        return {"status": "success", "message": "تم فك الحظر عن المستخدم بنجاح."}
+    except Exception as e:
+        logger.error(f"❌ Error unbanning user: {str(e)}")
+        raise HTTPException(status_code=500, detail="فشل فك الحظر عن المستخدم")
+
+@router.get("/analytics/financial")
+async def get_financial_analytics(admin=Depends(verify_admin)):
+    """Fetch financial analytics (MRR, Total Revenue)."""
+    try:
+        supabase = get_supabase()
+        res = supabase.table("transactions").select("amount, created_at, status").eq("status", "approved").execute()
+        
+        total_revenue = sum(float(tx.get("amount", 0)) for tx in (res.data or []))
+        
+        # Simple MRR calculation based on last 30 days
+        from datetime import datetime, timedelta
+        import pytz
+        thirty_days_ago = datetime.now(pytz.UTC) - timedelta(days=30)
+        mrr = sum(float(tx.get("amount", 0)) for tx in (res.data or []) if datetime.fromisoformat(tx.get("created_at").replace('Z', '+00:00')) >= thirty_days_ago)
+
+        return {
+            "total_revenue": total_revenue,
+            "mrr": mrr,
+            "total_approved_transactions": len(res.data or [])
+        }
+    except Exception as e:
+        logger.error(f"❌ Error fetching financial analytics: {str(e)}")
+        raise HTTPException(status_code=500, detail="فشل جلب التحليلات المالية")
+
+import json
+import os
+
+SETTINGS_FILE = os.path.join(os.path.dirname(__file__), "..", "..", "system_settings.json")
+
+@router.get("/announcements")
+async def get_announcement():
+    """Fetch global announcement (publicly accessible)."""
+    try:
+        if os.path.exists(SETTINGS_FILE):
+            with open(SETTINGS_FILE, "r", encoding="utf-8") as f:
+                return json.load(f).get("global_announcement", {"message": "", "active": False})
+        return {"message": "", "active": False}
+    except Exception:
+        return {"message": "", "active": False}
+
+from pydantic import BaseModel
+class AnnouncementModel(BaseModel):
+    message: str
+    active: bool
+
+@router.post("/announcements")
+async def update_announcement(data: AnnouncementModel, admin=Depends(verify_admin)):
+    """Update global announcement."""
+    try:
+        settings = {}
+        if os.path.exists(SETTINGS_FILE):
+            with open(SETTINGS_FILE, "r", encoding="utf-8") as f:
+                settings = json.load(f)
+                
+        settings["global_announcement"] = {"message": data.message, "active": data.active}
+        
+        with open(SETTINGS_FILE, "w", encoding="utf-8") as f:
+            json.dump(settings, f, ensure_ascii=False)
+            
+        return {"status": "success", "message": "تم تحديث الإشعار العام بنجاح"}
+    except Exception as e:
+        logger.error(f"❌ Error updating announcement: {str(e)}")
+        raise HTTPException(status_code=500, detail="فشل تحديث الإشعار")
