@@ -66,11 +66,11 @@ def transcribe_audio(file_path: str, progress_callback=None) -> str:
                 "Content-Type": "application/json"
             }
             
-            # Helper to encode file to base64
+            # Helper to encode file to base64 (raw string, no prefix)
             with open(file_path, "rb") as f:
                 encoded_audio = base64.b64encode(f.read()).decode('utf-8')
             
-            ext = os.path.splitext(file_path)[1].replace(".", "")
+            ext = os.path.splitext(file_path)[1].replace(".", "").lower()
             if ext == "m4a": ext = "mp4" # OpenRouter mapping
             
             # Try primary model first, then fallback to turbo
@@ -79,10 +79,13 @@ def transcribe_audio(file_path: str, progress_callback=None) -> str:
             
             for m in models_to_try:
                 try:
-                    logger.info(f"🌐 [OR-JSON] Trying model: {m}")
+                    logger.info(f"🌐 [OR-FIX] Trying model: {m} with format: {ext}")
                     payload = {
                         "model": m,
-                        "file": f"data:audio/{ext};base64,{encoded_audio}"
+                        "input_audio": {
+                            "data": encoded_audio,
+                            "format": ext
+                        }
                     }
                     
                     response = requests.post(
@@ -206,10 +209,13 @@ def _transcribe_large_audio(file_path: str, progress_callback=None) -> str:
                     chunk_success = False
                     for m in models_to_try:
                         try:
-                            logger.info(f"🎙️ [OR-JSON] Transcribing chunk with model: {m}")
+                            logger.info(f"🎙️ [OR-FIX] Transcribing chunk with model: {m}")
                             payload = {
                                 "model": m,
-                                "file": f"data:audio/mp3;base64,{encoded_chunk}"
+                                "input_audio": {
+                                    "data": encoded_chunk,
+                                    "format": "mp3"
+                                }
                             }
                             
                             response = requests.post(
