@@ -16,3 +16,5 @@ python-multipart
 openai
 langchain-openai
 PyMuPDF
+requests
+yt-dlp

@@ -6,6 +6,7 @@ from app.services.pdf_service import extract_pages_from_pdf
 from app.services.rag_service import process_and_store_document, query_relevant_context
 from app.services.summarizer_service import generate_smart_annotations
 from app.services.subscription_service import use_lecture_quota, log_usage_failure
+from app.services.link_ingest_service import download_audio_from_link
 from app.core.auth_guard import check_quota, verify_phone_active, get_user_profile, verify_token
 from app.core.queue_manager import queue_manager, JobStatus, JobPriority
 from app.core.logger import logger
@@ -28,6 +29,7 @@ async def process_lecture(
     pdf_file: Optional[UploadFile] = File(None),
     audio_temp_id: Optional[str] = Form(None),
     pdf_temp_id: Optional[str] = Form(None),
+    lecture_url: Optional[str] = Form(None),
     profile=Depends(check_quota)
 ):
     """
@@ -50,6 +52,8 @@ async def process_lecture(
             raise HTTPException(status_code=400, detail="temp_file_missing")
 
     async def event_stream():
+        audio_path = None
+        pdf_path = None
         try:
             # 0. Flush initial headers & Padding
             padding = ":" + " " * 1024 + "\n\n"
@@ -61,7 +65,7 @@ async def process_lecture(
             yield f"data: {json.dumps({'type': 'progress', 'step': '0/5', 'message': '📥 جاري تجهيز الملفات...'}, ensure_ascii=False)}\n\n"
             os.makedirs(upload_dir, exist_ok=True)
             
-            # Handle Audio (either direct upload or pre-uploaded temp id)
+            # Handle Audio (direct upload, pre-uploaded temp id, or lecture link)
             if audio_temp_id:
                 temp_path = os.path.join(temp_dir, audio_temp_id)
                 audio_path = os.path.join(upload_dir, f"{unique_id}_{audio_temp_id}")
@@ -72,11 +76,13 @@ async def process_lecture(
                     with open(audio_path, "wb") as buffer:
                         shutil.copyfileobj(audio_file.file, buffer)
                 await asyncio.to_thread(save_audio)
+            elif lecture_url:
+                yield f"data: {json.dumps({'type': 'progress', 'step': '0/5', 'message': '🔗 جاري تحميل المحاضرة من الرابط...'}, ensure_ascii=False)}\n\n"
+                audio_path = await asyncio.to_thread(download_audio_from_link, lecture_url.strip(), upload_dir, unique_id)
             else:
-                raise HTTPException(status_code=400, detail="Missing audio file")
+                raise HTTPException(status_code=400, detail="Missing audio source (file or lecture_url)")
             
             # Handle PDF
-            pdf_path = None
             if pdf_temp_id:
                 temp_path = os.path.join(temp_dir, pdf_temp_id)
                 pdf_path = os.path.join(upload_dir, f"{unique_id}_{pdf_temp_id}")
