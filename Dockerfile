@@ -14,6 +14,9 @@ WORKDIR /app
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
+# Always upgrade yt-dlp to latest to keep up with YouTube's anti-bot changes
+RUN pip install --no-cache-dir --upgrade yt-dlp
+
 # Copy application files
 COPY . .
 

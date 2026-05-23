@@ -66,22 +66,24 @@ def download_audio_from_link(lecture_url: str, upload_dir: str, unique_id: str) 
 
     output_template = os.path.join(upload_dir, f"{unique_id}_%(id)s.%(ext)s")
     ydl_opts = {
+        # web_embedded client does NOT require PO tokens and works on datacenter IPs.
+        # ios/mweb/android now require GVS PO tokens which we can't provide, so they are excluded.
         "format": "bestaudio/best",
         "outtmpl": output_template,
         "noplaylist": True,
         "quiet": True,
         "no_warnings": True,
-        "retries": 3,
+        "retries": 5,
+        "fragment_retries": 5,
         "nocheckcertificate": True,
         "extractor_args": {
             "youtube": {
-                "player_client": ["android", "mweb"]
+                "player_client": ["web_embedded", "web"]
             }
         },
         "http_headers": {
-            "User-Agent": "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0.0.0 Mobile Safari/537.36",
-            "Accept": "*/*",
-            "Accept-Language": "en-US,en;q=0.5",
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36",
+            "Accept-Language": "en-US,en;q=0.9",
         },
         "postprocessors": [{
             "key": "FFmpegExtractAudio",
@@ -108,7 +110,14 @@ def download_audio_from_link(lecture_url: str, upload_dir: str, unique_id: str) 
         logger.info(f"Downloaded lecture using yt-dlp: {downloaded_path}")
         return downloaded_path
     except Exception as e:
-        logger.error(f"yt-dlp download failed: {e}")
+        err_str = str(e)
+        logger.error(f"yt-dlp download failed: {err_str}")
+        # Provide a more specific message when YouTube is blocking the server IP
+        if "Sign in" in err_str or "bot" in err_str or "403" in err_str:
+            raise RuntimeError(
+                "❌ فشل جلب المحاضرة: يوتيوب يمنع التنزيل من السيرفر. "
+                "يرجى تنزيل المحاضرة على جهازك ورفعها مباشرة كملف صوتي."
+            )
         raise RuntimeError(
-            "تعذر جلب المحاضرة من هذا الرابط. تأكد أن الرابط عام ومتاح بدون تسجيل دخول."
+            "❌ فشل جلب المحاضرة من هذا الرابط. تأكد أن الرابط عام ومتاح بدون تسجيل دخول."
         )
