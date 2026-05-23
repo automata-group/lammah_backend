@@ -234,3 +234,35 @@ async def update_announcement(data: AnnouncementModel, admin=Depends(verify_admi
     except Exception as e:
         logger.error(f"❌ Error updating announcement: {str(e)}")
         raise HTTPException(status_code=500, detail="فشل تحديث الإشعار")
+
+class BulkCancelPlanModel(BaseModel):
+    user_ids: list
+
+@router.post("/users/bulk-cancel-plan")
+async def bulk_cancel_user_plans(data: BulkCancelPlanModel, admin=Depends(verify_admin)):
+    """Revoke plans for multiple users at once and reset them to free trial."""
+    if not data.user_ids:
+        raise HTTPException(status_code=400, detail="يرجى تحديد معرفات المستخدمين")
+    try:
+        supabase = get_supabase()
+
+        # 1. Cancel active subscriptions for all specified users
+        supabase.table("user_subscriptions") \
+            .update({"status": "cancelled"}) \
+            .in_("user_id", data.user_ids) \
+            .eq("status", "active") \
+            .execute()
+
+        # 2. Reset profile quota and plan for all specified users
+        supabase.table("profiles") \
+            .update({"quota_remaining": 0, "current_plan_id": None}) \
+            .in_("id", data.user_ids) \
+            .execute()
+
+        logger.info(f"✅ Admin {admin['id']} bulk revoked plans for users: {data.user_ids}")
+        return {"status": "success", "message": f"تم إلغاء خطط {len(data.user_ids)} مستخدم بنجاح وإعادتهم للتجربة المجانية."}
+
+    except Exception as e:
+        logger.error(f"❌ Error bulk revoking plans: {str(e)}")
+        raise HTTPException(status_code=500, detail="فشل إلغاء الخطط للمستخدمين المحددين")
+

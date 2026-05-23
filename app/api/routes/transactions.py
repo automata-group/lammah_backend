@@ -178,3 +178,69 @@ async def get_admin_stats(profile: dict = Depends(verify_admin)):
     except Exception as e:
         logger.error(f"Failed to fetch admin stats: {str(e)}")
         raise HTTPException(status_code=500, detail={"user_message": "فشل جلب الإحصائيات."})
+
+@router.post("/admin/bulk-approve")
+async def bulk_approve_transactions(
+    payload: dict = Body(...),
+    profile: dict = Depends(verify_admin)
+):
+    tx_ids = payload.get("transaction_ids")
+    if not tx_ids or not isinstance(tx_ids, list):
+        raise HTTPException(status_code=400, detail={"user_message": "يرجى تحديد معرفات الطلبات"})
+        
+    supabase = get_supabase()
+    results = {"approved": [], "failed": []}
+    
+    for tx_id in tx_ids:
+        try:
+            tx_result = supabase.table("transactions").select("*").eq("id", tx_id).execute()
+            if not tx_result.data:
+                results["failed"].append({"id": tx_id, "error": "الطلب غير موجود"})
+                continue
+                
+            tx = tx_result.data[0]
+            if tx["status"] != "pending":
+                results["failed"].append({"id": tx_id, "error": "الطلب ليس في حالة انتظار"})
+                continue
+                
+            # Update transaction status
+            supabase.table("transactions").update({"status": "completed"}).eq("id", tx_id).execute()
+            
+            # Create subscription
+            sub, error = create_subscription(user_id=tx["user_id"], plan_id=tx["plan_id"])
+            if error:
+                logger.error(f"Failed to create subscription during approval for tx {tx_id}: {error}")
+                # Rollback status to pending on error
+                supabase.table("transactions").update({"status": "pending"}).eq("id", tx_id).execute()
+                results["failed"].append({"id": tx_id, "error": error})
+                continue
+                
+            results["approved"].append(tx_id)
+        except Exception as e:
+            logger.error(f"Error bulk approving transaction {tx_id}: {str(e)}")
+            results["failed"].append({"id": tx_id, "error": str(e)})
+            
+    return {"status": "success", "results": results}
+
+@router.post("/admin/bulk-reject")
+async def bulk_reject_transactions(
+    payload: dict = Body(...),
+    profile: dict = Depends(verify_admin)
+):
+    tx_ids = payload.get("transaction_ids")
+    if not tx_ids or not isinstance(tx_ids, list):
+        raise HTTPException(status_code=400, detail={"user_message": "يرجى تحديد معرفات الطلبات"})
+        
+    supabase = get_supabase()
+    try:
+        supabase.table("transactions")\
+            .update({"status": "rejected"})\
+            .in_("id", tx_ids)\
+            .eq("status", "pending")\
+            .execute()
+            
+        return {"status": "success", "message": "تم رفض الطلبات المحددة بنجاح"}
+    except Exception as e:
+        logger.error(f"Failed to bulk reject transactions: {str(e)}")
+        raise HTTPException(status_code=500, detail={"user_message": "فشل رفض الطلبات المحددة."})
+
