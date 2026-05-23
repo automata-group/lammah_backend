@@ -37,12 +37,13 @@ backend/temp_pdf/
 *.wav
 
 # Project specific
-backend/logs/
-backend/outputs/
-backend/uploads/
-backend/chroma_data/
-backend/brain/
-backend/scratch/
+logs/
+outputs/
+uploads/
+chroma_data/
+brain/
+scratch/
+
 startup.log
 
 # OS
