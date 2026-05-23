@@ -93,8 +93,18 @@ async def process_notebook(
     
     unique_id = str(uuid.uuid4())[:8]
     base_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))))
-    upload_dir = os.path.normpath(os.path.join(base_dir, "backend/uploads"))
-    temp_dir = os.path.normpath(os.path.join(base_dir, "uploader-go/uploads/temp"))
+    
+    upload_dir_env = os.getenv("UPLOAD_DIR")
+    if upload_dir_env:
+        upload_dir = os.path.normpath(upload_dir_env)
+    else:
+        upload_dir = os.path.normpath(os.path.join(base_dir, "backend/uploads"))
+        
+    temp_dir_env = os.getenv("TEMP_DIR")
+    if temp_dir_env:
+        temp_dir = os.path.normpath(temp_dir_env)
+    else:
+        temp_dir = os.path.normpath(os.path.join(base_dir, "uploader-go/uploads/temp"))
     
     # Sync with Go Uploader if needed
     audio_paths = []
