@@ -3,6 +3,8 @@ name: Build and Deploy Backend
 on:
   push:
     branches: [ main ]
+  workflow_dispatch:
+
 
 env:
   REGISTRY: ghcr.io
@@ -129,6 +131,9 @@ jobs:
 
             docker compose up -d --force-recreate
             
+            echo "Waiting 10 seconds for containers to initialize..."
+            sleep 10
+            
             echo "Deployment successful!"
             
             echo "=== Docker Container Status ==="
@@ -137,3 +142,4 @@ jobs:
             docker compose logs --tail=100 backend
             echo "=== Uploader Container Logs ==="
             docker compose logs --tail=100 uploader
+
