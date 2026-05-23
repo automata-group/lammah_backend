@@ -1,0 +1,30 @@
+name: Read Server Logs
+
+on:
+  workflow_dispatch:
+
+jobs:
+  read-logs:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Read Docker Logs via SSH
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.SERVER_IP }}
+          username: ${{ secrets.SERVER_USER }}
+          key: ${{ secrets.SSH_PRIVATE_SERVER }}
+          script: |
+            echo "=== DOCKER PS ==="
+            docker ps -a
+
+            echo ""
+            echo "=== BACKEND LOGS (last 200 lines) ==="
+            docker logs --tail=200 lammah_backend-backend-1 2>&1 || docker logs --tail=200 $(docker ps -a --filter "name=backend" --format "{{.Names}}" | head -1) 2>&1
+
+            echo ""
+            echo "=== UPLOADER LOGS (last 50 lines) ==="
+            docker logs --tail=50 lammah_backend-uploader-1 2>&1 || true
+
+            echo ""
+            echo "=== CADDY LOGS (last 50 lines) ==="
+            docker logs --tail=50 $(docker ps -a --filter "name=caddy" --format "{{.Names}}" | head -1) 2>&1 || true
