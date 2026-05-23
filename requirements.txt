@@ -18,3 +18,4 @@ langchain-openai
 PyMuPDF
 requests
 yt-dlp
+json-repair
