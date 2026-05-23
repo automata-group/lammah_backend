@@ -70,24 +70,22 @@ def create_subscription(user_id: str, plan_id: str):
     return sub_result.data[0] if sub_result.data else None, None
 
 
-def use_lecture_quota(user_id: str, metadata: dict = None):
+def use_lecture_quota(user_id: str, metadata: dict = None, cost: int = 15):
     """
-    Deduct a lecture from user's quota.
-    1. Try active subscription first.
-    2. Try free quota.
-    3. Log usage if successful.
+    Deducts a specific number of 'Smart Minutes' from the user's quota.
+    Defaults to 15 minutes for standard processing.
     """
     supabase = get_supabase()
     
-    # 1. Check for active subscription first
+    # 1. Check active subscription
     active_sub = supabase.table("user_subscriptions") \
-        .select("id, lectures_used, subscription_plans(lecture_quota)") \
+        .select("*, subscription_plans(*)") \
         .eq("user_id", user_id) \
         .eq("status", "active") \
         .order("created_at", desc=True) \
         .limit(1) \
         .execute()
-    
+        
     used_subscription = False
     
     if active_sub.data:
@@ -95,27 +93,33 @@ def use_lecture_quota(user_id: str, metadata: dict = None):
         used = sub.get("lectures_used", 0) or 0
         quota = sub.get("subscription_plans", {}).get("lecture_quota", 0)
         
-        if used < quota:
-            # Increment subscription usage
+        if used + cost <= quota:
+            new_used = used + cost
             supabase.table("user_subscriptions") \
-                .update({"lectures_used": used + 1}) \
+                .update({"lectures_used": new_used}) \
                 .eq("id", sub["id"]) \
                 .execute()
+            # Also sync profiles.quota_remaining so auth_guard + frontend display correct value
+            new_remaining = max(0, quota - new_used)
+            supabase.table("profiles") \
+                .update({"quota_remaining": new_remaining}) \
+                .eq("id", user_id) \
+                .execute()
             used_subscription = True
-            logger.info(f"📉 استخدام من باقة الاشتراك: المستخدم {user_id} - ({used+1}/{quota})")
+            logger.info(f"📉 خصم {cost} دقيقة من باقة الاشتراك: المستخدم {user_id} - (مستخدم: {new_used}/{quota} - متبقي: {new_remaining})")
             
     # 2. If no active subscription with quota, check free profile quota
     if not used_subscription:
         profile = supabase.table("profiles").select("quota_remaining").eq("id", user_id).execute()
         quota_remaining = profile.data[0].get("quota_remaining", 0) if profile.data else 0
         
-        if quota_remaining <= 0:
-            logger.warning(f"🚫 رفض معالجة لمحاضرة: لا توجد حصة {user_id}")
+        if quota_remaining < cost:
+            logger.warning(f"🚫 رفض معالجة لمحاضرة: لا تكفي الدقائق لـ {user_id} (مطلوب {cost}، متبقي {quota_remaining})")
             return False
         
-        new_quota = quota_remaining - 1
+        new_quota = quota_remaining - cost
         supabase.table("profiles").update({"quota_remaining": new_quota}).eq("id", user_id).execute()
-        logger.info(f"📉 استخدام من الحصة المجانية: المستخدم {user_id} - متبقي {new_quota}")
+        logger.info(f"📉 خصم {cost} دقيقة من الحصة المجانية: المستخدم {user_id} - متبقي {new_quota}")
 
     # 3. Log usage
     try:
@@ -205,3 +209,41 @@ def get_usage_logs(user_id: str, limit: int = 50):
     
     return result.data or []
 
+def refund_lecture_quota(user_id: str, history_id: str, error_msg: str = None):
+    """
+    Refunds a lecture credit if processing failed.
+    """
+    try:
+        supabase = get_supabase()
+        
+        # 1. Update the log to failed status
+        supabase.table("usage_logs").update({
+            "status": "failed",
+            "metadata": {"error": error_msg or "Unknown error"}
+        }).eq("id", history_id).execute()
+
+        # 2. Check if we should refund profile quota or subscription quota
+        # If the user has an active subscription, increment its 'available' quota by decrementing used
+        active_sub = supabase.table("user_subscriptions") \
+            .select("id, lectures_used") \
+            .eq("user_id", user_id) \
+            .eq("status", "active") \
+            .execute()
+        
+        if active_sub.data:
+            sub_id = active_sub.data[0]["id"]
+            used = active_data = active_sub.data[0].get("lectures_used", 0)
+            if used > 0:
+                supabase.table("user_subscriptions").update({"lectures_used": used - 1}).eq("id", sub_id).execute()
+                logger.info(f"🔄 Refunded 1 lecture to subscription {sub_id} for user {user_id}")
+                return
+                
+        # 3. Fallback: Refund to profile quota
+        prof = supabase.table("profiles").select("quota_remaining").eq("id", user_id).execute()
+        if prof.data:
+            curr = prof.data[0].get("quota_remaining", 0)
+            supabase.table("profiles").update({"quota_remaining": curr + 1}).eq("id", user_id).execute()
+            logger.info(f"🔄 Refunded 1 lecture to profile for user {user_id}")
+            
+    except Exception as e:
+        logger.error(f"[REFUND ERROR] Failed to refund for user {user_id}: {e}")

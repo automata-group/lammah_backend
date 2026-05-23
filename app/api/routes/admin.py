@@ -122,10 +122,10 @@ async def cancel_user_plan(user_id: str, admin=Depends(verify_admin)):
             .eq("status", "active") \
             .execute()
             
-        # 2. Reset profile (Quota to 1, clear plan)
+        # 2. Reset profile (Quota to 0, clear plan)
         supabase.table("profiles") \
             .update({
-                "quota_remaining": 1,
+                "quota_remaining": 0,
                 "current_plan_id": None
             }) \
             .eq("id", user_id) \

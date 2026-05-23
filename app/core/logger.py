@@ -3,6 +3,18 @@ import sys
 import os
 from logging.handlers import RotatingFileHandler
 
+# Enforce UTF-8 encoding on Windows standard streams to avoid UnicodeEncodeError in console
+if hasattr(sys.stdout, "reconfigure"):
+    try:
+        sys.stdout.reconfigure(encoding="utf-8")
+    except Exception:
+        pass
+if hasattr(sys.stderr, "reconfigure"):
+    try:
+        sys.stderr.reconfigure(encoding="utf-8")
+    except Exception:
+        pass
+
 # إنشاء مجلد للسجلات بمسار مطلق لضمان الثبات
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 LOG_DIR = os.path.join(BASE_DIR, "logs")

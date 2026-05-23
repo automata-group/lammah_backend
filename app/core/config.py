@@ -32,7 +32,7 @@ class Settings(BaseSettings):
     GEMINI_API_KEY: str | None = None
     OPENROUTER_API_KEY: str | None = None
     GROQ_API_KEY: str | None = None
-    WHISPER_API_KEY: str | None = None
+    GPT_AUDIO_KEY: str | None = None
 
     model_config = SettingsConfigDict(
         env_file=(".env", ".env.local"), 

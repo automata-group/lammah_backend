@@ -51,7 +51,7 @@ async def get_user_profile(request: Request, user=Depends(verify_token)):
             "id": user.id,
             "phone_number": getattr(user, 'phone', None),
             "phone_verified": bool(getattr(user, 'phone', None)),
-            "quota_remaining": 1,
+            "quota_remaining": 0,
         }
         
         try:
@@ -109,6 +109,7 @@ async def verify_phone_active(profile=Depends(get_user_profile)):
 
 async def check_quota(request: Request, profile=Depends(get_user_profile)):
     """Verify user has remaining quota and prevent device-level trial abuse."""
+    logger.info(f"🛡️ [CHECK_QUOTA] Checking quota for user: {profile.get('id')} | Current quota: {profile.get('quota_remaining')}")
     supabase = get_supabase()
     quota = profile.get("quota_remaining", 0)
     fingerprint = profile.get("device_fingerprint") # Already updated by get_user_profile
@@ -172,6 +173,45 @@ async def check_quota(request: Request, profile=Depends(get_user_profile)):
             "type": "quota_exceeded"
         })
     
+    return profile
+
+async def check_premium_plans(request: Request, profile=Depends(check_quota)):
+    """Enforces access control: ONLY 'شهري - برو' or 'أسبوعي - VIP' subscribers are authorized."""
+    logger.info(f"🛡️ [check_premium_plans] Verifying premium status for user: {profile.get('id')}")
+    supabase = get_supabase()
+    
+    try:
+        sub_result = supabase.table("user_subscriptions") \
+            .select("*, subscription_plans(*)") \
+            .eq("user_id", profile["id"]) \
+            .eq("status", "active") \
+            .gte("expires_at", datetime.now(timezone.utc).isoformat()) \
+            .order("created_at", desc=True) \
+            .limit(1) \
+            .execute()
+            
+        active_sub = sub_result.data[0] if sub_result.data else None
+    except Exception as e:
+        logger.error(f"❌ Error checking premium plan: {str(e)}")
+        active_sub = None
+        
+    if not active_sub:
+        raise HTTPException(status_code=403, detail={
+            "user_message": "🚫 هذه الميزة الحصرية متاحة فقط للمشتركين في الباقات المدفوعة. يرجى ترقية حسابك للاستمتاع بها! 🚀"
+        })
+        
+    plan = active_sub.get("subscription_plans", {})
+    plan_name = plan.get("name", "")
+    plan_price = float(plan.get("price_ils", 0))
+    
+    # Enforce only the 100 shekels Gold plan ("باقة الفصل الدراسي (الذهبية)")
+    if plan_price < 100.0 and "الذهبية" not in plan_name:
+        raise HTTPException(status_code=403, detail={
+            "user_message": "🚫 ميزة إنشاء وتوليد دفاتر البائعين للمتجر متاحة حصرياً لمشتركي (باقة الفصل الدراسي - 100 شيكل) فقط. يرجى ترقية باقتك للبدء في جني الأرباح! 💰🚀"
+        })
+        
+    # Inject active subscription into profile to reuse it in routing
+    profile["active_subscription"] = active_sub
     return profile
 
 async def verify_admin(profile=Depends(get_user_profile)):

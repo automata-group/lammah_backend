@@ -70,27 +70,8 @@ export default function CheckoutPage({ params }: { params: Promise<{ planId: str
       }
     } catch(e) {}
     
-    const phone = "970598298930"; // Formatted internationally
+    const phone = "972598298930"; // Formatted internationally with +972 prefix
     const message = `مرحباً، أود تأكيد الدفع لباقة (${orderDetails.plan_name}).\nالاسم الثلاثي: ${fullName}\nرقم الطلب الخاص بي هو: ${orderDetails.order_id}\nمرفق صورة إيصال الدفع عبر تطبيق ريفلكت.`;
-    const url = `https://wa.me/${phone}?text=${encodeURIComponent(message)}`;
-    window.open(url, "_blank");
-  };
-
-  const handleOtherPayment = async () => {
-    if (!orderDetails) return;
-    if (!fullName.trim()) {
-      alert("الرجاء إدخال اسمك الثلاثي أولاً.");
-      return;
-    }
-    try {
-      if (user) {
-        const supabase = createClient();
-        await supabase.from('profiles').update({ full_name: fullName.trim() }).eq('id', user.id);
-      }
-    } catch(e) {}
-    
-    const phone = "970598298930";
-    const message = `مرحباً، أود الاشتراك في باقة (${orderDetails.plan_name}).\nالاسم الثلاثي: ${fullName}\nرقم الطلب: ${orderDetails.order_id}\nأريد الاستفسار عن طريقة دفع أخرى غير ريفلكت.`;
     const url = `https://wa.me/${phone}?text=${encodeURIComponent(message)}`;
     window.open(url, "_blank");
   };
@@ -130,7 +111,7 @@ export default function CheckoutPage({ params }: { params: Promise<{ planId: str
                  placeholder="الرجاء إدخال اسمك الثلاثي لمطابقته مع حوالة Reflect" 
                  value={fullName}
                  onChange={(e) => setFullName(e.target.value)}
-                 className="w-full bg-slate-900/80 border border-slate-700 focus:border-indigo-500 rounded-xl py-3 px-4 text-slate-100 placeholder:text-slate-500 text-sm outline-none transition-all"
+                 className="w-full bg-slate-950 border border-slate-800 focus:border-indigo-500 rounded-xl py-3 px-4 text-slate-100 placeholder:text-slate-500 text-sm outline-none transition-all"
                />
              </div>
              
@@ -141,22 +122,9 @@ export default function CheckoutPage({ params }: { params: Promise<{ planId: str
                title={!fullName.trim() ? "الرجاء كتابة اسمك أولاً" : ""}
              >
                <MessageCircle className="w-5 h-5" />
-               إرسال الإيصال عبر واتساب
+               إرسال الإيصال عبر تطبيق ريفليكت على واتساب
              </button>
 
-             <div className="bg-slate-900/40 border border-slate-700/50 rounded-xl p-5 mb-4 text-center">
-               <p className="text-sm text-slate-400 mb-3">هل تفضل استخدام طريقة دفع أخرى؟</p>
-               <button 
-                 onClick={handleOtherPayment} 
-                 disabled={!fullName.trim()} 
-                 title={!fullName.trim() ? "الرجاء كتابة اسمك أولاً" : ""}
-                 className="w-full border border-slate-600 hover:bg-slate-700 text-slate-200 font-semibold py-3 rounded-lg flex items-center justify-center gap-2 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-               >
-                 <MessageCircle className="w-4 h-4 text-slate-400" />
-                 تواصل معي عبر واتساب
-               </button>
-             </div>
-             
              <div className="mt-4">
                 <button onClick={() => router.push("/dashboard")} className="text-slate-500 hover:text-slate-300 text-sm hover:underline underline-offset-4">سأقوم بالدفع لاحقاً (العودة للوحة التحكم)</button>
              </div>

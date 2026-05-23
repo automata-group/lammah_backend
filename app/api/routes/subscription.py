@@ -62,7 +62,8 @@ async def get_my_quota(profile=Depends(get_user_profile)):
         "quota_remaining": info.get("quota_remaining", 0),
         "quota_reset_at": profile.get("quota_reset_at"),
         "plan_id": profile.get("current_plan_id"),
-        "plan_name": plan_name
+        "plan_name": plan_name,
+        "full_name": profile.get("full_name")
     }
 
 
@@ -91,3 +92,29 @@ async def get_history_item(log_id: str, profile=Depends(get_user_profile)):
     except Exception as e:
         logger.warning(f"⚠️ خطأ في جلب تفاصيل السجل: {str(e)}")
         raise HTTPException(status_code=404, detail="السجل غير موجود أو يخص شخصاً آخر")
+
+
+class UpdateTitleRequest(BaseModel):
+    title: str
+
+
+@router.patch("/history/{log_id}/title")
+async def update_lecture_title(log_id: str, body: UpdateTitleRequest, profile=Depends(get_user_profile)):
+    """Update the title of a specific lecture history record."""
+    try:
+        from app.db.supabase_client import get_supabase
+        supabase = get_supabase()
+        # Fetch existing record
+        existing = supabase.table("usage_logs").select("metadata").eq("id", log_id).eq("user_id", profile["id"]).single().execute()
+        if not existing.data:
+            raise HTTPException(status_code=404, detail="السجل غير موجود")
+        # Merge title into existing metadata
+        meta = existing.data.get("metadata") or {}
+        meta["title"] = body.title.strip()
+        supabase.table("usage_logs").update({"metadata": meta}).eq("id", log_id).execute()
+        return {"success": True, "title": meta["title"]}
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"⚠️ خطأ في تحديث العنوان: {str(e)}")
+        raise HTTPException(status_code=500, detail="فشل تحديث العنوان")

@@ -631,7 +631,7 @@ function DashboardContent() {
                       <button 
                         onClick={() => {
                           const msg = `مرحباً بكِ مهندسة، أواجه مشكلة تقنية في المنصة.\nحسابي: ${user?.user_metadata?.full_name || user?.email || 'غير معروف'}\nالخطأ الذي ظهر لي:\n"${error}"\nأرجو المساعدة.`;
-                          window.open(`https://wa.me/970598298930?text=${encodeURIComponent(msg)}`, '_blank');
+                          window.open(`https://wa.me/972598298930?text=${encodeURIComponent(msg)}`, '_blank');
                         }}
                         className="text-sm bg-slate-800 border border-slate-600 hover:bg-slate-700 text-slate-200 px-4 py-2 rounded-lg flex items-center justify-center gap-2 transition-colors min-w-[140px]"
                         title="إرسال سجل الخطأ للدعم الفني عبر واتساب"

@@ -7,8 +7,8 @@ from pydantic import BaseModel
 from langchain_core.messages import SystemMessage, HumanMessage, AIMessage
 from app.core.config import settings
 from app.core.auth_guard import get_user_profile, verify_phone_active
-from app.services.rag_service import query_relevant_context
-from app.services.llm_factory import get_llm_for_user
+from app.services.ai.rag import query_relevant_context
+from app.services.ai.factory import get_llm_for_user
 from app.db.supabase_client import get_supabase
 
 logger = logging.getLogger(__name__)
@@ -100,15 +100,18 @@ async def chat_with_lecture(request: ChatRequest, user: dict = Depends(get_user_
         window_size = 8
         history_window = full_history[-window_size:] if len(full_history) > window_size else full_history
 
-        # 4. System Prompt Optimization
-        # Increase context window for paid users in Chat
-        max_chars = 50000 if "متقدم" in plan_name or "VIP" in plan_name or "برو" in plan_name else 3000
+        # 4. System Prompt Optimization (Externalized to chat_agent.md)
+        from pathlib import Path
+        prompt_path = Path(__file__).parent.parent.parent / "services" / "ai" / "prompts" / "chat_agent.md"
         
-        system_instruction = (
-            "أنت مساعد دراسي ذكي. أجب على أسئلة الطالب بناءً على نص المحاضرة المرفق فقط. "
-            "قدم إجابات دقيقة، مباشرة، ومختصرة قدر الإمكان. لا تقم بتوليد شروحات طويلة أو إضافية إلا إذا طلب منك الطالب ذلك صراحة.\n\n"
-            f"--- نص المحاضرة ---\n{transcript[:max_chars]}\n\n"
-            f"--- سياق الشرائح ذي الصلة ---\n{rag_text}\n"
+        with open(prompt_path, "r", encoding="utf-8") as f:
+            prompt_template = f.read()
+            
+        max_chars = 50000 if any(term in plan_name for term in ["متقدم", "VIP", "برو", "Advanced", "Pro"]) else 3000
+        
+        system_instruction = prompt_template.format(
+            transcript=transcript[:max_chars],
+            rag_text=rag_text
         )
 
         model = get_llm_for_user(user_id=user["id"], streaming=True)

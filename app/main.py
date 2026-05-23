@@ -64,12 +64,16 @@ async def early_security_middleware(request: Request, call_next):
     return await call_next(request)
 
 
+from app.api.routes import notebook, marketplace
+
 # ====== Routes ======
 app.include_router(summarize.router, prefix="/api/v1/summarize", tags=["summarize"])
 app.include_router(subscription.router, prefix="/api/v1/subscription", tags=["subscription"])
 app.include_router(chat.router, prefix="/api/v1/chat", tags=["chat"])
 app.include_router(transactions.router, prefix="/api/v1/transactions", tags=["transactions"])
 app.include_router(admin.router, prefix="/api/v1/admin", tags=["admin"])
+app.include_router(notebook.router, prefix="/api/v1/notebook", tags=["notebook"])
+app.include_router(marketplace.router, prefix="/api/v1/marketplace", tags=["marketplace"])
 
 # ====== Global Error Handler ======
 @app.exception_handler(Exception)

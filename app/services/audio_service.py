@@ -12,23 +12,23 @@ from app.core.logger import logger
 client = None
 is_openrouter = False
 
-if settings.WHISPER_API_KEY:
-    key = settings.WHISPER_API_KEY.strip()
+if settings.GPT_AUDIO_KEY:
+    key = settings.GPT_AUDIO_KEY.strip()
     if key.startswith("sk-or-"):
-        logger.info(f"🌐 [INIT] Using OpenRouter for Whisper (Key: {key[:10]}...)")
+        logger.info(f"[INIT] Using OpenRouter for Lammah Audio Engine (Key: {key[:10]}...)")
         client = OpenAI(
             api_key=key,
             base_url="https://openrouter.ai/api/v1"
         )
         is_openrouter = True
     else:
-        logger.info(f"🏎️ [INIT] Using Direct Groq for Whisper (Key: {key[:10]}...)")
+        logger.info(f"[INIT] Using Direct API for Audio (Key: {key[:10]}...)")
         client = Groq(api_key=key)
 elif settings.GROQ_API_KEY:
-    logger.info(f"🏎️ [INIT] Using Groq API Key for Whisper")
+    logger.info(f"[INIT] Using Groq API Key for Whisper")
     client = Groq(api_key=settings.GROQ_API_KEY.strip())
 else:
-    logger.error("❌ [INIT] No API Key found for transcription!")
+    logger.error("[INIT] No API Key found for transcription!")
 
 def transcribe_audio(file_path: str, progress_callback=None) -> str:
     """
@@ -45,7 +45,7 @@ def transcribe_audio(file_path: str, progress_callback=None) -> str:
     if progress_callback:
         progress_callback(f"📦 حجم الملف: {file_size_mb:.2f} ميجابايت")
     
-    if file_size_mb > 24.0: # Groq limit is 25MB
+    if file_size_mb > 2.0: # Auto-chunk files > 2MB for beautiful 5-minute timestamps!
         return _transcribe_large_audio(file_path, progress_callback)
     
     if progress_callback:
@@ -57,10 +57,10 @@ def transcribe_audio(file_path: str, progress_callback=None) -> str:
         import requests
         try:
             if progress_callback:
-                progress_callback("⚡ إرسال الملف لمحرك لمّاح (OpenRouter)...")
+                progress_callback("⚡ جاري الإرسال لمحرك لمّاح الصوتي الذكي...")
             
             headers = {
-                "Authorization": f"Bearer {settings.WHISPER_API_KEY.strip()}",
+                "Authorization": f"Bearer {settings.GPT_AUDIO_KEY.strip()}",
                 "HTTP-Referer": "https://lammah.site",
                 "X-Title": "Lammah AI",
                 "Content-Type": "application/json"
@@ -73,8 +73,8 @@ def transcribe_audio(file_path: str, progress_callback=None) -> str:
             ext = os.path.splitext(file_path)[1].replace(".", "").lower()
             if ext == "m4a": ext = "mp4" # OpenRouter mapping
             
-            # Try primary model first, then fallback to turbo
-            models_to_try = ["openai/whisper-large-v3", "openai/whisper-large-v3-turbo"]
+            # Strictly use Qwen ASR Flash as primary, with GPT Audio Mini as fallback
+            models_to_try = ["qwen/qwen3-asr-flash-2026-02-10", "openai/gpt-4o-mini-transcribe"]
             last_error = ""
             
             for m in models_to_try:
@@ -150,7 +150,7 @@ def _transcribe_large_audio(file_path: str, progress_callback=None) -> str:
     # Use local state to avoid global mutation issues (UnboundLocalError)
     active_client = client
     active_is_openrouter = is_openrouter
-    active_model = "openai/whisper-large-v3" if is_openrouter else "whisper-large-v3"
+    active_model = "qwen/qwen3-asr-flash-2026-02-10" if is_openrouter else "whisper-large-v3"
     
     chunk_dir = f"{file_path}_chunks"
     os.makedirs(chunk_dir, exist_ok=True)
@@ -158,13 +158,13 @@ def _transcribe_large_audio(file_path: str, progress_callback=None) -> str:
     ext = os.path.splitext(file_path)[1]
     
     if progress_callback:
-        progress_callback("✂️ الملف كبير، جاري تقسيمه لمقاطع (10 دقائق)...")
+        progress_callback("✂️ جاري تقسيم الملف لمقاطع (5 دقائق) لتوليد التوقيتات...")
         
-    # Split into 10-minute segments using ffmpeg
+    # Split into 5-minute segments using ffmpeg
     try:
         subprocess.run([
             "ffmpeg", "-y", "-i", file_path,
-            "-f", "segment", "-segment_time", "600",
+            "-f", "segment", "-segment_time", "300",
             "-c:a", "libmp3lame", "-b:a", "48k", "-ac", "1", # Re-encode to small mono MP3 for high reliability
             f"{chunk_dir}/chunk_%03d.mp3"
         ], check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
@@ -191,7 +191,7 @@ def _transcribe_large_audio(file_path: str, progress_callback=None) -> str:
                 if active_is_openrouter:
                     import requests
                     headers = {
-                        "Authorization": f"Bearer {settings.WHISPER_API_KEY.strip()}",
+                        "Authorization": f"Bearer {settings.GPT_AUDIO_KEY.strip()}",
                         "HTTP-Referer": "https://lammah.site",
                         "X-Title": "Lammah AI",
                         "Content-Type": "application/json"
@@ -201,15 +201,13 @@ def _transcribe_large_audio(file_path: str, progress_callback=None) -> str:
                     with open(chunk_path, "rb") as f:
                         encoded_chunk = base64.b64encode(f.read()).decode('utf-8')
                     
-                    # Try current active model (or start with v3 then turbo)
-                    models_to_try = [active_model]
-                    if active_model == "openai/whisper-large-v3":
-                        models_to_try.append("openai/whisper-large-v3-turbo")
+                    # Strictly use Qwen ASR Flash with GPT as fallback
+                    models_to_try = ["qwen/qwen3-asr-flash-2026-02-10", "openai/gpt-4o-mini-transcribe"]
                     
                     chunk_success = False
                     for m in models_to_try:
                         try:
-                            logger.info(f"🎙️ [OR-FIX] Transcribing chunk with model: {m}")
+                            logger.info(f"🎙️ [LAMMAH] Transcribing chunk with model: {m}")
                             payload = {
                                 "model": m,
                                 "input_audio": {
@@ -226,7 +224,11 @@ def _transcribe_large_audio(file_path: str, progress_callback=None) -> str:
                             )
                             
                             if response.status_code == 200:
-                                full_transcript.append(response.json().get("text", ""))
+                                chunk_text = response.json().get("text", "").strip()
+                                m_start = idx * 5
+                                m_end = (idx + 1) * 5
+                                timestamp_label = f"\n\n⏱️ [{m_start:02d}:00 - {m_end:02d}:00]\n"
+                                full_transcript.append(timestamp_label + chunk_text)
                                 success = True
                                 chunk_success = True
                                 # If this model worked, stick with it for next chunks
@@ -250,38 +252,49 @@ def _transcribe_large_audio(file_path: str, progress_callback=None) -> str:
                             model=active_model,
                             timeout=300.0
                         )
-                        full_transcript.append(transcription.text)
+                        chunk_text = transcription.text.strip()
+                        m_start = idx * 5
+                        m_end = (idx + 1) * 5
+                        timestamp_label = f"\n\n⏱️ [{m_start:02d}:00 - {m_end:02d}:00]\n"
+                        full_transcript.append(timestamp_label + chunk_text)
                         success = True
                         break
             except Exception as e:
                 err_msg = str(e)
                 logger.error(f"❌ CHUNK {idx} FAILED (Attempt {attempt+1}): {err_msg}")
                 
-                if attempt < retries - 1:
-                    import time
-                    time.sleep(5)
-                    continue
-                else:
-                    # Fallback to Groq if OpenRouter fails completely
-                    if active_is_openrouter and settings.GROQ_API_KEY:
-                        logger.info("🚀 محرك لمّاح الأساسي متوقف مؤقتاً... ننتقل للمحرك البديل الفائق...")
-                        try:
-                            groq_client = Groq(api_key=settings.GROQ_API_KEY.strip())
-                            with open(chunk_path, "rb") as f:
-                                transcription = groq_client.audio.transcriptions.create(
-                                    file=(os.path.basename(chunk_path), f.read(), "audio/mpeg"),
-                                    model="whisper-large-v3",
-                                    timeout=300.0
-                                )
-                                full_transcript.append(transcription.text)
-                                active_client = groq_client
-                                active_is_openrouter = False
-                                active_model = "whisper-large-v3"
-                                success = True
-                                break 
-                        except Exception as fallback_e:
-                            logger.error(f"❌ Lammah-Groq fallback failed: {str(fallback_e)}")
-                            raise RuntimeError(f"⚠️ عذراً، محرك لمّاح يواجه ضغطاً استثنائياً حالياً. (REV-777)")
+                # If OpenRouter fails, immediately switch to Groq if key is available, without waiting for 10 retries!
+                if active_is_openrouter and settings.GROQ_API_KEY:
+                    logger.info("🚀 [OR-FAIL-IMMEDIATE] Switch to Groq immediately due to OpenRouter limitation...")
+                    try:
+                        groq_client = Groq(api_key=settings.GROQ_API_KEY.strip())
+                        with open(chunk_path, "rb") as f:
+                            transcription = groq_client.audio.transcriptions.create(
+                                file=(os.path.basename(chunk_path), f.read(), "audio/mpeg"),
+                                model="whisper-large-v3",
+                                timeout=300.0
+                            )
+                            chunk_text = transcription.text.strip()
+                            m_start = idx * 5
+                            m_end = (idx + 1) * 5
+                            timestamp_label = f"\n\n⏱️ [{m_start:02d}:00 - {m_end:02d}:00]\n"
+                            full_transcript.append(timestamp_label + chunk_text)
+                            
+                            # Make the switch PERMANENT for all subsequent chunks!
+                            active_client = groq_client
+                            active_is_openrouter = False
+                            active_model = "whisper-large-v3"
+                            
+                            success = True
+                            break
+                    except Exception as fallback_e:
+                        logger.error(f"❌ Lammah-Groq fallback failed: {str(fallback_e)}")
+                
+                if not success:
+                    if attempt < retries - 1:
+                        import time
+                        time.sleep(5)
+                        continue
                     else:
                         raise RuntimeError(f"⚠️ عذراً، محرك لمّاح يواجه ضغطاً شديداً حالياً. (REV-777)")
 
