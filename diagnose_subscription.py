@@ -43,38 +43,41 @@ try:
     else:
         print(f"\n✅ Found 'شهري - برو' Plan ID: {pro_plan['id']}")
         
-        # Apply upgrade to all profiles so they can test easily!
-        for p in profiles:
-            user_id = p['id']
-            # Check if this user has an active sub for 'شهري - برو'
-            active_pro = [s for s in subs if s['user_id'] == user_id and s.get('subscription_plans', {}).get('name') == 'شهري - برو' and s['status'] == 'active']
-            
-            if not active_pro:
-                print(f"⚡ Fixing user {p.get('full_name')} ({user_id}) - inserting active 'شهري - برو' subscription!")
-                
-                # First deactivate any existing subscriptions
-                supabase.table('user_subscriptions').update({'status': 'expired'}).eq('user_id', user_id).execute()
-                
-                # Insert active subscription
-                expires = datetime.now(timezone.utc) + timedelta(days=30)
-                sub_data = {
-                    "user_id": user_id,
-                    "plan_id": pro_plan['id'],
-                    "status": "active",
-                    "expires_at": expires.isoformat(),
-                    "lectures_used": 0,
-                    "created_at": datetime.now(timezone.utc).isoformat()
-                }
-                
-                ins_resp = supabase.table('user_subscriptions').insert(sub_data).execute()
-                if ins_resp.data:
-                    # Update profile current_plan_id & quota
-                    supabase.table('profiles').update({
-                        'current_plan_id': pro_plan['id'],
-                        'quota_remaining': pro_plan.get('lecture_quota', 100)
-                    }).eq('id', user_id).execute()
-                    
-                    print(f"🎉 SUCCESS! User {p.get('full_name')} is now fully upgraded to active 'شهري - برو' with {pro_plan.get('lecture_quota', 100)} lectures!")
+        # [COMMENTED OUT FOR SAFETY]
+        # To avoid accidentally upgrading all accounts during diagnostics, the auto-upgrade block has been disabled.
+        # If you need to manually upgrade a specific user, do not run a loop over all profiles.
+        #
+        # for p in profiles:
+        #     user_id = p['id']
+        #     # Check if this user has an active sub for 'شهري - برو'
+        #     active_pro = [s for s in subs if s['user_id'] == user_id and s.get('subscription_plans', {}).get('name') == 'شهري - برو' and s['status'] == 'active']
+        #     
+        #     if not active_pro:
+        #         print(f"⚡ Fixing user {p.get('full_name')} ({user_id}) - inserting active 'شهري - برو' subscription!")
+        #         
+        #         # First deactivate any existing subscriptions
+        #         supabase.table('user_subscriptions').update({'status': 'expired'}).eq('user_id', user_id).execute()
+        #         
+        #         # Insert active subscription
+        #         expires = datetime.now(timezone.utc) + timedelta(days=30)
+        #         sub_data = {
+        #             "user_id": user_id,
+        #             "plan_id": pro_plan['id'],
+        #             "status": "active",
+        #             "expires_at": expires.isoformat(),
+        #             "lectures_used": 0,
+        #             "created_at": datetime.now(timezone.utc).isoformat()
+        #         }
+        #         
+        #         ins_resp = supabase.table('user_subscriptions').insert(sub_data).execute()
+        #         if ins_resp.data:
+        #             # Update profile current_plan_id & quota
+        #             supabase.table('profiles').update({
+        #                 'current_plan_id': pro_plan['id'],
+        #                 'quota_remaining': pro_plan.get('lecture_quota', 100)
+        #             }).eq('id', user_id).execute()
+        #             
+        #             print(f"🎉 SUCCESS! User {p.get('full_name')} is now fully upgraded to active 'شهري - برو' with {pro_plan.get('lecture_quota', 100)} lectures!")
 
 except Exception as e:
     print("❌ Diagnostics failed with error:", e)
