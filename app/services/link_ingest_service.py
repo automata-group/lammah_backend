@@ -139,6 +139,11 @@ def download_audio_from_link(lecture_url: str, upload_dir: str, unique_id: str) 
         }],
     }
 
+    proxy = os.getenv("YOUTUBE_PROXY")
+    if proxy:
+        logger.info(f"Routing local fallback download through proxy: {proxy}")
+        ydl_opts["proxy"] = proxy
+
     try:
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             info = ydl.extract_info(lecture_url, download=True)
