@@ -33,6 +33,7 @@ class Settings(BaseSettings):
     OPENROUTER_API_KEY: str | None = None
     GROQ_API_KEY: str | None = None
     GPT_AUDIO_KEY: str | None = None
+    YOUTUBE_DOWNLOADER_URL: str | None = None
 
     model_config = SettingsConfigDict(
         env_file=(".env", ".env.local"), 

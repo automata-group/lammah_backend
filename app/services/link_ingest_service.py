@@ -53,6 +53,53 @@ def download_audio_from_link(lecture_url: str, upload_dir: str, unique_id: str) 
     fallback_name = f"{unique_id}_{uuid.uuid4().hex[:6]}{target_ext}"
     fallback_path = os.path.join(upload_dir, fallback_name)
 
+    # Check if a dedicated YouTube downloader container is configured
+    from app.core.config import settings
+    if settings.YOUTUBE_DOWNLOADER_URL:
+        import requests
+        try:
+            logger.info(f"Using dedicated YouTube downloader container at {settings.YOUTUBE_DOWNLOADER_URL}")
+            response = requests.post(
+                f"{settings.YOUTUBE_DOWNLOADER_URL.rstrip('/')}/download",
+                json={
+                    "url": lecture_url,
+                    "unique_id": unique_id,
+                    "upload_dir": upload_dir
+                },
+                timeout=300  # 5 minutes timeout for downloading and transcoding
+            )
+            if response.status_code == 200:
+                data = response.json()
+                downloaded_path = data.get("filepath")
+                filename = data.get("filename")
+                
+                backend_path = os.path.join(upload_dir, filename)
+                if os.path.exists(backend_path):
+                    logger.info(f"Downloaded lecture using ytdl-service and verified file at: {backend_path}")
+                    return backend_path
+                elif downloaded_path and os.path.exists(downloaded_path):
+                    logger.info(f"Downloaded lecture using ytdl-service and verified file at service path: {downloaded_path}")
+                    return downloaded_path
+                else:
+                    logger.error(f"ytdl-service returned success, but file not found at {backend_path} or {downloaded_path}")
+            else:
+                try:
+                    err_json = response.json()
+                    err_detail = err_json.get("detail", response.text)
+                except Exception:
+                    err_detail = response.text
+                
+                logger.error(f"ytdl-service failed with status {response.status_code}: {err_detail}")
+                if "blocked" in err_detail or "Sign in" in err_detail or "403" in err_detail:
+                    raise RuntimeError(
+                        "❌ فشل جلب المحاضرة: يوتيوب يمنع التنزيل من السيرفر. "
+                        "يرجى تنزيل المحاضرة على جهازك ورفعها مباشرة كملف صوتي."
+                    )
+        except RuntimeError:
+            raise
+        except Exception as e:
+            logger.error(f"Failed to communicate with ytdl-service: {e}. Falling back to local download.")
+
     # We removed the direct HTTP download fallback because it downloads HTML pages for YouTube/Zoom links
     # and saves them as .mp3 files, which crashes the audio transcriber.
     # yt-dlp is perfectly capable of handling direct links anyway.
