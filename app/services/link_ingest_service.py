@@ -144,6 +144,14 @@ def download_audio_from_link(lecture_url: str, upload_dir: str, unique_id: str) 
         logger.info(f"Routing local fallback download through proxy: {proxy}")
         ydl_opts["proxy"] = proxy
 
+    # Use YouTube cookies if available — completely bypasses datacenter IP block & PO token requirement
+    cookies_path = os.getenv("YOUTUBE_COOKIES_PATH", "/app/youtube_cookies.txt")
+    if os.path.exists(cookies_path):
+        logger.info(f"Using YouTube cookies from: {cookies_path}")
+        ydl_opts["cookiefile"] = cookies_path
+    else:
+        logger.warning("No YouTube cookies file found — local fallback may be blocked by YouTube on datacenter IPs.")
+
     try:
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             info = ydl.extract_info(lecture_url, download=True)
