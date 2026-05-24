@@ -339,7 +339,8 @@ async def process_batch_lectures(
                         audio_paths.append(dl_path)
                     except Exception as e:
                         logger.error(f"Failed to download audio from {url}: {e}")
-                        yield f"data: {json.dumps({'type': 'progress', 'step': '0/5', 'message': f'⚠️ فشل تحميل الرابط {idx+1}...'}, ensure_ascii=False)}\n\n"
+                        yield f"data: {json.dumps({'type': 'error', 'message': str(e)}, ensure_ascii=False)}\n\n"
+                        return
 
             # 2. Resolve temp IDs (if any) and append to audio_paths
             if temp_ids_list:

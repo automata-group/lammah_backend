@@ -178,6 +178,8 @@ async def process_notebook(
                         audio_paths.append(dl_path)
                     except Exception as e:
                         logger.error(f"Failed to download audio from {url}: {e}")
+                        yield f"data: {json.dumps({'type': 'error', 'message': str(e)}, ensure_ascii=False)}\n\n"
+                        return
             else:
                 yield f"data: {json.dumps({'type': 'progress', 'step': '1/5', 'message': '📥 تم استلام وتجهيز الملفات.'}, ensure_ascii=False)}\n\n"
 
