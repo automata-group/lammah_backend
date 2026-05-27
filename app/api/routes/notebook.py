@@ -121,16 +121,20 @@ async def process_notebook(
             base, _ = os.path.splitext(temp_id)
             processed_p = os.path.join(temp_dir, f"{base}_processed.mp3")
             
-            # If both raw temp_path and processed_p are missing, wait up to 10 seconds for file system sync
-            max_wait = 10
+            logger.info(f"[NOTEBOOK] Looking for audio: {temp_id} in {temp_dir}")
+            
+            # Wait up to 15 seconds for file to appear (shared volume sync delay in Docker)
+            max_wait = 15
             waited = 0
             while not os.path.exists(temp_path) and not os.path.exists(processed_p) and waited < max_wait:
                 await asyncio.sleep(1)
                 waited += 1
                 
             if os.path.exists(processed_p):
+                logger.info(f"[NOTEBOOK] Found processed audio: {processed_p}")
                 audio_paths.append(processed_p)
             elif os.path.exists(temp_path):
+                logger.info(f"[NOTEBOOK] Found original audio: {temp_path}")
                 audio_paths.append(temp_path)
             else:
                 raise HTTPException(status_code=400, detail="temp_file_missing")
@@ -149,7 +153,16 @@ async def process_notebook(
 
     if pdf_temp_id:
         pdf_path = os.path.join(temp_dir, pdf_temp_id)
-        if not os.path.exists(pdf_path):
+        logger.info(f"[NOTEBOOK] Looking for PDF temp file: {pdf_path}")
+        max_pdf_wait = 10
+        pdf_waited = 0
+        while not os.path.exists(pdf_path) and pdf_waited < max_pdf_wait:
+            await asyncio.sleep(1)
+            pdf_waited += 1
+        if os.path.exists(pdf_path):
+            logger.info(f"[NOTEBOOK] Found PDF: {pdf_path} ({os.path.getsize(pdf_path)} bytes)")
+        else:
+            logger.warning(f"[NOTEBOOK][WARN] PDF not found after {max_pdf_wait}s: {pdf_path} — continuing without slides.")
             pdf_path = None
     elif pdf_file:
         os.makedirs(upload_dir, exist_ok=True)

@@ -309,11 +309,20 @@ async def process_batch_lectures(
     if not urls_list and not temp_ids_list:
         raise HTTPException(status_code=400, detail="Missing audio sources. Provide at least one URL or file.")
         
-    # Handle PDF
+    # Handle PDF — wait up to 10 seconds for it to appear from Go Uploader shared volume
     pdf_path = None
     if pdf_temp_id:
         pdf_path = os.path.join(temp_dir, pdf_temp_id)
-        if not os.path.exists(pdf_path):
+        logger.info(f"[DEBUG] [BATCH] Looking for PDF temp file: {pdf_path}")
+        max_pdf_wait = 10
+        pdf_waited = 0
+        while not os.path.exists(pdf_path) and pdf_waited < max_pdf_wait:
+            await asyncio.sleep(1)
+            pdf_waited += 1
+        if os.path.exists(pdf_path):
+            logger.info(f"[DEBUG] [BATCH] Found PDF: {pdf_path} ({os.path.getsize(pdf_path)} bytes)")
+        else:
+            logger.warning(f"[WARN] [BATCH] PDF not found after {max_pdf_wait}s: {pdf_path} — continuing without.")
             pdf_path = None
     elif pdf_file:
         os.makedirs(upload_dir, exist_ok=True)
@@ -610,23 +619,24 @@ async def process_lecture(
         base, _ = os.path.splitext(audio_temp_id)
         processed_p = os.path.join(temp_dir, f"{base}_processed.mp3")
         
-        logger.info(f"[DEBUG] Waiting for Go Uploader to finish processing: {audio_temp_id}")
+        logger.info(f"[DEBUG] Looking for audio temp file: {audio_temp_id}")
+        logger.info(f"[DEBUG] temp_dir resolved to: {temp_dir}")
         
-        max_wait_seconds = 300 
+        # Wait up to 15 seconds for the file to appear (shared volume sync delay)
+        max_wait_seconds = 15
         waited = 0
-        # While the original file still exists, Go is STILL processing it
-        while os.path.exists(temp_path) and waited < max_wait_seconds:
-            await asyncio.sleep(2)
-            waited += 2
+        while not os.path.exists(processed_p) and not os.path.exists(temp_path) and waited < max_wait_seconds:
+            await asyncio.sleep(1)
+            waited += 1
             
         if os.path.exists(processed_p):
-            logger.info(f"[DEBUG] Go Uploader finished. Found processed path: {processed_p}")
-            audio_path = processed_p  # Just use it directly! No need to move!
+            logger.info(f"[DEBUG] Found Go-processed audio: {processed_p}")
+            audio_path = processed_p
         elif os.path.exists(temp_path):
-            logger.warning(f"[DEBUG] Go Uploader taking too long. Using original path: {temp_path}")
+            logger.info(f"[DEBUG] Found original audio temp file: {temp_path}")
             audio_path = temp_path
         else:
-            logger.error(f"[ERROR] Temp audio file NOT found: {temp_path} or {processed_p}")
+            logger.error(f"[ERROR] Temp audio file NOT found after {max_wait_seconds}s. Checked: {temp_path} and {processed_p}")
             raise HTTPException(status_code=400, detail="temp_file_missing")
             
     elif audio_file:
@@ -639,11 +649,19 @@ async def process_lecture(
     else:
         raise HTTPException(status_code=400, detail="Missing audio source")
 
-    # Handle PDF
+    # Handle PDF — wait up to 10 seconds for it to appear from Go Uploader shared volume
     if pdf_temp_id:
         pdf_path = os.path.join(temp_dir, pdf_temp_id)
-        if not os.path.exists(pdf_path):
-            logger.warning(f"Failed to find PDF: {pdf_path}, continuing without it.")
+        logger.info(f"[DEBUG] Looking for PDF temp file: {pdf_path}")
+        max_pdf_wait = 10
+        pdf_waited = 0
+        while not os.path.exists(pdf_path) and pdf_waited < max_pdf_wait:
+            await asyncio.sleep(1)
+            pdf_waited += 1
+        if os.path.exists(pdf_path):
+            logger.info(f"[DEBUG] Found PDF temp file: {pdf_path} (size: {os.path.getsize(pdf_path)} bytes)")
+        else:
+            logger.warning(f"[WARN] PDF temp file not found after {max_pdf_wait}s: {pdf_path} — continuing without slides.")
             pdf_path = None
     elif pdf_file:
         os.makedirs(upload_dir, exist_ok=True)
