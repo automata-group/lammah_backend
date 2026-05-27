@@ -857,8 +857,8 @@ async def process_lecture(
             }
             log_id = use_lecture_quota(profile["id"], metadata=history_meta, cost=calculated_cost)
             
-            yield f"data: {json.dumps({'type': 'metadata', 'transcript': transcript, 'annotations': annotations}, ensure_ascii=False)}\n\n"
-            yield f"data: {json.dumps({'type': 'done', 'download_url': download_url, 'history_id': log_id, 'title': ai_title}, ensure_ascii=False)}\n\n"
+            yield f"data: {json.dumps({'type': 'metadata', 'annotations': annotations}, ensure_ascii=False)}\n\n"
+            yield f"data: {json.dumps({'type': 'done', 'download_url': download_url, 'history_id': log_id, 'title': ai_title, 'annotations': annotations}, ensure_ascii=False)}\n\n"
 
         except Exception as e:
             logger.error(f"STREAM ERROR: {str(e)}", exc_info=True)
