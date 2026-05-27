@@ -572,7 +572,11 @@ async def process_batch_lectures(
             except Exception as cleanup_err:
                 logger.error(f"[CLEANUP ERROR] Failed to clean up files in batch: {cleanup_err}")
 
-    return StreamingResponse(event_stream(), media_type="text/event-stream")
+    return StreamingResponse(event_stream(), media_type="text/event-stream", headers={
+        "X-Accel-Buffering": "no",
+        "Cache-Control": "no-cache",
+        "Connection": "keep-alive",
+    })
 
 @router.post("/process-lecture")
 async def process_lecture(
@@ -860,7 +864,11 @@ async def process_lecture(
                 if pdf_path and os.path.exists(pdf_path): os.remove(pdf_path)
             except: pass
 
-    return StreamingResponse(event_stream(), media_type="text/event-stream")
+    return StreamingResponse(event_stream(), media_type="text/event-stream", headers={
+        "X-Accel-Buffering": "no",
+        "Cache-Control": "no-cache",
+        "Connection": "keep-alive",
+    })
 
 @router.get("/download/{job_id}.pdf")
 async def download_annotated_pdf(job_id: str):

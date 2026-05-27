@@ -452,7 +452,11 @@ async def process_notebook(
             log_usage_failure(user_id, f"Notebook failure: {str(e)}")
             yield f"data: {json.dumps({'type': 'error', 'message': f'حدث خطأ غير متوقع: {str(e)}'}, ensure_ascii=False)}\n\n"
 
-    return StreamingResponse(event_stream(), media_type="text/event-stream")
+    return StreamingResponse(event_stream(), media_type="text/event-stream", headers={
+        "X-Accel-Buffering": "no",
+        "Cache-Control": "no-cache",
+        "Connection": "keep-alive",
+    })
 
 @router.get("/download/{job_id}.pdf")
 def download_notebook(job_id: str):
