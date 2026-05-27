@@ -144,13 +144,15 @@ async def background_worker(row: LectureRow, user_id: str, plan_name: str, histo
         pdf_context = []
         if pdf_path:
             if pdf_path.lower().endswith(".pptx"):
-                update_progress("3/5", "📑 جاري تحويل عرض البوربوينت لـ PDF...")
-                from app.services.pptx_converter import convert_pptx_to_pdf
-                pdf_path = await asyncio.to_thread(convert_pptx_to_pdf, pdf_path, os.path.dirname(pdf_path))
-            
-            update_progress("3/5", "🔍 جاري تحليل محتوى الشرائح...")
-            pages = await asyncio.to_thread(extract_pages_from_pdf, pdf_path)
-            pdf_context = [p['text'] for p in pages[:150]]
+                update_progress("3/5", "📑 جاري استخراج محتوى شرائح البوربوينت...")
+                from app.services.pptx_converter import extract_text_from_pptx
+                pptx_pages = await asyncio.to_thread(extract_text_from_pptx, pdf_path)
+                pdf_context = [f"--- الشريحة {p['page_number']} ---\n{p['text']}" for p in pptx_pages[:150]]
+            else:
+                update_progress("3/5", "🔍 جاري تحليل محتوى الشرائح...")
+                pages = await asyncio.to_thread(extract_pages_from_pdf, pdf_path)
+                pdf_context = [p['text'] for p in pages[:150]]
+
 
         update_progress("4/5", "🧠 لمّاح يفكّر الآن... جاري استنتاج أهم النقاط...")
         orchestrator = AIOrchestrator()
@@ -793,16 +795,20 @@ async def process_lecture(
             pdf_context = []
             if pdf_path:
                 if pdf_path.lower().endswith(".pptx"):
-                    yield f"data: {json.dumps({'type': 'progress', 'step': '2/5', 'message': '📑 2/5 اكتشفنا ملف بوربوينت! جاري تحويله لملف PDF فائق الجودة...'}, ensure_ascii=False)}\n\n"
-                    from app.services.pptx_converter import convert_pptx_to_pdf
-                    pdf_path = await asyncio.to_thread(convert_pptx_to_pdf, pdf_path, os.path.dirname(pdf_path))
-                
-                yield f"data: {json.dumps({'type': 'progress', 'step': '2/5', 'message': '🔍 2/5 جاري قراءة محتوى الشرائح بدقة هندسية...'}, ensure_ascii=False)}\n\n"
-                pdf_pages = await asyncio.to_thread(extract_pages_from_pdf, pdf_path)
-                
-                # Full context for MiniMax/Gemini
-                max_pages = pdf_pages[:150]
-                pdf_context = [f"--- Page {p['page_number']} ---\n{p['text']}" for p in max_pages]
+                    yield f"data: {json.dumps({'type': 'progress', 'step': '2/5', 'message': '📑 2/5 اكتشفنا ملف بوربوينت! جاري استخراج محتوى الشرائح...'}, ensure_ascii=False)}\n\n"
+                    from app.services.pptx_converter import extract_text_from_pptx
+                    pptx_pages = await asyncio.to_thread(extract_text_from_pptx, pdf_path)
+                    logger.info(f"[PROCESS_LECTURE] PPTX extracted {len(pptx_pages)} slides from {pdf_path}")
+                    pdf_context = [f"--- الشريحة {p['page_number']} ---\n{p['text']}" for p in pptx_pages[:150]]
+                else:
+                    yield f"data: {json.dumps({'type': 'progress', 'step': '2/5', 'message': '🔍 2/5 جاري قراءة محتوى الشرائح بدقة هندسية...'}, ensure_ascii=False)}\n\n"
+                    pdf_pages = await asyncio.to_thread(extract_pages_from_pdf, pdf_path)
+                    logger.info(f"[PROCESS_LECTURE] PDF extracted {len(pdf_pages)} pages from {pdf_path}")
+                    pdf_context = [f"--- Page {p['page_number']} ---\n{p['text']}" for p in pdf_pages[:150]]
+
+                if not pdf_context:
+                    logger.warning(f"[PROCESS_LECTURE] pdf_context is EMPTY after extraction — file may be image-based or corrupted: {pdf_path}")
+
             
             # 3. AI Annotations
             yield f"data: {json.dumps({'type': 'progress', 'step': '4/5', 'time_estimate': 120, 'message': '🧠 4/5 لمّاح يعمل الآن! جاري استنتاج أهم النقاط والأسئلة المتوقعة...'}, ensure_ascii=False)}\n\n"

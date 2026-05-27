@@ -258,10 +258,17 @@ async def process_notebook(
             if pdf_path:
                 yield f"data: {json.dumps({'type': 'progress', 'step': '3/5', 'message': '📑 جاري تحليل واستخلاص محتوى الشرائح...'}, ensure_ascii=False)}\n\n"
                 if pdf_path.lower().endswith(".pptx"):
-                    from app.services.pptx_converter import convert_pptx_to_pdf
-                    pdf_path = await asyncio.to_thread(convert_pptx_to_pdf, pdf_path, os.path.dirname(pdf_path))
-                pages = await asyncio.to_thread(extract_pages_from_pdf, pdf_path)
-                pdf_context = [p['text'] for p in pages[:150]]
+                    from app.services.pptx_converter import extract_text_from_pptx
+                    pptx_pages = await asyncio.to_thread(extract_text_from_pptx, pdf_path)
+                    logger.info(f"[NOTEBOOK] PPTX extracted {len(pptx_pages)} slides from {pdf_path}")
+                    pdf_context = [f"--- الشريحة {p['page_number']} ---\n{p['text']}" for p in pptx_pages[:150]]
+                else:
+                    pages = await asyncio.to_thread(extract_pages_from_pdf, pdf_path)
+                    logger.info(f"[NOTEBOOK] PDF extracted {len(pages)} pages from {pdf_path}")
+                    pdf_context = [p['text'] for p in pages[:150]]
+
+                if not pdf_context:
+                    logger.warning(f"[NOTEBOOK] pdf_context is EMPTY after extraction — file may be image-based or corrupted: {pdf_path}")
 
             # 5. Lammah AI Engine Call
             num_sources = len(audio_paths)

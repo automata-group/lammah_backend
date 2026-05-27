@@ -24,3 +24,4 @@ reportlab
 fpdf2
 arabic-reshaper
 python-bidi
+python-pptx
