@@ -176,9 +176,20 @@ async def background_worker(row: LectureRow, user_id: str, plan_name: str, histo
             base_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
             output_pdf_path = os.path.join(base_dir, "outputs", f"{job.job_id}.pdf")
             os.makedirs(os.path.dirname(output_pdf_path), exist_ok=True)
+            
+            annotatable_pdf_path = pdf_path
+            if pdf_path.lower().endswith(".pptx"):
+                try:
+                    from app.services.pptx_converter import convert_pptx_to_pdf
+                    annotatable_pdf_path = await asyncio.to_thread(convert_pptx_to_pdf, pdf_path, os.path.dirname(pdf_path))
+                except Exception as pptx_err:
+                    logger.error(f"Failed to convert PPTX to PDF for annotation: {pptx_err}")
+                    raise Exception("فشل تحويل ملف البوربوينت إلى PDF للرسم والتلوين. يرجى رفع ملف PDF مباشرة.")
+            
             from app.services.pdf_annotator import annotate_pdf
-            await asyncio.to_thread(annotate_pdf, pdf_path, output_pdf_path, annotations, is_free_trial)
+            await asyncio.to_thread(annotate_pdf, annotatable_pdf_path, output_pdf_path, annotations, is_free_trial)
             download_url = f"/api/v1/summarize/download/{job.job_id}.pdf"
+
 
         # Generate AI Title
         ai_title = await generate_ai_title(llm, transcript)
@@ -549,9 +560,20 @@ async def process_batch_lectures(
                 output_pdf_path = os.path.join(base_dir_out, "outputs", f"{unique_id}.pdf")
                 os.makedirs(os.path.dirname(output_pdf_path), exist_ok=True)
 
+                annotatable_pdf_path = pdf_path
+                if pdf_path.lower().endswith(".pptx"):
+                    try:
+                        from app.services.pptx_converter import convert_pptx_to_pdf
+                        annotatable_pdf_path = await asyncio.to_thread(convert_pptx_to_pdf, pdf_path, os.path.dirname(pdf_path))
+                    except Exception as pptx_err:
+                        logger.error(f"Failed to convert PPTX to PDF for batch annotation: {pptx_err}")
+                        yield f"data: {json.dumps({'type': 'error', 'message': 'فشل تحويل ملف البوربوينت إلى PDF للرسم والتلوين. يرجى رفع ملف PDF مباشرة.'}, ensure_ascii=False)}\n\n"
+                        return
+
                 from app.services.pdf_annotator import annotate_pdf
-                await asyncio.to_thread(annotate_pdf, pdf_path, output_pdf_path, annotations, False)
+                await asyncio.to_thread(annotate_pdf, annotatable_pdf_path, output_pdf_path, annotations, False)
                 download_url = f"/api/v1/summarize/download/{unique_id}.pdf"
+
 
             # Emit events matching what the frontend stream reader expects (metadata + done)
             _meta_msg = json.dumps({'type': 'metadata', 'transcript': transcript, 'annotations': annotations}, ensure_ascii=False)

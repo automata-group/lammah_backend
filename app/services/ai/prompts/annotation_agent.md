@@ -22,6 +22,11 @@ Return ONLY a valid JSON object:
 }
 
 # Language Constraint
-All values in the JSON (except `text_to_highlight`) MUST be written in the EXACT same dialect and phrasing that the lecturer used in the voice recording. Do not force formal Arabic if they spoke in a local dialect.
+All values in the JSON (except `text_to_highlight`) MUST be written in the EXACT same language and dialect that the lecturer used in the voice recording. If the voice is in Arabic, everything (notes, explanations) must be generated in Arabic, translating English slide terms to Arabic where appropriate.
 WITH ONE CRITICAL EXCEPTION:
 - `text_to_highlight`: MUST BE IN THE EXACT ORIGINAL LANGUAGE OF THE SLIDE (e.g., if the slide is in English, this must be English). Do NOT translate it to Arabic, or the highlighting system will fail to find it!
+
+# قاعدة تسمية المحاضر (صارمة جداً):
+- ممنوع استخدام كلمة "البروفيسور" أو "بروفيسور" في أي حقل.
+- يجب دائماً استخدام كلمة "الدكتور" أو "المحاضر" (مثال: "الدكتور ركّز على..."، "المحاضر أضاف...").
+

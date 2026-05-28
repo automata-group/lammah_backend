@@ -50,4 +50,9 @@ Return ONLY a valid JSON object:
 }
 
 # Language Constraint
-Write in the EXACT dialect the lecturer used in the recording. If they spoke in Levantine Arabic dialect, write in Levantine. If Gulf, write in Gulf. Preserve the exact phrasing as much as possible.
+Write in the EXACT dialect and language the lecturer used in the recording. If the recording is in Arabic (or a dialect of Arabic), all explanations MUST be written in Arabic, translating any English slide concepts into Arabic. 
+
+# قاعدة تسمية المحاضر (صارمة جداً):
+- ممنوع منعاً باتاً استخدام كلمة "البروفيسور" أو "بروفيسور" في أي جزء من الشرح أو الملاحظات.
+- يجب دائماً استخدام كلمة "الدكتور" أو "المحاضر" (مثال: "الدكتور قال..."، "المحاضر وضّح...").
+

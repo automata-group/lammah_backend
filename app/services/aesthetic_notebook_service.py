@@ -29,8 +29,24 @@ logger = logging.getLogger(__name__)
 
 # ── Font Paths ────────────────────────────────────────────────────────────────
 _BACKEND   = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
-FONTS_DIR  = os.path.join(_BACKEND, "app", "static", "fonts")
-os.makedirs(FONTS_DIR, exist_ok=True)
+
+# Search in multiple potential directories (dev and Docker paths)
+POTENTIAL_DIRS = [
+    os.path.join(_BACKEND, "app", "static", "fonts"),
+    os.path.join(_BACKEND, "static", "fonts"),
+    "/app/app/static/fonts",
+    "/app/static/fonts"
+]
+
+FONTS_DIR = None
+for d in POTENTIAL_DIRS:
+    if os.path.isdir(d):
+        FONTS_DIR = d
+        break
+
+if not FONTS_DIR:
+    FONTS_DIR = os.path.join(_BACKEND, "app", "static", "fonts")
+    os.makedirs(FONTS_DIR, exist_ok=True)
 
 FONT_REG_PATH  = os.path.join(FONTS_DIR, "Amiri-Regular.ttf")
 FONT_BOLD_PATH = os.path.join(FONTS_DIR, "Amiri-Bold.ttf")
@@ -41,11 +57,19 @@ def _download_fonts():
         FONT_BOLD_PATH: "https://github.com/google/fonts/raw/main/ofl/amiri/Amiri-Bold.ttf",
     }
     for path, url in urls.items():
+        # Remove empty/corrupted font files (e.g. < 1000 bytes)
+        if os.path.exists(path) and os.path.getsize(path) < 1000:
+            try:
+                os.remove(path)
+            except Exception:
+                pass
+        
         if not os.path.exists(path):
             try:
                 urllib.request.urlretrieve(url, path)
+                logger.info(f"[NOTEBOOK] Font downloaded successfully to {path}")
             except Exception as e:
-                logger.error(f"[NOTEBOOK] Font download failed: {e}")
+                logger.error(f"[NOTEBOOK] Font download failed for {url}: {e}")
 
 _download_fonts()
 
@@ -54,15 +78,19 @@ def _reg_fonts():
         ("HW-Reg",  FONT_REG_PATH,  "Helvetica"),
         ("HW-Bold", FONT_BOLD_PATH, "Helvetica-Bold"),
     ]:
-        if os.path.exists(path):
+        if os.path.exists(path) and os.path.getsize(path) > 1000:
             try:
                 pdfmetrics.registerFont(TTFont(name, path))
-            except Exception:
+                logger.info(f"[NOTEBOOK] Successfully registered font {name} from {path}")
+            except Exception as e:
+                logger.error(f"[NOTEBOOK] Failed to register font {name}: {e}. Falling back to {fallback}")
                 pdfmetrics.registerFont(TTFont(name, fallback))
         else:
+            logger.warning(f"[NOTEBOOK] Font path {path} does not exist or is too small. Falling back to {fallback}")
             pdfmetrics.registerFont(TTFont(name, fallback))
 
 _reg_fonts()
+
 
 FONT_REG  = "HW-Reg"
 FONT_BOLD = "HW-Bold"
