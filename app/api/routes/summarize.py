@@ -941,3 +941,45 @@ async def upload_temp(
         "status": "Processing"
     }
 
+
+@router.get("/debug-env")
+async def debug_env():
+    """
+    Temporary diagnostic endpoint — shows TEMP_DIR, UPLOAD_DIR, and their contents.
+    Helps verify file paths and shared volume access on production.
+    """
+    base_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))))
+    temp_dir_env = os.getenv("TEMP_DIR", "uploader-go/uploads/temp")
+    upload_dir_env = os.getenv("UPLOAD_DIR", "backend/uploads")
+    temp_dir = temp_dir_env if os.path.isabs(temp_dir_env) else os.path.normpath(os.path.join(base_dir, temp_dir_env))
+    upload_dir = upload_dir_env if os.path.isabs(upload_dir_env) else os.path.normpath(os.path.join(base_dir, upload_dir_env))
+
+    def list_dir_safe(path):
+        if not os.path.exists(path):
+            return {"exists": False, "path": path}
+        try:
+            files = os.listdir(path)
+            files_info = []
+            for f in files[:20]:
+                fp = os.path.join(path, f)
+                files_info.append({
+                    "name": f,
+                    "size_kb": round(os.path.getsize(fp) / 1024, 1) if os.path.isfile(fp) else None,
+                    "modified_ago_s": round(os.path.getmtime(fp))
+                })
+            return {"exists": True, "path": path, "count": len(files), "files": files_info}
+        except Exception as e:
+            return {"exists": True, "path": path, "error": str(e)}
+
+    return {
+        "python_file": __file__,
+        "base_dir": base_dir,
+        "env": {
+            "TEMP_DIR": os.getenv("TEMP_DIR", "NOT SET"),
+            "UPLOAD_DIR": os.getenv("UPLOAD_DIR", "NOT SET"),
+        },
+        "temp_dir": list_dir_safe(temp_dir),
+        "upload_dir": list_dir_safe(upload_dir),
+        "pptx_available": __import__('importlib').util.find_spec('pptx') is not None,
+        "pymupdf_available": __import__('importlib').util.find_spec('fitz') is not None,
+    }
