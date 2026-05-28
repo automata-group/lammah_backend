@@ -988,17 +988,20 @@ async def debug_env():
 
     # Font path resolution and diagnostics
     backend_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-    amiri_path = os.path.join(backend_dir, "app", "static", "fonts", "Amiri-Regular.ttf")
-    font_exists = os.path.exists(amiri_path)
-    font_size_bytes = os.path.getsize(amiri_path) if font_exists else None
+    # backend_dir is app/ (i.e. /app/app inside Docker)
+    amiri_reg_path = os.path.join(backend_dir, "static", "fonts", "Amiri-Regular.ttf")
+    amiri_bold_path = os.path.join(backend_dir, "static", "fonts", "Amiri-Bold.ttf")
+    
+    reg_exists = os.path.exists(amiri_reg_path)
+    bold_exists = os.path.exists(amiri_bold_path)
     
     font_test_status = "Not tested"
-    if font_exists:
+    if reg_exists:
         try:
             import fitz
             doc = fitz.open()
             page = doc.new_page()
-            page.insert_font(fontname="arfont", fontfile=amiri_path)
+            page.insert_font(fontname="arfont", fontfile=amiri_reg_path)
             font_test_status = "Success"
         except Exception as e:
             font_test_status = f"Failed: {str(e)}"
@@ -1015,9 +1018,10 @@ async def debug_env():
         "pptx_available": __import__('importlib').util.find_spec('pptx') is not None,
         "pymupdf_available": __import__('importlib').util.find_spec('fitz') is not None,
         "font_info": {
-            "path": amiri_path,
-            "exists": font_exists,
-            "size_bytes": font_size_bytes,
+            "reg_path": amiri_reg_path,
+            "reg_exists": reg_exists,
+            "bold_path": amiri_bold_path,
+            "bold_exists": bold_exists,
             "test_status": font_test_status
         }
     }
