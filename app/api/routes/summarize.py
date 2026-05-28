@@ -835,16 +835,26 @@ async def process_lecture(
             # 4. Final PDF
             download_url = None
             if pdf_path:
+                yield f"data: {json.dumps({'type': 'progress', 'step': '5/5', 'message': '🎨 5/5 اللمسات الأخيرة! جاري تلوين الشرائح وإضافة الملاحظات الذكية...'}, ensure_ascii=False)}\n\n"
+                
+                actual_pdf_path = pdf_path
                 if pdf_path.lower().endswith(".pptx"):
-                    logger.info("Uploaded file is PPTX, skipping annotated PDF generation (conversion disabled).")
-                else:
-                    yield f"data: {json.dumps({'type': 'progress', 'step': '5/5', 'message': '🎨 5/5 اللمسات الأخيرة! جاري تلوين الشرائح وإضافة الملاحظات الذكية...'}, ensure_ascii=False)}\n\n"
+                    try:
+                        from app.services.pptx_converter import convert_pptx_to_pdf
+                        temp_pdf_dir = os.path.dirname(pdf_path)
+                        actual_pdf_path = await asyncio.to_thread(convert_pptx_to_pdf, pdf_path, temp_pdf_dir)
+                        logger.info(f"[PROCESS_LECTURE] PPTX converted successfully to PDF: {actual_pdf_path}")
+                    except Exception as ce:
+                        logger.error(f"[PROCESS_LECTURE] Failed to convert PPTX to PDF for annotation: {ce}")
+                        actual_pdf_path = None
+                
+                if actual_pdf_path:
                     base_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
                     output_pdf_path = os.path.join(base_dir, "outputs", f"{job.job_id}.pdf")
                     os.makedirs(os.path.dirname(output_pdf_path), exist_ok=True)
                     
                     from app.services.pdf_annotator import annotate_pdf
-                    await asyncio.to_thread(annotate_pdf, pdf_path, output_pdf_path, annotations, False)
+                    await asyncio.to_thread(annotate_pdf, actual_pdf_path, output_pdf_path, annotations, False)
                     download_url = f"/api/v1/summarize/download/{job.job_id}.pdf"
  
             # 5. Save History & Finalize
@@ -871,6 +881,8 @@ async def process_lecture(
             try:
                 if os.path.exists(audio_path): os.remove(audio_path)
                 if pdf_path and os.path.exists(pdf_path): os.remove(pdf_path)
+                if 'actual_pdf_path' in locals() and actual_pdf_path and actual_pdf_path != pdf_path and os.path.exists(actual_pdf_path):
+                    os.remove(actual_pdf_path)
             except: pass
 
     return StreamingResponse(event_stream(), media_type="text/event-stream", headers={

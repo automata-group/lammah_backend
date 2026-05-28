@@ -193,27 +193,27 @@ def annotate_pdf(input_path: str, output_path: str, annotations: dict, is_free_t
                     
                     # ── HEADER ──
                     header = format_arabic(f"\u0645\u0627 \u0642\u0627\u0644\u0647 \u0627\u0644\u062f\u0643\u062a\u0648\u0631 | \u0627\u0644\u0634\u0631\u064a\u062d\u0629 {i+1}")
-                    header_rect = fitz.Rect(50, 25, page_rect.width - 50, 58)
+                    header_rect = fitz.Rect(50, 15, page_rect.width - 50, 65)
                     new_page.insert_textbox(header_rect, header, fontsize=15, color=(0.5, 0.3, 0.0), fontname=fontname_to_use, align=fitz.TEXT_ALIGN_RIGHT)
-                    new_page.draw_line(fitz.Point(50, 62), fitz.Point(page_rect.width - 50, 62), color=(0.8, 0.6, 0.0), width=1.5)
+                    new_page.draw_line(fitz.Point(50, 68), fitz.Point(page_rect.width - 50, 68), color=(0.8, 0.6, 0.0), width=1.5)
                     
-                    y_pos = 82
+                    y_pos = 88
                     
                     # ── SECTION 1: Quick Notes (from Mapper) ──
                     if page_notes:
                         section_header = format_arabic("\u2714 \u0646\u0642\u0627\u0637 \u0633\u0631\u064a\u0639\u0629 \u0645\u0646 \u0643\u0644\u0627\u0645 \u0627\u0644\u062f\u0643\u062a\u0648\u0631")
-                        sh_rect = fitz.Rect(50, y_pos, page_rect.width - 50, y_pos + 20)
+                        sh_rect = fitz.Rect(50, y_pos - 5, page_rect.width - 50, y_pos + 25)
                         new_page.insert_textbox(sh_rect, section_header, fontsize=11, color=(0.2, 0.5, 0.1), fontname=fontname_to_use, align=fitz.TEXT_ALIGN_RIGHT)
-                        y_pos += 22
+                        y_pos += 26
                         
                         for note in page_notes:
                             bullet_lines = wrap_arabic_text(f"\u25cf {clean_text(note)}", max_chars=85)
                             for bline in bullet_lines:
                                 if y_pos > page_rect.height - 40:
                                     break
-                                b_rect = fitz.Rect(50, y_pos - 13, page_rect.width - 50, y_pos + 5)
+                                b_rect = fitz.Rect(50, y_pos - 15, page_rect.width - 50, y_pos + 15)
                                 new_page.insert_textbox(b_rect, bline, fontsize=11, color=(0.15, 0.4, 0.1), fontname=fontname_to_use, align=fitz.TEXT_ALIGN_RIGHT)
-                                y_pos += 16
+                                y_pos += 22
                         
                         # Divider between sections
                         if exp_text:
@@ -224,18 +224,18 @@ def annotate_pdf(input_path: str, output_path: str, annotations: dict, is_free_t
                     # ── SECTION 2: Full Explanation (from Tutor) ──
                     if exp_text:
                         if page_notes:
-                            section_header2 = format_arabic("\u270f\ufe0f \u0634\u0631\u062d \u062a\u0641\u0635\u064a\u0644\u064a")
-                            sh2_rect = fitz.Rect(50, y_pos, page_rect.width - 50, y_pos + 20)
+                            section_header2 = format_arabic("\u270f\ufe0f \u0634\u0631\u062d \u062a\u0641\u0635\u064a\u0645\u064a")
+                            sh2_rect = fitz.Rect(50, y_pos - 5, page_rect.width - 50, y_pos + 25)
                             new_page.insert_textbox(sh2_rect, section_header2, fontsize=11, color=(0.3, 0.1, 0.5), fontname=fontname_to_use, align=fitz.TEXT_ALIGN_RIGHT)
-                            y_pos += 22
+                            y_pos += 26
                         
                         lines = wrap_arabic_text(exp_text, max_chars=85)
                         for line in lines:
                             if y_pos > page_rect.height - 40:
                                 break
-                            text_rect = fitz.Rect(50, y_pos - 13, page_rect.width - 50, y_pos + 5)
+                            text_rect = fitz.Rect(50, y_pos - 15, page_rect.width - 50, y_pos + 15)
                             new_page.insert_textbox(text_rect, line, fontsize=12, color=(0.1, 0.1, 0.1), fontname=fontname_to_use, align=fitz.TEXT_ALIGN_RIGHT)
-                            y_pos += 18
+                            y_pos += 24
             
             doc = new_doc
 

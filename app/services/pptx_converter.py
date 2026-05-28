@@ -59,7 +59,7 @@ def convert_pptx_to_pdf(pptx_path: str, output_dir: str) -> str:
 
             # Run conversion
             process = subprocess.run(
-                [command, "--headless", "--convert-to", "pdf",
+                [command, "-env:UserInstallation=file:///tmp/libreoffice-profile", "--headless", "--convert-to", "pdf",
                  "--outdir", output_dir, pptx_path],
                 stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=90
             )
