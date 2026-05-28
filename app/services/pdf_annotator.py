@@ -165,10 +165,28 @@ def annotate_pdf(input_path: str, output_path: str, annotations: dict, is_free_t
                     page_rect = doc[i].rect
                     new_page = new_doc.new_page(width=page_rect.width, height=page_rect.height)
                     
-                    try:
-                        new_page.insert_font(fontname="arfont", fontfile="C:/Windows/Fonts/arial.ttf")
-                    except:
-                        pass
+                    # Load a font that supports Arabic
+                    font_loaded = False
+                    backend_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+                    amiri_path = os.path.join(backend_dir, "app", "static", "fonts", "Amiri-Regular.ttf")
+                    
+                    if os.path.exists(amiri_path):
+                        try:
+                            new_page.insert_font(fontname="arfont", fontfile=amiri_path)
+                            font_loaded = True
+                        except Exception as fe:
+                            logger.warning(f"Failed to load Amiri font: {fe}")
+                            
+                    if not font_loaded:
+                        windows_arial = "C:/Windows/Fonts/arial.ttf"
+                        if os.path.exists(windows_arial):
+                            try:
+                                new_page.insert_font(fontname="arfont", fontfile=windows_arial)
+                                font_loaded = True
+                            except Exception as fe:
+                                logger.warning(f"Failed to load Windows Arial: {fe}")
+                                
+                    fontname_to_use = "arfont" if font_loaded else "helv"
                     
                     # Warm yellow-cream background
                     new_page.draw_rect(new_page.rect, color=(1.0, 1.0, 0.92), fill=(1.0, 1.0, 0.96))
@@ -176,7 +194,7 @@ def annotate_pdf(input_path: str, output_path: str, annotations: dict, is_free_t
                     # ── HEADER ──
                     header = format_arabic(f"\u0645\u0627 \u0642\u0627\u0644\u0647 \u0627\u0644\u062f\u0643\u062a\u0648\u0631 | \u0627\u0644\u0634\u0631\u064a\u062d\u0629 {i+1}")
                     header_rect = fitz.Rect(50, 25, page_rect.width - 50, 58)
-                    new_page.insert_textbox(header_rect, header, fontsize=15, color=(0.5, 0.3, 0.0), fontname="arfont", align=fitz.TEXT_ALIGN_RIGHT)
+                    new_page.insert_textbox(header_rect, header, fontsize=15, color=(0.5, 0.3, 0.0), fontname=fontname_to_use, align=fitz.TEXT_ALIGN_RIGHT)
                     new_page.draw_line(fitz.Point(50, 62), fitz.Point(page_rect.width - 50, 62), color=(0.8, 0.6, 0.0), width=1.5)
                     
                     y_pos = 82
@@ -185,7 +203,7 @@ def annotate_pdf(input_path: str, output_path: str, annotations: dict, is_free_t
                     if page_notes:
                         section_header = format_arabic("\u2714 \u0646\u0642\u0627\u0637 \u0633\u0631\u064a\u0639\u0629 \u0645\u0646 \u0643\u0644\u0627\u0645 \u0627\u0644\u062f\u0643\u062a\u0648\u0631")
                         sh_rect = fitz.Rect(50, y_pos, page_rect.width - 50, y_pos + 20)
-                        new_page.insert_textbox(sh_rect, section_header, fontsize=11, color=(0.2, 0.5, 0.1), fontname="arfont", align=fitz.TEXT_ALIGN_RIGHT)
+                        new_page.insert_textbox(sh_rect, section_header, fontsize=11, color=(0.2, 0.5, 0.1), fontname=fontname_to_use, align=fitz.TEXT_ALIGN_RIGHT)
                         y_pos += 22
                         
                         for note in page_notes:
@@ -194,7 +212,7 @@ def annotate_pdf(input_path: str, output_path: str, annotations: dict, is_free_t
                                 if y_pos > page_rect.height - 40:
                                     break
                                 b_rect = fitz.Rect(50, y_pos - 13, page_rect.width - 50, y_pos + 5)
-                                new_page.insert_textbox(b_rect, bline, fontsize=11, color=(0.15, 0.4, 0.1), fontname="arfont", align=fitz.TEXT_ALIGN_RIGHT)
+                                new_page.insert_textbox(b_rect, bline, fontsize=11, color=(0.15, 0.4, 0.1), fontname=fontname_to_use, align=fitz.TEXT_ALIGN_RIGHT)
                                 y_pos += 16
                         
                         # Divider between sections
@@ -208,7 +226,7 @@ def annotate_pdf(input_path: str, output_path: str, annotations: dict, is_free_t
                         if page_notes:
                             section_header2 = format_arabic("\u270f\ufe0f \u0634\u0631\u062d \u062a\u0641\u0635\u064a\u0644\u064a")
                             sh2_rect = fitz.Rect(50, y_pos, page_rect.width - 50, y_pos + 20)
-                            new_page.insert_textbox(sh2_rect, section_header2, fontsize=11, color=(0.3, 0.1, 0.5), fontname="arfont", align=fitz.TEXT_ALIGN_RIGHT)
+                            new_page.insert_textbox(sh2_rect, section_header2, fontsize=11, color=(0.3, 0.1, 0.5), fontname=fontname_to_use, align=fitz.TEXT_ALIGN_RIGHT)
                             y_pos += 22
                         
                         lines = wrap_arabic_text(exp_text, max_chars=85)
@@ -216,7 +234,7 @@ def annotate_pdf(input_path: str, output_path: str, annotations: dict, is_free_t
                             if y_pos > page_rect.height - 40:
                                 break
                             text_rect = fitz.Rect(50, y_pos - 13, page_rect.width - 50, y_pos + 5)
-                            new_page.insert_textbox(text_rect, line, fontsize=12, color=(0.1, 0.1, 0.1), fontname="arfont", align=fitz.TEXT_ALIGN_RIGHT)
+                            new_page.insert_textbox(text_rect, line, fontsize=12, color=(0.1, 0.1, 0.1), fontname=fontname_to_use, align=fitz.TEXT_ALIGN_RIGHT)
                             y_pos += 18
             
             doc = new_doc

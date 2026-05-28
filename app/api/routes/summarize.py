@@ -835,14 +835,17 @@ async def process_lecture(
             # 4. Final PDF
             download_url = None
             if pdf_path:
-                yield f"data: {json.dumps({'type': 'progress', 'step': '5/5', 'message': '🎨 5/5 اللمسات الأخيرة! جاري تلوين الشرائح وإضافة الملاحظات الذكية...'}, ensure_ascii=False)}\n\n"
-                base_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
-                output_pdf_path = os.path.join(base_dir, "outputs", f"{job.job_id}.pdf")
-                os.makedirs(os.path.dirname(output_pdf_path), exist_ok=True)
-                
-                from app.services.pdf_annotator import annotate_pdf
-                await asyncio.to_thread(annotate_pdf, pdf_path, output_pdf_path, annotations, False)
-                download_url = f"/api/v1/summarize/download/{job.job_id}.pdf"
+                if pdf_path.lower().endswith(".pptx"):
+                    logger.info("Uploaded file is PPTX, skipping annotated PDF generation (conversion disabled).")
+                else:
+                    yield f"data: {json.dumps({'type': 'progress', 'step': '5/5', 'message': '🎨 5/5 اللمسات الأخيرة! جاري تلوين الشرائح وإضافة الملاحظات الذكية...'}, ensure_ascii=False)}\n\n"
+                    base_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
+                    output_pdf_path = os.path.join(base_dir, "outputs", f"{job.job_id}.pdf")
+                    os.makedirs(os.path.dirname(output_pdf_path), exist_ok=True)
+                    
+                    from app.services.pdf_annotator import annotate_pdf
+                    await asyncio.to_thread(annotate_pdf, pdf_path, output_pdf_path, annotations, False)
+                    download_url = f"/api/v1/summarize/download/{job.job_id}.pdf"
  
             # 5. Save History & Finalize
             # Generate AI Title
