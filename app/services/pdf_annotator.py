@@ -4,6 +4,36 @@ import logging
 
 logger = logging.getLogger(__name__)
 
+# ── Font Path Resolution ───────────────────────────────────────────────────────
+# Search multiple candidate paths (works in both local dev and Docker)
+_THIS_DIR = os.path.dirname(os.path.abspath(__file__))
+_CANDIDATE_FONT_DIRS = [
+    # Docker: /app/app/static/fonts  (services/ -> app/ -> app/)
+    os.path.join(os.path.dirname(os.path.dirname(_THIS_DIR)), "app", "static", "fonts"),
+    # Docker flat: /app/static/fonts
+    os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(_THIS_DIR))), "static", "fonts"),
+    # Absolute Docker paths
+    "/app/app/static/fonts",
+    "/app/static/fonts",
+    # Windows dev
+    "C:/Windows/Fonts",
+]
+
+def _find_font(filename: str) -> str | None:
+    """Return the first absolute path where `filename` exists, or None."""
+    for d in _CANDIDATE_FONT_DIRS:
+        fp = os.path.join(d, filename)
+        if os.path.exists(fp) and os.path.getsize(fp) > 1000:
+            return fp
+    return None
+
+AMIRI_REG_PATH  = _find_font("Amiri-Regular.ttf")
+AMIRI_BOLD_PATH = _find_font("Amiri-Bold.ttf")
+ARIAL_PATH      = _find_font("arial.ttf")
+
+logger.info(f"[PDF_ANNOTATOR] Amiri-Regular: {AMIRI_REG_PATH}")
+logger.info(f"[PDF_ANNOTATOR] Amiri-Bold:    {AMIRI_BOLD_PATH}")
+
 def annotate_pdf(input_path: str, output_path: str, annotations: dict, is_free_trial: bool = False) -> str:
     """
     Applies highlights and text annotations to a PDF using PyMuPDF.
@@ -13,6 +43,10 @@ def annotate_pdf(input_path: str, output_path: str, annotations: dict, is_free_t
        "sticky_notes": [{"note_text": "...", "page_number": int}]
     }
     """
+    # Guard: only accept actual PDF files — PPTX must be converted first
+    if not input_path or not input_path.lower().endswith(".pdf"):
+        raise ValueError(f"annotate_pdf only accepts PDF files. Got: {input_path}")
+
     try:
         doc = fitz.open(input_path)
         
@@ -165,27 +199,18 @@ def annotate_pdf(input_path: str, output_path: str, annotations: dict, is_free_t
                     page_rect = doc[i].rect
                     new_page = new_doc.new_page(width=page_rect.width, height=page_rect.height)
                     
-                    # Load a font that supports Arabic
+                    # Load a font that supports Arabic (uses module-level resolved paths)
                     font_loaded = False
-                    backend_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-                    amiri_path = os.path.join(backend_dir, "app", "static", "fonts", "Amiri-Regular.ttf")
-                    
-                    if os.path.exists(amiri_path):
-                        try:
-                            new_page.insert_font(fontname="arfont", fontfile=amiri_path)
-                            font_loaded = True
-                        except Exception as fe:
-                            logger.warning(f"Failed to load Amiri font: {fe}")
-                            
-                    if not font_loaded:
-                        windows_arial = "C:/Windows/Fonts/arial.ttf"
-                        if os.path.exists(windows_arial):
+                    for font_candidate in [AMIRI_REG_PATH, ARIAL_PATH]:
+                        if font_candidate and os.path.exists(font_candidate):
                             try:
-                                new_page.insert_font(fontname="arfont", fontfile=windows_arial)
+                                new_page.insert_font(fontname="arfont", fontfile=font_candidate)
                                 font_loaded = True
+                                logger.info(f"[PDF_ANNOTATOR] Loaded font from: {font_candidate}")
+                                break
                             except Exception as fe:
-                                logger.warning(f"Failed to load Windows Arial: {fe}")
-                                
+                                logger.warning(f"[PDF_ANNOTATOR] Failed to load font {font_candidate}: {fe}")
+
                     fontname_to_use = "arfont" if font_loaded else "helv"
                     
                     # Warm yellow-cream background
