@@ -56,26 +56,22 @@ async def chat_with_lecture(request: ChatRequest, user: dict = Depends(get_user_
         subscription = sub_check.data[0]
         plan_name = subscription["subscription_plans"]["name"]
         
-        # 1.1 Restriction for Basic Plans (User request)
-        if any(term in plan_name for term in ["أساسي", "اساسي", "Basic"]):
-            raise HTTPException(status_code=403, detail={
-                "user_message": "🔒 ميزة المحادثة مع المحاضر حصرية للباقات المتقدمة و VIP. يمكنك ترقية باقتك للاستمتاع بهذه الميزة!",
-                "type": "upgrade_required"
-            })
-        # User requested to keep basic monthly at 15 messages.
-        # Advanced/Pro/VIP plans get 100 messages.
-        limit = 15 # Default limit for Basic Monthly and Free Trial
-        
-        if sub_check.data:
-            # Check if it's a higher tier plan
-            if any(term in plan_name for term in ["متقدم", "برو", "VIP", "Advanced", "Pro"]):
-                limit = 100
+        # Determine plan tier and message limit
+        limit = 5  # Default/Free/Student
+        if any(term in plan_name for term in ["الذهبية", "الفصل الدراسي", "برو", "VIP", "Elite", "Pro", "النخبة"]):
+            limit = 100
+        elif any(term in plan_name for term in ["الميدتيرم", "التفوق", "متقدم", "Advanced", "Premium"]):
+            limit = 25
+        elif any(term in plan_name for term in ["الإنقاذ", "الأساسية", "الاساسية", "أساسي", "اساسي", "Basic", "Essential", "Emergency"]):
+            limit = 5
             
-        current_count = log_result.data.get("chat_count", 0)
+        # Calculate total chat count across all user's lectures
+        total_chats = supabase.table("usage_logs").select("chat_count").eq("user_id", user["id"]).execute()
+        total_used = sum(item.get("chat_count", 0) or 0 for item in total_chats.data) if total_chats.data else 0
         
-        if current_count >= limit:
+        if total_used >= limit:
             raise HTTPException(status_code=403, detail={
-                "user_message": f"لقد وصلت للحد الأقصى للمحادثة في هذه المحاضرة ({limit} رسالة) حسب باقتك ({plan_name}). يمكنك الترقية للحصول على حدود أعلى!",
+                "user_message": f"لقد وصلت للحد الأقصى الإجمالي للمحادثات المتاح لحسابك ({limit} رسالة) حسب باقتك ({plan_name}). يمكنك الترقية للحصول على حدود أعلى!",
                 "type": "limit_reached",
                 "limit": limit
             })

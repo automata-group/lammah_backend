@@ -49,22 +49,23 @@ async def get_my_info(profile=Depends(get_user_profile)):
 
 
 @router.get("/quota")
-async def get_my_quota(profile=Depends(get_user_profile)):
-    """Quick check of remaining aggregate quota."""
-    from app.services.subscription_service import get_user_subscription_info
-    info = get_user_subscription_info(profile["id"])
-    active = info.get("active_subscription")
-    plan_name = "مجاني"
-    if active and "subscription_plans" in active:
-        plan_name = active["subscription_plans"].get("name", "مجاني")
+async def get_quota(profile=Depends(get_user_profile)):
+    from app.services.subscription_service import get_active_quota
+    return get_active_quota(profile["id"])
 
-    return {
-        "quota_remaining": info.get("quota_remaining", 0),
-        "quota_reset_at": profile.get("quota_reset_at"),
-        "plan_id": profile.get("current_plan_id"),
-        "plan_name": plan_name,
-        "full_name": profile.get("full_name")
-    }
+
+@router.get("/chat-usage")
+async def get_chat_usage(profile=Depends(get_user_profile)):
+    """Get total chat messages used by the user across all lectures."""
+    try:
+        from app.db.supabase_client import get_supabase
+        supabase = get_supabase()
+        total_chats = supabase.table("usage_logs").select("chat_count").eq("user_id", profile["id"]).execute()
+        total_chat_count = sum(item.get("chat_count", 0) or 0 for item in total_chats.data) if total_chats.data else 0
+        return {"total_chat_count": total_chat_count}
+    except Exception as e:
+        logger.warning(f"⚠️ Error fetching chat usage: {str(e)}")
+        return {"total_chat_count": 0}
 
 
 @router.get("/history")
@@ -81,14 +82,21 @@ async def get_history(profile=Depends(get_user_profile)):
 
 @router.get("/history/{log_id}")
 async def get_history_item(log_id: str, profile=Depends(get_user_profile)):
-    """Get a specific usage history item including metadata annotations."""
+    """Get a specific usage history item including metadata annotations and total chat count."""
     try:
         from app.db.supabase_client import get_supabase
         supabase = get_supabase()
         result = supabase.table("usage_logs").select("*").eq("id", log_id).eq("user_id", profile["id"]).single().execute()
         if not result.data:
             raise HTTPException(status_code=404, detail="السجل غير موجود")
-        return result.data
+        
+        # Calculate total chat count across all user's lectures
+        total_chats = supabase.table("usage_logs").select("chat_count").eq("user_id", profile["id"]).execute()
+        total_chat_count = sum(item.get("chat_count", 0) or 0 for item in total_chats.data) if total_chats.data else 0
+        
+        data = result.data
+        data["total_chat_count"] = total_chat_count
+        return data
     except Exception as e:
         logger.warning(f"⚠️ خطأ في جلب تفاصيل السجل: {str(e)}")
         raise HTTPException(status_code=404, detail="السجل غير موجود أو يخص شخصاً آخر")
