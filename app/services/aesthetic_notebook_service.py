@@ -126,8 +126,23 @@ def _has_ar(t): return bool(_AR.search(t))
 def _bidi(text):
     if not text: return "", False
     if _has_ar(text):
-        try:   return get_display(arabic_reshaper.reshape(text)), True
-        except: return text, True
+        try:
+            reshaped = arabic_reshaper.reshape(text)
+            bidi_text = get_display(reshaped)
+            # Remove ALL directional and invisible Unicode control characters
+            _CTRL_CHARS = [
+                '\u202a', '\u202b', '\u202c', '\u202d', '\u202e',  # LRE, RLE, PDF, LRO, RLO
+                '\u200e', '\u200f',  # LRM, RLM
+                '\ufeff',            # BOM / ZWNBSP
+                '\u200b', '\u200c', '\u200d',  # ZWSP, ZWNJ, ZWJ
+                '\u2066', '\u2067', '\u2068', '\u2069',  # LRI, RLI, FSI, PDI
+                '\u061c',  # Arabic Letter Mark
+            ]
+            for char in _CTRL_CHARS:
+                bidi_text = bidi_text.replace(char, '')
+            return bidi_text, True
+        except Exception:
+            return text, True
     return text, False
 
 def _clean(s):
@@ -314,9 +329,14 @@ def _h3(c, st, title):
 # ── Callout Box ───────────────────────────────────────────────────────────────
 def _callout(c, st, text, kind="note"):
     """kind: 'note' | 'exam' | 'remember'"""
-    labels  = {"exam": "⚠ هام للامتحان", "note": "💡 توضيح دراسي", "remember": "📌 تذكّر"}
+    # Auto-detect language: use English labels for English text, Arabic for Arabic
+    is_arabic_text = _has_ar(text)
+    if is_arabic_text:
+        labels = {"exam": "⚠ هام للامتحان", "note": "💡 توضيح دراسي", "remember": "📌 تذكّر"}
+    else:
+        labels = {"exam": "⚠ Exam Alert", "note": "💡 Note", "remember": "📌 Remember"}
     colors  = {"exam": C_GOLD, "note": C_BLUE, "remember": C_TEAL}
-    lbl     = labels.get(kind, "💡 توضيح")
+    lbl     = labels.get(kind, "💡 Note" if not is_arabic_text else "💡 توضيح")
     bar_clr = colors.get(kind, C_BLUE)
 
     est_lines = max(2, len(text) // 50 + 2)
@@ -429,12 +449,15 @@ def _render(c, st, text):
         elif level == 2:
             _h2(c, st, body)
         elif level == 3:
-            is_exam_sum = "ملخص" in body or "نقاط" in body or "امتحان" in body
             _h3(c, st, body)
         else:
-            is_exam    = any(k in s for k in ["هام للامتحان", "⚠", "امتحان", "مهم", "ركز"])
-            is_note    = any(k in s for k in ["💡", "ملاحظة", "توضيح"])
-            is_rem     = any(k in s for k in ["📌", "تذكّر", "تذكر"])
+            # Arabic callout keywords
+            is_exam    = any(k in s for k in ["هام للامتحان", "⚠", "امتحان", "مهم", "ركز",
+                                               "Exam Alert", "EXAM", "Important:", "WARNING:"])
+            is_note    = any(k in s for k in ["💡", "ملاحظة", "توضيح",
+                                               "Note:", "NOTE:", "Tip:", "TIP:"])
+            is_rem     = any(k in s for k in ["📌", "تذكّر", "تذكر",
+                                               "Remember:", "REMEMBER:", "Key Point:"])
 
             if is_exam and len(body) < 500:
                 _callout(c, st, body, kind="exam")

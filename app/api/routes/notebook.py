@@ -311,16 +311,81 @@ async def process_notebook(
             elif word_count > 5000:
                 depth_note = "المحاضرة طويلة ومفصلة، غطِّ كل نقطة بعمق وشمولية تامة. "
 
-            full_prompt = (
-                "أنت 'محرك لمّاح الدراسي' — ذكاء اصطناعي متخصص في إعداد ملازم دراسية جامعية احترافية للبيع.\n"
+            # STEP 1: Generate comprehensive bilingual Markdown study notebook
+            yield f"data: {json.dumps({'type': 'progress', 'step': '4/5', 'message': '🧠 محرك لمّاح الذكي يكتب محتوى الدفتر الدراسي ثنائي اللغة بالتفصيل...'}, ensure_ascii=False)}\n\n"
+
+            prompt_step1 = (
+                "أنت 'محرك لمّاح الدراسي' — ذكاء اصطناعي متخصص في إعداد ملازم ودفاتر دراسية جامعية احترافية فائقة الدقة والشمولية والروعة للبيع والتسويق.\n"
                 f"{depth_note}\n\n"
                 "══════════════════════════════════════\n"
-                "⚠️ تعليمات المخرجات الإلزامية — اقرأها جيداً وبشكل حازم:\n"
+                "🚨 STRICT BILINGUAL STRUCTURE — MANDATORY RULES (100% ENFORCED) 🚨\n"
+                "══════════════════════════════════════\n"
+                "\n"
+                "RULE 1 — TWO COMPLETELY SEPARATE SECTIONS, SEQUENTIAL ORDER:\n"
+                "  ▶ SECTION 1: Complete English Study Notebook\n"
+                "    - Write the ENTIRE first section in English ONLY.\n"
+                "    - Cover EVERY idea, concept, example, and detail from the transcript with maximum depth.\n"
+                "    - Use ## for chapter headings, ### for sub-sections, and bullet points / numbered lists throughout.\n"
+                "    - Mark important terms: <mark>term</mark>\n"
+                "    - Use English callouts: 💡 Note: / ⚠ Exam Alert: / 📌 Remember:\n"
+                "    - DO NOT write a single Arabic word in this section.\n"
+                "    - The English section must be at least 1200 words long and deeply detailed.\n"
+                "\n"
+                "  ▶ SECTION 2: الترجمة والشرح الكامل بالعربية\n"
+                "    - يبدأ هذا القسم فقط بعد انتهاء القسم الإنجليزي بالكامل.\n"
+                "    - اكتب هذا القسم بالكامل باللغة العربية الفصحى فقط دون أي كلمات إنجليزية.\n"
+                "    - نفس العناوين والترتيب والأقسام الموجودة في القسم الإنجليزي تماماً (ترجمة متوازية).\n"
+                "    - ## للعناوين الرئيسية، ### للعناوين الفرعية، ونقاط مخرزة وقوائم مرقمة في كل مكان.\n"
+                "    - ضع المصطلحات المهمة داخل: <mark>المصطلح</mark>\n"
+                "    - استخدم التنبيهات العربية: 💡 ملاحظة: / ⚠ هام للامتحان: / 📌 تذكّر:\n"
+                "    - القسم العربي يجب ألا يقل عن 1200 كلمة أيضاً.\n"
+                "\n"
+                "RULE 2 — NO LINE-BY-LINE MIXING: NEVER alternate between Arabic and English within the body.\n"
+                "RULE 3 — NO NUMBERED HEADINGS (avoid '1.1' or '2.'). Use clean Markdown: ## Title (not ## 2. Title).\n"
+                "RULE 4 — NO DENSE PARAGRAPHS: Break everything into bullet points and numbered lists.\n"
+                "RULE 5 — NO 'بروفيسور': Always use 'الدكتور' or 'المحاضر'.\n"
+                "RULE 6 — MINIMUM LENGTH: The total notebook must be at least 2500 words (English + Arabic combined).\n"
+                "         Do NOT cut short. Cover ALL details. The notebook should fill 15+ pages to feel premium.\n"
+                "RULE 7 — RICHNESS: Every section must have sub-points, examples, and explanations. No skeleton outlines.\n"
+                "\n"
+                "══════════════════════════════════════\n"
+                f"LECTURE TRANSCRIPT ({word_count} words):\n"
+                "══════════════════════════════════════\n"
+                f"{transcript[:180000]}\n"
+            )
+            if pdf_context:
+                prompt_step1 += (
+                    "\n══════════════════════════════════════\n"
+                    "📊 محتوى شرائح المحاضرة:\n"
+                    "══════════════════════════════════════\n"
+                    f"{json.dumps(pdf_context[:60], ensure_ascii=False)}"
+                )
+
+            try:
+                logger.info("[NOTEBOOK] Call 1: Requesting Lammah AI Engine for bilingual markdown content...")
+                ai_response = await asyncio.to_thread(llm.invoke, prompt_step1)
+                markdown_content = ai_response.content.strip()
+            except Exception as e:
+                logger.warning(f"[NOTEBOOK] Call 1: Lammah AI Engine failed: {e}. Falling back to Gemini 2.0...")
+                fallback_llm = get_llm_for_user(user_id)
+                ai_response = await asyncio.to_thread(fallback_llm.invoke, prompt_step1)
+                markdown_content = ai_response.content.strip()
+
+            # STEP 2: Generate structured cheat_sheet, mcqs, and comparisons based on the generated markdown
+            yield f"data: {json.dumps({'type': 'progress', 'step': '4.5/5', 'message': '🧠 محرك لمّاح يستخلص خلاصة ليلة الامتحان وأسئلة المراجعة...'}, ensure_ascii=False)}\n\n"
+
+            prompt_step2 = (
+                "أنت 'محرك لمّاح الدراسي' — ذكاء اصطناعي متخصص في استخلاص المخرجات المهيكلة والتلخيصات الذكية للملازم الدراسية.\n"
+                "بناءً على نص الدفتر الدراسي (Markdown) المرفق بالأسفل، يجب عليك توليد مخرجات JSON تحتوي بدقة على المفاتيح التالية (cheat_sheet, mcqs, comparisons) ودون حذف أو تجاهل أي منها:\n"
+                "1. خلاصة ليلة الامتحان (cheat_sheet): حصر جميع القوانين والمصطلحات والرموز الواردة في الدفتر مع تعريف مختصر من سطر واحد (من 10 إلى 25 مصطلحاً).\n"
+                "2. جداول المقارنة الذكية (comparisons): جدول مقارنة ذكي واحد على الأقل يقارن بين أهم مفهومين أو وسيلتين أو قانونين في الدفتر. ممنوع إبقاء هذا الحقل فارغاً.\n"
+                "3. أسئلة اختبر نفسك (mcqs): ما لا يقل عن 5 أسئلة اختيار من متعدد خياراتها (أ، ب، ج، د) وتغطي كامل الدفتر بشكل ذكي ودقيق.\n\n"
+                "══════════════════════════════════════\n"
+                "⚠️ قواعد المخرجات الإلزامية:\n"
                 "══════════════════════════════════════\n"
                 "يجب عليك إرجاع المخرجات بصيغة JSON فقط ولا تكتب أي كود أو تعليق خارج الـ JSON. "
-                "يجب أن يحتوي الـ JSON بشكل إجباري وإلزامي 100% على المفاتيح التالية (main_content, cheat_sheet, mcqs, comparisons) ودون حذف أو تجاهل أي منها:\n\n"
+                "يجب أن يكون الـ JSON صالحاً ومطابقاً للنموذج التالي 100%:\n\n"
                 "{\n"
-                '  "main_content": "...(نص الملزمة الكامل بتنسيق Markdown)...",\n'
                 '  "cheat_sheet": [\n'
                 '    {"term": "مصطلح أو قانون", "brief_definition": "تعريف بسطر واحد وموجز جداً"}\n'
                 '  ],\n'
@@ -338,88 +403,47 @@ async def process_notebook(
                 '      "rows": [["وجه المقارنة", "قيمة أ", "قيمة ب"]]\n'
                 '    }\n'
                 '  ]\n'
-                '}\n\n'
+                "}\n\n"
                 "══════════════════════════════════════\n"
-                "📋 قواعد أقسام الـ JSON (إلزامية ومفروضة):\n"
+                "نص الدفتر الدراسي (Markdown) المستخلص:\n"
                 "══════════════════════════════════════\n"
-                "1. حقل main_content:\n"
-                "   - يجب إعداد الملزمة كاملة بلغة ثنائية احترافية (بين الإنجليزية والعربية الفصحى) سطر بسطر أو نقطة بنقطة لمساعدة الطالب على فهم المادة الأكاديمية بالإنجليزية مع شرحها وتوضيحها بالعربية مباشرة.\n"
-                "   - اكتب المحتوى الأكاديمي والنقاط العلمية باللغة الإنجليزية أولاً، ثم أتبعها مباشرة بالترجمة والتوضيح باللغة العربية الفصحى الفخمة والواضحة.\n"
-                "   - استخدم العناوين المزدوجة أيضاً (مثال: ## Incremental Development Problems / مشاكل التطوير التدريجي).\n"
-                "   - ضع كل مصطلح إنجليزي أو مفهوم علمي مهم داخل وسم التلوين <mark>المصطلح</mark> لتمييزه وتسهيل حفظه.\n"
-                "   - استخدم التنبيهات الجاذبة مثل: 💡 ملاحظة / ⚠ هام للامتحان / 📌 تذكّر — للتأكيد على النقاط المصيرية باللغتين الإنجليزية والعربية.\n"
-                "   - لا تحذف أي معلومة أو شرح، واكتب ملخص نقاط الامتحان باللغتين في نهاية كل قسم.\n\n"
-                "2. حقل comparisons (جداول المقارنة الإلزامية):\n"
-                "   - يجب تعبئة هذا الحقل بجدول مقارنة ذكي واحد على الأقل. "
-                "إذا لم تحتوي المحاضرة على مقارنة مباشرة، قم بصناعة مقارنة منطقية ممتازة بين أهم مفهومين أو وسيلتين أو قانونين تم مناقشتهما في المحاضرة (مثال: مقارنة بين النظرية الكلاسيكية والنظرية الحديثة، أو الأداة أ والأداة ب). ممنوع إبقاء هذا الحقل فارغاً.\n\n"
-                "3. حقل mcqs (أسئلة اختبر نفسك الإلزامية):\n"
-                "   - يجب توليد ما لا يقل عن 5 أسئلة اختيار من متعدد خياراتها (أ، ب، ج، د) وتغطي كامل المحاضرة بشكل ذكي ودقيق.\n\n"
-                "4. حقل cheat_sheet (خلاصة ليلة الامتحان):\n"
-                "   - يجب حصر جميع القوانين والمصطلحات والرموز الواردة في المحاضرة مع تعريف مختصر من سطر واحد (من 10 إلى 25 مصطلحاً).\n\n"
-                "5. قواعد اللغة المزدوجة والتنسيق الهيكلي المنظم (صارمة جداً ومفروضة 100%):\n"
-                "   - يجب إقران النص الإنجليزي بالترجمة العربية مباشرة سطر بسطر (وليس كتابة القسم الإنجليزي كاملاً ثم العربي كاملاً!).\n"
-                "   - يجب تنظيم كافة الأفكار والنقاط في الملزمة على شكل نقاط مخرزة (Bullet Points) أو قوائم مرقمة (Numbered Lists) واضحة ومرتبة بشكل فائق للبيع والتسويق.\n"
-                "   - لكل نقطة أو فقرة، يجب أن يكون التنسيق كالتالي تماماً:\n"
-                "     - السطر الأول (بالإنجليزي مسبوق بنقطة مخرزة): • [النص الإنجليزي هنا]\n"
-                "     - السطر الثاني مباشرة (بالعربي ومحاذي للسطر الأول ومسبوق بنفس نوع النقطة): • [الترجمة العربية الاحترافية والأكاديمية الفخمة هنا]\n"
-                "     (مثال توضيحي):\n"
-                "     • The process is not visible to managers.\n"
-                "     • العملية غير مرئية بالنسبة للمديرين (أي لا يمكنهم متابعة سير العمل مباشرة).\n"
-                "   - استخدم العناوين المزدوجة أيضاً بنفس الأسلوب. مثال:\n"
-                "     ## Incremental Development Problems / مشاكل التطوير التدريجي\n"
-                "   - يمنع منعاً باتاً كتابة فقرات طويلة مكدسة دون تقسيمها إلى نقاط مرقمة أو مخرزة ثنائية اللغة.\n"
-                "   - طبق هذا التنسيق المنظم سطر-بسطر (إنجليزي يليه عربي مباشرة) على كافة أجزاء الملزمة بما في ذلك حقول الأسئلة والملخصات وجداول المقارنة.\n"
-                "   - ممنوع منعاً باتاً استخدام كلمة \"البروفيسور\" أو \"بروفيسور\" في أي جزء من الملزمة أو الأسئلة أو الشروحات. يجب دائماً استخدام كلمة \"الدكتور\" أو \"المحاضر\" (مثال بالإنجليزية: \"The doctor explained...\"، ومترجمة بالعربية: \"أوضح الدكتور...\").\n\n"
-                "══════════════════════════════════════\n"
-                f"التفريغ النصي الكامل للمحاضرة ({word_count} كلمة):\n"
-                "══════════════════════════════════════\n"
-                f"{transcript[:180000]}\n"
+                f"{markdown_content}\n"
             )
-            if pdf_context:
-                full_prompt += (
-                    "\n══════════════════════════════════════\n"
-                    "📊 محتوى شرائح المحاضرة:\n"
-                    "══════════════════════════════════════\n"
-                    f"{json.dumps(pdf_context[:60], ensure_ascii=False)}"
-                )
 
-            try:
-                logger.info("[NOTEBOOK] Requesting Lammah AI Engine...")
-                ai_response = await asyncio.to_thread(llm.invoke, full_prompt)
-                raw_content = ai_response.content.strip()
-            except Exception as e:
-                logger.warning(f"[NOTEBOOK] Lammah AI Engine failed: {e}. Falling back to Gemini 2.0...")
-                fallback_llm = get_llm_for_user(user_id)
-                ai_response = await asyncio.to_thread(fallback_llm.invoke, full_prompt)
-                raw_content = ai_response.content.strip()
-
-            # Parse structured JSON response
             cheat_sheet = []
             mcqs = []
             comparisons = []
-            markdown_content = raw_content
+            raw_json_content = ""
+
+            try:
+                logger.info("[NOTEBOOK] Call 2: Requesting structured JSON from Lammah AI Engine...")
+                ai_response_json = await asyncio.to_thread(llm.invoke, prompt_step2)
+                raw_json_content = ai_response_json.content.strip()
+            except Exception as e:
+                logger.warning(f"[NOTEBOOK] Call 2: Lammah AI Engine failed: {e}. Falling back to Gemini 2.0...")
+                fallback_llm = get_llm_for_user(user_id)
+                ai_response_json = await asyncio.to_thread(fallback_llm.invoke, prompt_step2)
+                raw_json_content = ai_response_json.content.strip()
 
             try:
                 # Extract JSON block (handle markdown code fences)
-                json_str = raw_content
-                fence_match = re.search(r'```(?:json)?\s*([\s\S]*?)```', raw_content)
+                json_str = raw_json_content
+                fence_match = re.search(r'```(?:json)?\s*([\s\S]*?)```', raw_json_content)
                 if fence_match:
                     json_str = fence_match.group(1).strip()
                 else:
-                    brace_start = raw_content.find('{')
-                    brace_end = raw_content.rfind('}')
+                    brace_start = raw_json_content.find('{')
+                    brace_end = raw_json_content.rfind('}')
                     if brace_start != -1 and brace_end != -1:
-                        json_str = raw_content[brace_start:brace_end + 1]
+                        json_str = raw_json_content[brace_start:brace_end + 1]
 
                 parsed = json.loads(json_str)
-                markdown_content = parsed.get("main_content", raw_content)
                 cheat_sheet = parsed.get("cheat_sheet", [])
                 mcqs = parsed.get("mcqs", [])
                 comparisons = parsed.get("comparisons", [])
-                logger.info(f"[NOTEBOOK] Parsed JSON: {len(cheat_sheet)} cheat items, {len(mcqs)} MCQs, {len(comparisons)} comparisons.")
+                logger.info(f"[NOTEBOOK] Call 2 Parsed: {len(cheat_sheet)} cheat items, {len(mcqs)} MCQs, {len(comparisons)} comparisons.")
             except Exception as parse_err:
-                logger.warning(f"[NOTEBOOK] JSON parse failed, using raw markdown: {parse_err}")
-                markdown_content = raw_content
+                logger.error(f"[NOTEBOOK] Call 2 JSON parse failed: {parse_err}. Raw JSON content: {raw_json_content}")
 
             # 6. Render Premium PDF
             yield f"data: {json.dumps({'type': 'progress', 'step': '5/5', 'message': '🎨 جاري رسم الدفتر الاحترافي بكل الميزات الجديدة...'}, ensure_ascii=False)}\n\n"
