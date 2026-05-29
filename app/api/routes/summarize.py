@@ -230,6 +230,7 @@ async def batch_process(req: BatchRequest, bg_tasks: BackgroundTasks, profile=De
         raise HTTPException(status_code=403, detail=f"رصيدك الحالي ({quota}) لا يكفي لمعالجة ({len(req.lectures)}) ملفات.")
 
     plan_name = "مجاني"
+    is_free_trial = profile.get("current_plan_id") is None or profile.get("current_plan_id") == "free"
     if sub_info.get("active_subscription"):
         plan_name = sub_info["active_subscription"].get("subscription_plans", {}).get("name", "مجاني")
 
@@ -245,7 +246,7 @@ async def batch_process(req: BatchRequest, bg_tasks: BackgroundTasks, profile=De
             
         supabase.table("usage_logs").update({"status": "processing"}).eq("id", history_id).execute()
         
-        bg_tasks.add_task(background_worker, row, user_id, plan_name, history_id)
+        bg_tasks.add_task(background_worker, row, user_id, plan_name, history_id, is_free_trial)
         results.append({"row_id": row.row_id, "history_id": history_id})
     
     return {"status": "success", "jobs": results}
@@ -295,6 +296,7 @@ async def process_batch_lectures(
     Provides a massive combined transcript for a single PDF.
     """
     logger.info(f"🚀 [BATCH_LECTURE] Request received: urls={lecture_urls}, temp_ids={audio_temp_ids}")
+    is_free_trial = profile.get("current_plan_id") is None or profile.get("current_plan_id") == "free"
     unique_id = str(uuid.uuid4())[:8]
     base_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))))
     upload_dir_env = os.getenv("UPLOAD_DIR", "backend/uploads")
@@ -372,7 +374,7 @@ async def process_batch_lectures(
                     processed_p = os.path.join(temp_dir, f"{base}_processed.mp3")
                     
                     # Sync check
-                    max_wait = 10
+                    max_wait = 45
                     waited = 0
                     while not os.path.exists(temp_path) and not os.path.exists(processed_p) and waited < max_wait:
                         await asyncio.sleep(1)
@@ -432,7 +434,8 @@ async def process_batch_lectures(
             yield f"data: {json.dumps({'type': 'progress', 'step': '0/5', 'message': '🎟️ تم حجز مكان لك في طابور المعالجة...'}, ensure_ascii=False)}\n\n"
             
             plan_name = "مجاني"
-            if not is_free_trial and profile.get("current_plan_id"):
+            _has_plan = profile.get("current_plan_id") and profile.get("current_plan_id") != "free"
+            if _has_plan:
                 from app.services.subscription_service import get_plan_by_id
                 plan = get_plan_by_id(profile["current_plan_id"])
                 plan_name = plan.get("name", "مجاني") if plan else "مجاني"
@@ -538,6 +541,16 @@ async def process_batch_lectures(
             else:
                 annotations = await anno_task
 
+            # Apply free trial limits if active
+            if is_free_trial:
+                if isinstance(annotations.get("slide_explanations"), list):
+                    annotations["slide_explanations"] = annotations["slide_explanations"][:2]
+                    annotations["slides_locked"] = True
+                if isinstance(annotations.get("expected_questions"), list):
+                    annotations["expected_questions"] = annotations["expected_questions"][:2]
+                if isinstance(annotations.get("flashcards"), list):
+                    annotations["flashcards"] = annotations["flashcards"][:2]
+
             # Generate AI Title
             ai_title = await generate_ai_title(llm, transcript)
             
@@ -571,7 +584,7 @@ async def process_batch_lectures(
                         return
 
                 from app.services.pdf_annotator import annotate_pdf
-                await asyncio.to_thread(annotate_pdf, annotatable_pdf_path, output_pdf_path, annotations, False)
+                await asyncio.to_thread(annotate_pdf, annotatable_pdf_path, output_pdf_path, annotations, is_free_trial)
                 download_url = f"/api/v1/summarize/download/{unique_id}.pdf"
 
 
