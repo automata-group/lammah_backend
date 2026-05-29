@@ -247,3 +247,22 @@ def refund_lecture_quota(user_id: str, history_id: str, error_msg: str = None):
             
     except Exception as e:
         logger.error(f"[REFUND ERROR] Failed to refund for user {user_id}: {e}")
+
+
+def get_active_quota(user_id: str) -> dict:
+    """Quick check of remaining aggregate quota for a user."""
+    info = get_user_subscription_info(user_id)
+    active = info.get("active_subscription")
+    plan_name = "مجاني"
+    if active and "subscription_plans" in active:
+        plan_name = active["subscription_plans"].get("name", "مجاني")
+
+    profile = info.get("profile") or {}
+    return {
+        "quota_remaining": info.get("quota_remaining", 0),
+        "quota_reset_at": profile.get("quota_reset_at"),
+        "plan_id": profile.get("current_plan_id"),
+        "plan_name": plan_name,
+        "full_name": profile.get("full_name")
+    }
+
