@@ -37,6 +37,8 @@ async def chat_with_lecture(request: ChatRequest, user: dict = Depends(get_user_
         if not log_result.data:
             raise HTTPException(status_code=404, detail="Lecture not found or unauthorized")
 
+        current_count = log_result.data.get("chat_count", 0) or 0
+
         # 1. Plan Verification & Limits
         from datetime import datetime, timezone
         sub_check = supabase.table("user_subscriptions") \
