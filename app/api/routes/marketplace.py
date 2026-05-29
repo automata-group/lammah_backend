@@ -20,6 +20,7 @@ class PublishNotebookRequest(BaseModel):
     preview_pdf_url: str
     description: Optional[str] = ""
     student_name: Optional[str] = ""
+    covered_topics: Optional[str] = ""
 
 @router.post("/publish")
 async def publish_notebook(
@@ -43,6 +44,7 @@ async def publish_notebook(
             "preview_pdf_url": request.preview_pdf_url,
             "description": request.description or "",
             "student_name": request.student_name or "",
+            "covered_topics": request.covered_topics or "",
             "views_count": 0,
             "sales_count": 0,
             "created_at": datetime.now(timezone.utc).isoformat()
@@ -51,7 +53,13 @@ async def publish_notebook(
         try:
             result = supabase.table("notebook_marketplace").insert(notebook_data).execute()
         except Exception as db_err:
-            if "description" in str(db_err) and "description" in notebook_data:
+            err_str = str(db_err)
+            # Gracefully handle missing columns (description / covered_topics)
+            if "covered_topics" in err_str and "covered_topics" in notebook_data:
+                logger.warning("Supabase table 'notebook_marketplace' lacks 'covered_topics' column. Skipping it...")
+                del notebook_data["covered_topics"]
+                result = supabase.table("notebook_marketplace").insert(notebook_data).execute()
+            elif "description" in err_str and "description" in notebook_data:
                 logger.warning("Supabase table 'notebook_marketplace' lacks 'description' column. Bypassing description during publish...")
                 del notebook_data["description"]
                 result = supabase.table("notebook_marketplace").insert(notebook_data).execute()
@@ -141,6 +149,7 @@ class EditNotebookRequest(BaseModel):
     description: Optional[str] = None
     student_name: Optional[str] = None
     reflect_details: Optional[str] = None
+    covered_topics: Optional[str] = None
 
 @router.put("/{notebook_id}")
 async def edit_my_notebook(
@@ -172,12 +181,20 @@ async def edit_my_notebook(
             update_data["student_name"] = request.student_name
         if request.reflect_details is not None:
             update_data["reflect_details"] = request.reflect_details
+        if request.covered_topics is not None:
+            update_data["covered_topics"] = request.covered_topics
             
         if update_data:
             try:
                 supabase.table("notebook_marketplace").update(update_data).eq("id", notebook_id).execute()
             except Exception as db_err:
-                if "description" in str(db_err) and "description" in update_data:
+                err_str = str(db_err)
+                if "covered_topics" in err_str and "covered_topics" in update_data:
+                    logger.warning("Supabase table 'notebook_marketplace' lacks 'covered_topics' column. Skipping it during update...")
+                    del update_data["covered_topics"]
+                    if update_data:
+                        supabase.table("notebook_marketplace").update(update_data).eq("id", notebook_id).execute()
+                elif "description" in err_str and "description" in update_data:
                     logger.warning("Supabase table 'notebook_marketplace' lacks 'description' column. Bypassing description during update...")
                     del update_data["description"]
                     if update_data:

@@ -184,6 +184,33 @@ def annotate_pdf(input_path: str, output_path: str, annotations: dict, is_free_t
                 
         # 3. Apply Full-Page Explanations (Pedagogical Notebook Upgrade)
         slide_explanations = annotations.get("slide_explanations", [])
+        
+        # ── Filter out "not covered" placeholder entries ──────────────────────
+        # When the AI says the lecturer didn't discuss a slide it writes one of
+        # the sentinel phrases below.  We must NOT create a yellow note page for
+        # those slides — the user asked us to skip them entirely.
+        _NO_CONTENT_PHRASES = [
+            "الدكتور ما ذكر هالشريحة",
+            "الدكتور ما ذكر",
+            "لم يذكر",
+            "لم يتطرق",
+            "لم يشرح",
+            "لا يوجد محتوى",
+            "no content",
+            "not mentioned",
+            "not covered",
+            "did not mention",
+            "did not discuss",
+        ]
+        def _is_no_content(text: str) -> bool:
+            t = text.strip().lower()
+            return any(phrase.lower() in t for phrase in _NO_CONTENT_PHRASES)
+        
+        slide_explanations = [
+            exp for exp in slide_explanations
+            if not _is_no_content(exp.get("explanation", ""))
+        ]
+        
         if slide_explanations:
             new_doc = fitz.open()
             exp_map = {int(exp.get("page_number", 0)): exp.get("explanation", "") for exp in slide_explanations}
