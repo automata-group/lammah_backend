@@ -325,10 +325,6 @@ def _para(c, text, st, font_sz=FSIZ, lh=LINE_H, color=C_BODY, bold=False, indent
 
             c.setFont(dfn, font_sz)
             lw = c.stringWidth(disp, dfn, font_sz)
-            if para_is_rtl:
-                # Add safe visual width lower bound for Arabic strings (0.60pt per char)
-                lw = max(lw, len(disp) * (font_sz * 0.60))
-            
             # Align text to left for LTR, right for RTL (with a safe 6pt buffer for Arabic stringWidth underestimation)
             if para_is_rtl:
                 x = avail_right - bul_ind - lw - 6
@@ -1011,10 +1007,8 @@ def _draw_mcqs(c, st, mcqs: list):
             c.roundRect(px, st.y - 1, 9, 9, 1.5, fill=0, stroke=1)
             item_d, _ = _bidi(item)
             itw = c.stringWidth(item_d, FONT_REG, 9)
-            # Add safe character-based minimum width bound (0.60pt per char for 9pt font)
-            itw = max(itw, len(item_d) * (9 * 0.60))
-            # Safe 38pt offset to prevent overlap due to Arabic stringWidth underestimation
-            c.drawString(W - MARGIN - itw - 38, st.y - 1, item_d)
+            # Draw Arabic text right-aligned with a neat 12pt gap from the checkbox
+            c.drawString(W - MARGIN - 32 - itw, st.y - 1, item_d)
         else:
             px = MARGIN + 8
             c.roundRect(px, st.y - 1, 9, 9, 1.5, fill=0, stroke=1)
