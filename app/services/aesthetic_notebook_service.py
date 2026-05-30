@@ -149,7 +149,7 @@ def _clean(s):
     return re.sub(r'\*\*|<mark>|</mark>|<span[^>]*>|</span>', '', s)
 
 # ── Lined Paper Background ────────────────────────────────────────────────────
-def _bg(c):
+def _bg(c, is_rtl=True):
     c.setFillColor(C_BG)
     c.rect(0, 0, W, H, fill=1, stroke=0)
     c.setStrokeColor(C_LINE)
@@ -158,22 +158,26 @@ def _bg(c):
     while y >= BOTTOM + 8:
         c.line(MARGIN - 12, y, W - MARGIN + 12, y)
         y -= 26
-    # Margin line (RTL: right side)
+    # Margin line (Dynamic placement)
     c.setStrokeColor(C_MARGIN)
     c.setLineWidth(1.0)
-    c.line(W - MARGIN - 18, 0, W - MARGIN - 18, H)
+    if is_rtl:
+        c.line(W - MARGIN - 18, 0, W - MARGIN - 18, H)
+    else:
+        c.line(MARGIN + 18, 0, MARGIN + 18, H)
 
 # ── Page State ────────────────────────────────────────────────────────────────
 class _S:
-    def __init__(self, page_num=1, student_name="طالب متميز"):
+    def __init__(self, page_num=1, student_name="طالب متميز", is_rtl=True):
         self.y = H - MARGIN - 18
         self.page_num = page_num
         self.student_name = student_name
+        self.is_rtl = is_rtl
 
     def new_page(self, c):
         c.showPage()
         self.page_num += 1
-        _bg(c)
+        _bg(c, is_rtl=self.is_rtl)
         self._footer(c)
         self.y = H - MARGIN - 18
 
@@ -184,17 +188,26 @@ class _S:
         c.line(MARGIN, BOTTOM - 8, W - MARGIN, BOTTOM - 8)
         c.setFont(FONT_REG, 7.5)
         c.setFillColor(C_MUTED)
-        # Left: brand
-        brand, _ = _bidi("✨ متجر لمّاح للملازم")
-        c.drawString(MARGIN, BOTTOM - 20, brand)
-        # Center: student
-        attr, _ = _bidi(f"إعداد: {self.student_name}")
-        aw = c.stringWidth(attr, FONT_REG, 7.5)
-        c.drawString(W / 2 - aw / 2, BOTTOM - 20, attr)
-        # Right: page
-        pg, _ = _bidi(f"صفحة {self.page_num}")
-        pw = c.stringWidth(pg, FONT_REG, 7.5)
-        c.drawString(W - MARGIN - pw, BOTTOM - 20, pg)
+        
+        # English vs Arabic footers
+        if not self.is_rtl:
+            brand, _ = _bidi("Lammah Study Notebook")
+            c.drawString(MARGIN, BOTTOM - 20, brand)
+            attr, _ = _bidi(f"Prepared by: {self.student_name}")
+            aw = c.stringWidth(attr, FONT_REG, 7.5)
+            c.drawString(W / 2 - aw / 2, BOTTOM - 20, attr)
+            pg, _ = _bidi(f"Page {self.page_num}")
+            pw = c.stringWidth(pg, FONT_REG, 7.5)
+            c.drawString(W - MARGIN - pw, BOTTOM - 20, pg)
+        else:
+            brand, _ = _bidi("متجر لمّاح للملازم")
+            c.drawString(MARGIN, BOTTOM - 20, brand)
+            attr, _ = _bidi(f"إعداد: {self.student_name}")
+            aw = c.stringWidth(attr, FONT_REG, 7.5)
+            c.drawString(W / 2 - aw / 2, BOTTOM - 20, attr)
+            pg, _ = _bidi(f"صفحة {self.page_num}")
+            pw = c.stringWidth(pg, FONT_REG, 7.5)
+            c.drawString(W - MARGIN - pw, BOTTOM - 20, pg)
 
 # ── Text Paragraph Renderer ───────────────────────────────────────────────────
 def _para(c, text, st, font_sz=FSIZ, lh=LINE_H, color=C_BODY, bold=False, indent=0, max_w=None):
@@ -210,8 +223,22 @@ def _para(c, text, st, font_sz=FSIZ, lh=LINE_H, color=C_BODY, bold=False, indent
 
         is_bullet = p.startswith(("- ", "• ", "* ", "– "))
         is_num    = bool(re.match(r'^\d+[\.\)]\s', p))
+        is_checkbox = False
+        is_checked = False
         pfx = ""
-        if is_bullet:
+        bul_ind = 0
+
+        if p.startswith(("- [ ]", "- [x]", "- [X]")):
+            is_checkbox = True
+            is_checked = "x" in p[:6] or "X" in p[:6]
+            p = p[5:].strip()
+            bul_ind = 16
+        elif p.startswith(("[ ]", "[x]", "[X]")):
+            is_checkbox = True
+            is_checked = "x" in p[:4] or "X" in p[:4]
+            p = p[3:].strip()
+            bul_ind = 16
+        elif is_bullet:
             pfx = "•"
             p   = p[2:].strip()
             bul_ind = 14
@@ -242,16 +269,37 @@ def _para(c, text, st, font_sz=FSIZ, lh=LINE_H, color=C_BODY, bold=False, indent
                 cur_words, cur_w = [word], ww
         if cur_words: lines.append(" ".join(cur_words))
 
+        # Detect paragraph language
+        para_is_rtl = _has_ar(p)
+        st.is_rtl = para_is_rtl
+
         for li, line_str in enumerate(lines):
             if st.y < BOTTOM + lh: st.new_page(c)
 
-            # Prefix (bullet / number)
-            if li == 0 and pfx:
-                pfx_d, _ = _bidi(pfx)
-                c.setFillColor(C_GOLD)
-                c.setFont(FONT_BOLD, font_sz + 1)
-                px = MARGIN + indent + avail - bul_ind + 2
-                c.drawString(px, st.y, pfx_d)
+            # Prefix (bullet / number / checkbox)
+            if li == 0:
+                if is_checkbox:
+                    c.setStrokeColor(C_GOLD)
+                    c.setLineWidth(1.0)
+                    if para_is_rtl:
+                        px = MARGIN + indent + avail - bul_ind + 2
+                    else:
+                        px = MARGIN + indent + 2
+                    c.roundRect(px, st.y - 1, 9, 9, 1.5, fill=0, stroke=1)
+                    if is_checked:
+                        c.setStrokeColor(C_GOLD)
+                        c.setLineWidth(1.2)
+                        c.line(px + 2, st.y + 3, px + 4, st.y + 1)
+                        c.line(px + 4, st.y + 1, px + 7, st.y + 6)
+                elif pfx:
+                    pfx_d, _ = _bidi(pfx)
+                    c.setFillColor(C_GOLD)
+                    c.setFont(FONT_BOLD, font_sz + 1)
+                    if para_is_rtl:
+                        px = MARGIN + indent + avail - bul_ind + 2
+                    else:
+                        px = MARGIN + indent + 2
+                    c.drawString(px, st.y, pfx_d)
 
             # Highlights
             hl = [m.group(1) for m in re.finditer(r'<mark>(.*?)</mark>', line_str)]
@@ -265,7 +313,9 @@ def _para(c, text, st, font_sz=FSIZ, lh=LINE_H, color=C_BODY, bold=False, indent
             c.setFont(dfn, font_sz)
             lw = c.stringWidth(disp, dfn, font_sz)
             x_base = MARGIN + indent
-            x = (x_base + avail_w - bul_ind - lw - 16) if is_rtl else (x_base + bul_ind)
+            
+            # Align line based on paragraph-level language direction
+            x = (x_base + avail_w - bul_ind - lw - 16) if para_is_rtl else (x_base + bul_ind)
 
             # Draw highlighter rectangles
             for hw in hl:
@@ -289,6 +339,8 @@ def _h1(c, st, title):
     if st.y - 50 < BOTTOM: st.new_page(c)
     st.y -= 14
     t = _clean(str(title))[:65]
+    is_rtl = _has_ar(t)
+    st.is_rtl = is_rtl
     td, _ = _bidi(t)
     c.setFont(FONT_BOLD, 15)
     tw = c.stringWidth(td, FONT_BOLD, 15)
@@ -296,7 +348,10 @@ def _h1(c, st, title):
     c.setFillColor(C_BLUE)
     c.roundRect(MARGIN, st.y - 6, TXT_W, 26, 5, fill=1, stroke=0)
     c.setFillColor(HexColor("#FDFBF7"))
-    c.drawString(W - MARGIN - tw - 22, st.y + 4, td)
+    if is_rtl:
+        c.drawString(W - MARGIN - tw - 22, st.y + 4, td)
+    else:
+        c.drawString(MARGIN + 22, st.y + 4, td)
     st.y -= 34
 
 # ── Sub-heading (H2) ──────────────────────────────────────────────────────────
@@ -304,14 +359,22 @@ def _h2(c, st, title):
     if st.y - 40 < BOTTOM: st.new_page(c)
     st.y -= 8
     t = _clean(str(title))[:70]
+    is_rtl = _has_ar(t)
+    st.is_rtl = is_rtl
     td, _ = _bidi(t)
     c.setFont(FONT_BOLD, 13)
     tw = c.stringWidth(td, FONT_BOLD, 13)
     c.setFillColor(C_GOLD)
-    c.drawString(W - MARGIN - tw - 20, st.y, td)
-    c.setStrokeColor(C_GOLD)
-    c.setLineWidth(1.2)
-    c.line(W - MARGIN - tw - 22, st.y - 3, W - MARGIN - 16, st.y - 3)
+    if is_rtl:
+        c.drawString(W - MARGIN - tw - 20, st.y, td)
+        c.setStrokeColor(C_GOLD)
+        c.setLineWidth(1.2)
+        c.line(W - MARGIN - tw - 22, st.y - 3, W - MARGIN - 16, st.y - 3)
+    else:
+        c.drawString(MARGIN + 20, st.y, td)
+        c.setStrokeColor(C_GOLD)
+        c.setLineWidth(1.2)
+        c.line(MARGIN + 16, st.y - 3, MARGIN + tw + 22, st.y - 3)
     st.y -= 22
 
 # ── H3 (Exam Summary Header) ─────────────────────────────────────────────────
@@ -319,50 +382,156 @@ def _h3(c, st, title):
     if st.y - 30 < BOTTOM: st.new_page(c)
     st.y -= 6
     t = _clean(str(title))[:80]
+    is_rtl = _has_ar(t)
+    st.is_rtl = is_rtl
     td, _ = _bidi(t)
     c.setFont(FONT_BOLD, 11.5)
     tw = c.stringWidth(td, FONT_BOLD, 11.5)
     c.setFillColor(C_TEAL)
-    c.drawString(W - MARGIN - tw - 18, st.y, td)
+    if is_rtl:
+        c.drawString(W - MARGIN - tw - 18, st.y, td)
+    else:
+        c.drawString(MARGIN + 18, st.y, td)
     st.y -= 20
 
-# ── Callout Box ───────────────────────────────────────────────────────────────
-def _callout(c, st, text, kind="note"):
-    """kind: 'note' | 'exam' | 'remember'"""
-    # Auto-detect language: use English labels for English text, Arabic for Arabic
+# ── Cornell-Style Note Box ───────────────────────────────────────────────────
+def _cornell_box(c, st, text, kind="note"):
+    """Renders a beautiful Cornell-style note box with a cue column and a note column."""
     is_arabic_text = _has_ar(text)
-    if is_arabic_text:
-        labels = {"exam": "⚠ هام للامتحان", "note": "💡 توضيح دراسي", "remember": "📌 تذكّر"}
+    st.is_rtl = is_arabic_text
+    
+    # Define labels without emojis
+    labels = {
+        "exam": ("Exam Alert", "تنبيه هام"),
+        "note": ("Key Note", "ملاحظة هامة"),
+        "remember": ("Remember", "تذكّر")
+    }
+    lbl_en, lbl_ar = labels.get(kind, ("Note", "ملاحظة"))
+    
+    # Split text into cue and body at the first colon
+    if ":" in text:
+        parts = text.split(":", 1)
+        cue = parts[0].strip()
+        # Clean any emojis or markers from cue
+        cue = re.sub(r'^[💡🧪⚡✅📌⚠📊✨🔒\-•\s]+', '', cue)
+        body = parts[1].strip()
     else:
-        labels = {"exam": "⚠ Exam Alert", "note": "💡 Note", "remember": "📌 Remember"}
-    colors  = {"exam": C_GOLD, "note": C_BLUE, "remember": C_TEAL}
-    lbl     = labels.get(kind, "💡 Note" if not is_arabic_text else "💡 توضيح")
-    bar_clr = colors.get(kind, C_BLUE)
+        cue = lbl_ar if is_arabic_text else lbl_en
+        body = text.strip()
 
-    est_lines = max(2, len(text) // 50 + 2)
-    box_h     = est_lines * 20 + 28
+    # Estimate height based on body text length
+    est_lines = max(2, len(body) // 40 + 2)
+    box_h = est_lines * 19 + 28
     if st.y - box_h < BOTTOM: st.new_page(c)
-
+    
     box_y = st.y - box_h
+    
+    # Draw Cornell box background
     c.setFillColor(C_BOX_BG)
-    c.roundRect(MARGIN, box_y, TXT_W, box_h, 7, fill=1, stroke=0)
+    c.roundRect(MARGIN, box_y, TXT_W, box_h, 6, fill=1, stroke=0)
     c.setStrokeColor(C_BOX_BD)
     c.setLineWidth(0.8)
-    c.roundRect(MARGIN, box_y, TXT_W, box_h, 7, fill=0, stroke=1)
-    # Color left bar (RTL: right side)
-    c.setFillColor(bar_clr)
-    c.rect(W - MARGIN - 18, box_y + 5, 4, box_h - 10, fill=1, stroke=0)
+    c.roundRect(MARGIN, box_y, TXT_W, box_h, 6, fill=0, stroke=1)
+    
+    # Colors for dividers and highlights
+    colors = {"exam": C_GOLD, "note": C_BLUE, "remember": C_TEAL}
+    theme_clr = colors.get(kind, C_BLUE)
+    
+    # Cornell columns division: 28% for Cue column, 72% for Notes
+    cue_w = TXT_W * 0.28
+    notes_w = TXT_W * 0.72
+    
+    # Draw vertical divider and cue/notes content
+    c.setStrokeColor(C_DIV)
+    c.setLineWidth(0.8)
+    
+    if is_arabic_text:
+        # Arabic: Cue is on the right, Notes on the left
+        divider_x = W - MARGIN - cue_w
+        c.line(divider_x, box_y + 4, divider_x, box_y + box_h - 4)
+        
+        # Draw side colored bar on right edge
+        c.setFillColor(theme_clr)
+        c.rect(W - MARGIN - 4, box_y + 4, 3, box_h - 8, fill=1, stroke=0)
+        
+        # Draw Cue text (bold) in the Cue column
+        c.setFont(FONT_BOLD, 9.5)
+        c.setFillColor(theme_clr)
+        cue_d, _ = _bidi(cue)
+        c.drawRightString(W - MARGIN - 12, box_y + box_h - 18, cue_d)
+        
+        # Draw Body/Notes in the Notes column (left side)
+        inner = _S(st.page_num, st.student_name)
+        inner.y = box_y + box_h - 18
+        _para(c, body, inner, font_sz=9, lh=17, color=C_BODY, indent=0, max_w=notes_w - 12)
+        
+    else:
+        # English: Cue is on the left, Notes on the right
+        divider_x = MARGIN + cue_w
+        c.line(divider_x, box_y + 4, divider_x, box_y + box_h - 4)
+        
+        # Draw side colored bar on left edge
+        c.setFillColor(theme_clr)
+        c.rect(MARGIN + 1, box_y + 4, 3, box_h - 8, fill=1, stroke=0)
+        
+        # Draw Cue text (bold) in the Cue column
+        c.setFont(FONT_BOLD, 9.5)
+        c.setFillColor(theme_clr)
+        cue_d, _ = _bidi(cue)
+        c.drawString(MARGIN + 12, box_y + box_h - 18, cue_d)
+        
+        # Draw Body/Notes in the Notes column (right side)
+        inner = _S(st.page_num, st.student_name)
+        inner.y = box_y + box_h - 18
+        _para(c, body, inner, font_sz=9, lh=17, color=C_BODY, indent=cue_w + 8, max_w=TXT_W - 8)
+        
+    st.y = box_y - 12
 
-    lbl_d, _ = _bidi(lbl)
-    c.setFont(FONT_BOLD, 8.5)
-    c.setFillColor(bar_clr)
-    lw = c.stringWidth(lbl_d, FONT_BOLD, 8.5)
-    c.drawString(W - MARGIN - lw - 24, box_y + box_h - 14, lbl_d)
+# ── Code & Formula Card ──────────────────────────────────────────────────────
+def _code_card(c, st, code_lines, lang=""):
+    if not code_lines: return
+    
+    # Determine height of the code card
+    card_lh = 16
+    padding = 20
+    card_h = len(code_lines) * card_lh + padding * 2
+    if lang:
+        card_h += 16  # extra space for language title
+        
+    if st.y - card_h < BOTTOM: st.new_page(c)
+    
+    card_y = st.y - card_h
+    
+    # Draw dark rounded box
+    c.setFillColor(HexColor("#1A1510"))  # Premium dark charcoal brown
+    c.roundRect(MARGIN, card_y, TXT_W, card_h, 6, fill=1, stroke=0)
+    c.setStrokeColor(HexColor("#3A3025"))  # Muted outline
+    c.setLineWidth(1.0)
+    c.roundRect(MARGIN, card_y, TXT_W, card_h, 6, fill=0, stroke=1)
+    
+    cy = card_y + card_h - padding
+    
+    # Draw language header if available
+    if lang:
+        c.setFont("Courier-Bold", 8)
+        c.setFillColor(HexColor("#B45309"))  # Accent color
+        hdr, _ = _bidi(f"[ {lang.upper()} ]")
+        c.drawString(MARGIN + 12, cy - 2, hdr)
+        cy -= 18
+        
+    # Render each code line
+    c.setFont("Courier", 8.5)
+    c.setFillColor(HexColor("#E6D6BD"))  # Elegant cream code color
+    for line in code_lines:
+        l_text = line.replace("\t", "    ")
+        c.drawString(MARGIN + 16, cy - 8, l_text[:85])
+        cy -= card_lh
+        
+    st.y = card_y - 12
 
-    inner = _S(st.page_num, st.student_name)
-    inner.y = box_y + box_h - 24
-    _para(c, text, inner, font_sz=9.5, lh=19, color=C_BODY, indent=10, max_w=TXT_W - 24)
-    st.y = box_y - 10
+# ── Callout Box (Backwards Compatibility Wrapper) ────────────────────────────
+def _callout(c, st, text, kind="note"):
+    _cornell_box(c, st, text, kind)
 
 # ── Table Renderer ────────────────────────────────────────────────────────────
 def _table(c, st, raw):
@@ -426,17 +595,47 @@ def _render(c, st, text):
     txt = TABLE_PAT.sub(_save, text)
     ti  = iter(tables)
 
-    for seg in txt.split("\n"):
+    lines_list = txt.split("\n")
+    in_code_block = False
+    code_lines = []
+    code_lang = ""
+
+    i = 0
+    while i < len(lines_list):
+        seg = lines_list[i]
         s = seg.strip()
-        if not s: continue
+        
+        if not s:
+            if in_code_block:
+                code_lines.append("")
+            i += 1
+            continue
+
+        if s.startswith("```"):
+            if in_code_block:
+                _code_card(c, st, code_lines, code_lang)
+                in_code_block = False
+                code_lines = []
+            else:
+                in_code_block = True
+                code_lang = s[3:].strip()
+            i += 1
+            continue
+
+        if in_code_block:
+            code_lines.append(seg)
+            i += 1
+            continue
 
         if s == "[[TABLE]]":
             try: _table(c, st, next(ti))
             except StopIteration: pass
+            i += 1
             continue
 
         if s.startswith("---") or s.startswith("===") or s.startswith("***"):
             _divider(c, st)
+            i += 1
             continue
 
         level = 0
@@ -451,7 +650,6 @@ def _render(c, st, text):
         elif level == 3:
             _h3(c, st, body)
         else:
-            # Arabic callout keywords
             is_exam    = any(k in s for k in ["هام للامتحان", "⚠", "امتحان", "مهم", "ركز",
                                                "Exam Alert", "EXAM", "Important:", "WARNING:"])
             is_note    = any(k in s for k in ["💡", "ملاحظة", "توضيح",
@@ -460,17 +658,19 @@ def _render(c, st, text):
                                                "Remember:", "REMEMBER:", "Key Point:"])
 
             if is_exam and len(body) < 500:
-                _callout(c, st, body, kind="exam")
+                _cornell_box(c, st, body, kind="exam")
             elif is_rem and len(body) < 500:
-                _callout(c, st, body, kind="remember")
+                _cornell_box(c, st, body, kind="remember")
             elif is_note and len(body) < 500:
-                _callout(c, st, body, kind="note")
+                _cornell_box(c, st, body, kind="note")
             else:
                 _para(c, body, st)
+        i += 1
 
 # ── Cover Page ────────────────────────────────────────────────────────────────
 def _cover(c, title, student_name):
-    _bg(c)
+    # Cover is drawn RTL (Arabic platform base style) but cleaned of emojis
+    _bg(c, is_rtl=True)
 
     # Top decorative header bar
     c.setFillColor(C_COVER_H)
@@ -479,7 +679,7 @@ def _cover(c, title, student_name):
     c.rect(0, H - 204, W, 4, fill=1, stroke=0)
 
     # Brand name
-    brand, _ = _bidi("✨ دفتر الطالب المتفوق الجامعي")
+    brand, _ = _bidi("دفتر الطالب المتفوق الجامعي")
     c.setFillColor(HexColor("#FDFBF7"))
     c.setFont(FONT_BOLD, 15)
     bw = c.stringWidth(brand, FONT_BOLD, 15)
@@ -513,6 +713,7 @@ def _cover(c, title, student_name):
     c.setStrokeColor(C_BOX_BD)
     c.setLineWidth(0.8)
     c.roundRect(bx, by, bw2, bh2, 12, fill=0, stroke=1)
+    
     # Right accent bar
     c.setFillColor(C_BLUE)
     c.rect(bx + bw2 - 5, by + 10, 4, bh2 - 20, fill=1, stroke=0)
@@ -520,7 +721,7 @@ def _cover(c, title, student_name):
     rows = [
         ("إعداد الطالب:", student_name),
         ("المنصة الناشرة:", "منصة لمّاح الرقمية"),
-        ("حقوق الملكية:", "محفوظة للبائع والمنصة 🔒"),
+        ("حقوق الملكية:", "محفوظة للبائع والمنصة"),
     ]
     for i, (lbl, val) in enumerate(rows):
         row_y = by + bh2 - 45 - i * 42
@@ -547,23 +748,30 @@ def _draw_cheat_sheet(c, st, items: list):
     """Renders a 'زبدة ليلة الامتحان' cheat sheet table."""
     if not items: return
 
+    # Detect cheat sheet language
+    is_arabic_cheat = any(_has_ar(item.get("term", "")) or _has_ar(item.get("brief_definition", "")) for item in items)
+    st.is_rtl = is_arabic_cheat
+
     # New page with section header
     st.new_page(c)
     st.y -= 6
 
-    # Section banner
+    # Section banner (No emojis)
     c.setFillColor(HexColor("#1B3A8A"))
     c.rect(MARGIN, st.y - 34, TXT_W, 34, fill=1, stroke=0)
     c.setFillColor(HexColor("#FCD34D"))
     c.rect(MARGIN, st.y - 38, TXT_W, 4, fill=1, stroke=0)
-    title_d, _ = _bidi("⚡ خلاصة ليلة الامتحان")
+    
+    title_text = "خلاصة ليلة الامتحان" if is_arabic_cheat else "Exam Cheat Sheet"
+    title_d, _ = _bidi(title_text)
     c.setFillColor(HexColor("#FDFBF7"))
     c.setFont(FONT_BOLD, 14)
     tw = c.stringWidth(title_d, FONT_BOLD, 14)
     c.drawString(W / 2 - tw / 2, st.y - 24, title_d)
     st.y -= 52
 
-    sub_d, _ = _bidi("جميع المصطلحات والقوانين المهمة — راجعها قبل الامتحان مباشرةً")
+    sub_text = "جميع المصطلحات والقوانين المهمة — راجعها قبل الامتحان مباشرةً" if is_arabic_cheat else "Key terms and formulas to review right before the exam"
+    sub_d, _ = _bidi(sub_text)
     c.setFont(FONT_REG, 9)
     c.setFillColor(C_MUTED)
     sw = c.stringWidth(sub_d, FONT_REG, 9)
@@ -575,38 +783,6 @@ def _draw_cheat_sheet(c, st, items: list):
     col_def  = TXT_W * 0.65
     row_h = 22
 
-    def _draw_row(term_text, def_text, is_header=False):
-        if st.y - row_h < BOTTOM: st.new_page(c)
-        bg = HexColor("#D9CBBA") if is_header else (HexColor("#FDFBF7") if (items.index({"term": term_text, "brief_definition": def_text} if not is_header else {}) % 2 == 0) else HexColor("#F7F1E8"))
-        try:
-            idx_check = next((i for i, x in enumerate(items) if x.get("term") == term_text), -1)
-            bg = HexColor("#D9CBBA") if is_header else (HexColor("#FDFBF7") if idx_check % 2 == 0 else HexColor("#F7F1E8"))
-        except Exception:
-            bg = HexColor("#F7F1E8")
-        c.setFillColor(bg)
-        c.rect(MARGIN, st.y - row_h, TXT_W, row_h, fill=1, stroke=0)
-        c.setStrokeColor(C_DIV)
-        c.setLineWidth(0.4)
-        c.rect(MARGIN, st.y - row_h, TXT_W, row_h, fill=0, stroke=1)
-        c.line(MARGIN + col_term, st.y - row_h, MARGIN + col_term, st.y)
-
-        fn = FONT_BOLD if is_header else FONT_REG
-        fc = C_BLUE if is_header else C_BODY
-        c.setFillColor(fc)
-        c.setFont(fn, 9.5 if is_header else 9)
-
-        # Term (right side, RTL)
-        td, _ = _bidi(str(term_text)[:40])
-        tw2 = c.stringWidth(td, fn, 9.5 if is_header else 9)
-        c.drawString(MARGIN + col_term - tw2 - 6, st.y - row_h + 7, td)
-
-        # Definition (left side)
-        dd, is_rtl = _bidi(str(def_text)[:80])
-        dw = c.stringWidth(dd, fn, 9.5 if is_header else 9)
-        x_def = MARGIN + col_term + col_def - dw - 8 if is_rtl else MARGIN + col_term + 6
-        c.drawString(x_def, st.y - row_h + 7, dd)
-        st.y -= row_h
-
     # Draw header
     if st.y - row_h < BOTTOM: st.new_page(c)
     c.setFillColor(HexColor("#D9CBBA"))
@@ -617,12 +793,18 @@ def _draw_cheat_sheet(c, st, items: list):
     c.line(MARGIN + col_term, st.y - row_h, MARGIN + col_term, st.y)
     c.setFont(FONT_BOLD, 10)
     c.setFillColor(C_BLUE)
-    th1, _ = _bidi("المصطلح / القانون")
-    th2, _ = _bidi("التعريف المختصر")
-    tw1 = c.stringWidth(th1, FONT_BOLD, 10)
-    tw2 = c.stringWidth(th2, FONT_BOLD, 10)
-    c.drawString(MARGIN + col_term - tw1 - 6, st.y - row_h + 7, th1)
-    c.drawString(MARGIN + col_term + col_def - tw2 - 8, st.y - row_h + 7, th2)
+    
+    th1 = "المصطلح / القانون" if is_arabic_cheat else "Term / Formula"
+    th2 = "التعريف المختصر" if is_arabic_cheat else "Brief Definition"
+    th1_d, th1_rtl = _bidi(th1)
+    th2_d, th2_rtl = _bidi(th2)
+    tw1 = c.stringWidth(th1_d, FONT_BOLD, 10)
+    tw2 = c.stringWidth(th2_d, FONT_BOLD, 10)
+    
+    x_h1 = MARGIN + col_term - tw1 - 6 if th1_rtl else MARGIN + 6
+    x_h2 = MARGIN + col_term + col_def - tw2 - 8 if th2_rtl else MARGIN + col_term + 6
+    c.drawString(x_h1, st.y - row_h + 7, th1_d)
+    c.drawString(x_h2, st.y - row_h + 7, th2_d)
     st.y -= row_h
 
     # Draw items
@@ -639,39 +821,47 @@ def _draw_cheat_sheet(c, st, items: list):
         term = str(item.get("term", ""))[:45]
         defn = str(item.get("brief_definition", ""))[:90]
 
-        # Highlight term
+        # Highlight term column background
         c.setFillColor(C_MARK)
         c.roundRect(MARGIN + 3, st.y - row_h + 3, col_term - 8, row_h - 6, 3, fill=1, stroke=0)
 
+        # Draw Term
         c.setFillColor(C_BODY)
         c.setFont(FONT_BOLD, 9)
-        td, _ = _bidi(term)
+        td, term_rtl = _bidi(term)
         tw3 = c.stringWidth(td, FONT_BOLD, 9)
-        c.drawString(MARGIN + col_term - tw3 - 6, st.y - row_h + 7, td)
+        x_term = MARGIN + col_term - tw3 - 6 if term_rtl else MARGIN + 6
+        c.drawString(x_term, st.y - row_h + 7, td)
 
+        # Draw Definition
         c.setFont(FONT_REG, 9)
         c.setFillColor(C_BODY)
-        dd, is_rtl = _bidi(defn)
+        dd, def_rtl = _bidi(defn)
         dw = c.stringWidth(dd, FONT_REG, 9)
-        x_def = MARGIN + col_term + col_def - dw - 8 if is_rtl else MARGIN + col_term + 6
+        x_def = MARGIN + col_term + col_def - dw - 8 if def_rtl else MARGIN + col_term + 6
         c.drawString(x_def, st.y - row_h + 7, dd)
         st.y -= row_h
-
 
 # ── MCQ Quiz Page ──────────────────────────────────────────────────────────────
 def _draw_mcqs(c, st, mcqs: list):
     """Renders 'اختبر نفسك' multiple choice questions."""
     if not mcqs: return
 
+    # Detect language of questions
+    is_arabic_mcqs = any(_has_ar(q.get("question", "")) for q in mcqs)
+    st.is_rtl = is_arabic_mcqs
+
     st.new_page(c)
     st.y -= 6
 
-    # Section banner
+    # Section banner (No emojis)
     c.setFillColor(C_TEAL)
     c.rect(MARGIN, st.y - 34, TXT_W, 34, fill=1, stroke=0)
     c.setFillColor(C_GOLD)
     c.rect(MARGIN, st.y - 38, TXT_W, 4, fill=1, stroke=0)
-    title_d, _ = _bidi("🧪 اختبر نفسك — هل أنت جاهز للامتحان؟")
+    
+    title_text = "اختبر نفسك — هل أنت جاهز للامتحان؟" if is_arabic_mcqs else "Self-Test: Are you ready for the exam?"
+    title_d, _ = _bidi(title_text)
     c.setFillColor(HexColor("#FDFBF7"))
     c.setFont(FONT_BOLD, 14)
     tw = c.stringWidth(title_d, FONT_BOLD, 14)
@@ -693,68 +883,132 @@ def _draw_mcqs(c, st, mcqs: list):
         c.setStrokeColor(C_TEAL)
         c.setLineWidth(0.8)
         c.roundRect(MARGIN, st.y - q_box_h, TXT_W, q_box_h, 6, fill=0, stroke=1)
-        c.setFillColor(C_TEAL)
-        c.rect(W - MARGIN - 5, st.y - q_box_h + 4, 4, q_box_h - 8, fill=1, stroke=0)
-
+        
+        qd, is_q_rtl = _bidi(q_text[:120])
         c.setFont(FONT_BOLD, 10.5)
         c.setFillColor(HexColor("#0F766E"))
-        qd, _ = _bidi(q_text[:120])
         qw = c.stringWidth(qd, FONT_BOLD, 10.5)
-        c.drawString(W - MARGIN - qw - 12, st.y - q_box_h + 10, qd)
+        
+        if is_q_rtl:
+            # Bar on the right
+            c.setFillColor(C_TEAL)
+            c.rect(W - MARGIN - 5, st.y - q_box_h + 4, 4, q_box_h - 8, fill=1, stroke=0)
+            c.drawString(W - MARGIN - qw - 12, st.y - q_box_h + 10, qd)
+        else:
+            # Bar on the left
+            c.setFillColor(C_TEAL)
+            c.rect(MARGIN + 1, st.y - q_box_h + 4, 4, q_box_h - 8, fill=1, stroke=0)
+            c.drawString(MARGIN + 12, st.y - q_box_h + 10, qd)
+            
         st.y -= q_box_h + 4
 
         # Choices
         choices = q.get("choices", [])
         for ch in choices:
             if st.y - 22 < BOTTOM: st.new_page(c)
-            ch_d, _ = _bidi(str(ch)[:100])
+            ch_d, is_ch_rtl = _bidi(str(ch)[:100])
             c.setFont(FONT_REG, 9.5)
             c.setFillColor(C_BODY)
             chw = c.stringWidth(ch_d, FONT_REG, 9.5)
-            # Small circle bullet
-            c.setFillColor(C_DIV)
-            c.circle(W - MARGIN - 10, st.y - 7, 4, fill=1, stroke=0)
-            c.setFillColor(C_BODY)
-            c.drawString(W - MARGIN - chw - 20, st.y - 13, ch_d)
+            
+            if is_ch_rtl:
+                # Circle on the right, text right-aligned
+                c.setFillColor(C_DIV)
+                c.circle(W - MARGIN - 10, st.y - 7, 4, fill=1, stroke=0)
+                c.setFillColor(C_BODY)
+                c.drawString(W - MARGIN - chw - 20, st.y - 13, ch_d)
+            else:
+                # Circle on the left, text left-aligned
+                c.setFillColor(C_DIV)
+                c.circle(MARGIN + 10, st.y - 7, 4, fill=1, stroke=0)
+                c.setFillColor(C_BODY)
+                c.drawString(MARGIN + 20, st.y - 13, ch_d)
             st.y -= 22
 
         answers.append(f"{i+1}. {q.get('answer', '')}")
         st.y -= 10
 
-    # Answers section (small, upside-down style - we'll just do small grey text)
+    # Answers section (No emojis)
     if answers:
         st.y -= 14
         if st.y - 30 < BOTTOM: st.new_page(c)
-        ans_lbl, _ = _bidi("✅ مفتاح الإجابات:")
+        ans_lbl = "مفتاح الإجابات:" if is_arabic_mcqs else "Answer Key:"
+        ans_lbl_d, _ = _bidi(ans_lbl)
         c.setFont(FONT_BOLD, 8)
         c.setFillColor(C_MUTED)
-        alw = c.stringWidth(ans_lbl, FONT_BOLD, 8)
-        c.drawString(W - MARGIN - alw - 8, st.y, ans_lbl)
-        st.y -= 16
-
+        alw = c.stringWidth(ans_lbl_d, FONT_BOLD, 8)
+        
         ans_text = "   |   ".join(answers)
         ans_d, _ = _bidi(ans_text)
         c.setFont(FONT_REG, 7.5)
         c.setFillColor(C_MUTED)
         adw = c.stringWidth(ans_d, FONT_REG, 7.5)
-        c.drawString(W - MARGIN - adw - 8, st.y, ans_d)
+        
+        if is_arabic_mcqs:
+            c.drawString(W - MARGIN - alw - 8, st.y, ans_lbl_d)
+            st.y -= 16
+            c.drawString(W - MARGIN - adw - 8, st.y, ans_d)
+        else:
+            c.drawString(MARGIN + 8, st.y, ans_lbl_d)
+            st.y -= 16
+            c.drawString(MARGIN + 8, st.y, ans_d)
         st.y -= 20
 
+    # Self-Evaluation Mastery Checklist
+    if st.y - 120 < BOTTOM: st.new_page(c)
+    st.y -= 14
+    chk_title = "قائمة التقييم الذاتي والاستيعاب:" if is_arabic_mcqs else "Self-Evaluation & Mastery Checklist:"
+    chk_title_d, _ = _bidi(chk_title)
+    c.setFont(FONT_BOLD, 11)
+    c.setFillColor(C_BLUE)
+    if is_arabic_mcqs:
+        ctw = c.stringWidth(chk_title_d, FONT_BOLD, 11)
+        c.drawString(W - MARGIN - ctw - 8, st.y, chk_title_d)
+    else:
+        c.drawString(MARGIN + 8, st.y, chk_title_d)
+    st.y -= 20
+    
+    chk_items = [
+        "استوعبت المفاهيم الأساسية التي وردت في هذه المحاضرة." if is_arabic_mcqs else "I understand the core concepts covered in this lecture.",
+        "أستطيع شرح أوجه المقارنة بين المصطلحات بوضوح." if is_arabic_mcqs else "I can explain the difference between the main comparison aspects.",
+        "قمت بحل الأسئلة التدريبية بنجاح." if is_arabic_mcqs else "I have successfully solved all practice questions."
+    ]
+    for item in chk_items:
+        if st.y - 20 < BOTTOM: st.new_page(c)
+        c.setStrokeColor(C_GOLD)
+        c.setLineWidth(1.0)
+        if is_arabic_mcqs:
+            px = W - MARGIN - 20
+            c.roundRect(px, st.y - 1, 9, 9, 1.5, fill=0, stroke=1)
+            item_d, _ = _bidi(item)
+            itw = c.stringWidth(item_d, FONT_REG, 9)
+            c.drawString(W - MARGIN - itw - 32, st.y - 1, item_d)
+        else:
+            px = MARGIN + 8
+            c.roundRect(px, st.y - 1, 9, 9, 1.5, fill=0, stroke=1)
+            item_d, _ = _bidi(item)
+            c.drawString(MARGIN + 24, st.y - 1, item_d)
+        st.y -= 20
 
 # ── Comparison Tables Page ────────────────────────────────────────────────────
 def _draw_comparisons(c, st, comparisons: list):
     """Renders smart comparison tables extracted by the AI."""
     if not comparisons: return
 
+    is_arabic_comp = any(_has_ar(comp.get("title", "")) for comp in comparisons)
+    st.is_rtl = is_arabic_comp
+
     st.new_page(c)
     st.y -= 6
 
-    # Section banner
+    # Section banner (No emojis)
     c.setFillColor(C_GOLD)
     c.rect(MARGIN, st.y - 34, TXT_W, 34, fill=1, stroke=0)
     c.setFillColor(C_BLUE)
     c.rect(MARGIN, st.y - 38, TXT_W, 4, fill=1, stroke=0)
-    title_d, _ = _bidi("📊 جداول المقارنة الذكية")
+    
+    title_text = "جداول المقارنة الذكية" if is_arabic_comp else "Smart Comparison Tables"
+    title_d, _ = _bidi(title_text)
     c.setFillColor(HexColor("#FDFBF7"))
     c.setFont(FONT_BOLD, 14)
     tw = c.stringWidth(title_d, FONT_BOLD, 14)
@@ -788,19 +1042,22 @@ def _draw_comparisons(c, st, comparisons: list):
         c.setFont(FONT_BOLD, 9.5)
         c.setFillColor(HexColor("#FDFBF7"))
 
-        # "وجه المقارنة" label for first col
-        aspect_lbl, _ = _bidi("وجه المقارنة")
-        alw = c.stringWidth(aspect_lbl, FONT_BOLD, 9.5)
-        c.drawString(MARGIN + col_w - alw - 6, hy + 8, aspect_lbl)
+        # Aspect header
+        aspect_lbl = "وجه المقارنة" if is_arabic_comp else "Comparison Aspect"
+        aspect_lbl_d, is_asp_rtl = _bidi(aspect_lbl)
+        alw = c.stringWidth(aspect_lbl_d, FONT_BOLD, 9.5)
+        x_asp = MARGIN + col_w - alw - 6 if is_asp_rtl else MARGIN + 6
+        c.drawString(x_asp, hy + 8, aspect_lbl_d)
         c.setStrokeColor(HexColor("#FDFBF7"))
         c.setLineWidth(0.3)
         c.line(MARGIN + col_w, hy, MARGIN + col_w, hy + row_h)
 
         for hi, hdr in enumerate(headers[:ncols - 1]):
             hx = MARGIN + (hi + 1) * col_w
-            hd, _ = _bidi(str(hdr)[:30])
+            hd, is_hdr_rtl = _bidi(str(hdr)[:30])
             hw = c.stringWidth(hd, FONT_BOLD, 9.5)
-            c.drawString(hx + col_w - hw - 6, hy + 8, hd)
+            x_hdr = hx + col_w - hw - 6 if is_hdr_rtl else hx + 6
+            c.drawString(x_hdr, hy + 8, hd)
             c.line(hx + col_w, hy, hx + col_w, hy + row_h)
 
         # Data rows
@@ -847,8 +1104,9 @@ def generate_aesthetic_notebook_pdf(
     _cover(cv, lecture_title, student_name)
 
     # 2. Main Content
-    st = _S(page_num=2, student_name=student_name)
-    _bg(cv)
+    is_main_rtl = _has_ar(continuous_markdown[:2000]) if continuous_markdown else True
+    st = _S(page_num=2, student_name=student_name, is_rtl=is_main_rtl)
+    _bg(cv, is_rtl=is_main_rtl)
     st._footer(cv)
     _render(cv, st, continuous_markdown)
 

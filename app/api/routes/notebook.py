@@ -311,6 +311,26 @@ async def process_notebook(
             elif word_count > 5000:
                 depth_note = "المحاضرة طويلة ومفصلة، غطِّ كل نقطة بعمق وشمولية تامة. "
 
+            # Calculate target length instruction dynamically based on transcript word count
+            if word_count < 1000:
+                length_instruction = (
+                    "RULE 6 — ADAPTIVE LENGTH: Since the lecture is short, write a concise but comprehensive notebook. "
+                    "The English section should be around 400-600 words, and the Arabic section around 400-600 words. "
+                    "Do not compromise on quality, but do not force artificial fluff."
+                )
+            elif word_count < 3000:
+                length_instruction = (
+                    "RULE 6 — ADAPTIVE LENGTH: Write a moderately detailed notebook. "
+                    "The English section should be around 800-1200 words, and the Arabic section around 800-1200 words. "
+                    "Ensure everything explained in the audio is covered."
+                )
+            else:
+                length_instruction = (
+                    "RULE 6 — ADAPTIVE LENGTH: The lecture is very detailed. Write an extremely comprehensive notebook. "
+                    "The English section should be at least 1500-2500 words, and the Arabic section at least 1500-2500 words. "
+                    "Cover every sub-concept and explanation thoroughly."
+                )
+
             # STEP 1: Generate comprehensive bilingual Markdown study notebook
             yield f"data: {json.dumps({'type': 'progress', 'step': '4/5', 'message': '🧠 محرك لمّاح الذكي يكتب محتوى الدفتر الدراسي ثنائي اللغة بالتفصيل...'}, ensure_ascii=False)}\n\n"
 
@@ -344,12 +364,11 @@ async def process_notebook(
                 "RULE 3 — NO NUMBERED HEADINGS (avoid '1.1' or '2.'). Use clean Markdown: ## Title (not ## 2. Title).\n"
                 "RULE 4 — NO DENSE PARAGRAPHS: Break everything into bullet points and numbered lists.\n"
                 "RULE 5 — NO 'بروفيسور': Always use 'الدكتور' or 'المحاضر'.\n"
-                "RULE 6 — MINIMUM LENGTH: The total notebook must be at least 2500 words (English + Arabic combined).\n"
-                "         Do NOT cut short. Cover ALL details. The notebook should fill 15+ pages to feel premium.\n"
+                f"{length_instruction}\n"
                 "RULE 7 — RICHNESS: Every section must have sub-points, examples, and explanations. No skeleton outlines.\n"
                 "\n"
                 "══════════════════════════════════════\n"
-                f"LECTURE TRANSCRIPT ({word_count} words):\n"
+                "LECTURE TRANSCRIPT:\n"
                 "══════════════════════════════════════\n"
                 f"{transcript[:180000]}\n"
             )
@@ -483,7 +502,10 @@ async def process_notebook(
                 "title": ai_title,
                 "has_pdf": bool(pdf_path),
                 "is_notebook": True,
-                "student_name": student_name
+                "student_name": student_name,
+                "cheat_sheet": cheat_sheet,
+                "mcqs": mcqs,
+                "comparisons": comparisons
             }
             log_id = use_lecture_quota(user_id, metadata=history_meta, cost=calculated_cost)
 
@@ -557,6 +579,9 @@ def download_notebook(job_id: str):
                 markdown_content = annotations.get("markdown", "")
                 student_name = metadata.get("student_name", "طالب متميز")
                 ai_title = metadata.get("title", "ملزمة دراسية ممتازة")
+                cheat_sheet = metadata.get("cheat_sheet", None)
+                mcqs = metadata.get("mcqs", None)
+                comparisons = metadata.get("comparisons", None)
                 
                 if markdown_content:
                     original_pdf_path = os.path.join(base_dir, "outputs", f"notebook_{unique_id}.pdf")
@@ -570,9 +595,9 @@ def download_notebook(job_id: str):
                         continuous_markdown=markdown_content,
                         student_name=student_name,
                         lecture_title=ai_title,
-                        cheat_sheet=None,
-                        mcqs=None,
-                        comparisons=None,
+                        cheat_sheet=cheat_sheet,
+                        mcqs=mcqs,
+                        comparisons=comparisons,
                     )
                     
                     logger.info(f"[DOWNLOAD] Regenerating preview PDF to {preview_pdf_path}")
