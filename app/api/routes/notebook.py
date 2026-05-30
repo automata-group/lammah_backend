@@ -512,12 +512,20 @@ async def process_notebook(
 
 @router.get("/download/{job_id}.pdf")
 def download_notebook(job_id: str):
-    """Download generated notebook PDF checking both backend and project root outputs."""
+    """Download generated notebook PDF checking both backend and project root outputs.
+    Regenerates the file dynamically from Supabase history metadata if missing from disk.
+    """
     routes_dir = os.path.dirname(os.path.abspath(__file__))
     backend_dir = os.path.dirname(os.path.dirname(os.path.dirname(routes_dir)))
+    base_dir = os.path.dirname(backend_dir)
     
-    path_1 = os.path.join(backend_dir, "outputs", f"{job_id}.pdf")
-    path_2 = os.path.join(os.path.dirname(backend_dir), "outputs", f"{job_id}.pdf")
+    # Normalize job_id for previews
+    actual_job_id = job_id
+    if job_id.startswith("preview_") and "notebook_" not in job_id:
+        actual_job_id = job_id.replace("preview_", "preview_notebook_")
+        
+    path_1 = os.path.join(backend_dir, "outputs", f"{actual_job_id}.pdf")
+    path_2 = os.path.join(base_dir, "outputs", f"{actual_job_id}.pdf")
     
     resolved_path = None
     if os.path.exists(path_1):
@@ -525,6 +533,66 @@ def download_notebook(job_id: str):
     elif os.path.exists(path_2):
         resolved_path = path_2
         
+    if not resolved_path:
+        # File is missing from disk (likely due to container restart on ephemeral storage).
+        # We will attempt to regenerate it on the fly using Supabase usage logs history metadata.
+        logger.info(f"[DOWNLOAD] PDF file {actual_job_id}.pdf not found on disk. Attempting dynamic regeneration from Supabase...")
+        try:
+            # Extract unique_id
+            if actual_job_id.startswith("preview_notebook_"):
+                unique_id = actual_job_id.replace("preview_notebook_", "")
+            elif actual_job_id.startswith("notebook_"):
+                unique_id = actual_job_id.replace("notebook_", "")
+            else:
+                unique_id = actual_job_id
+                
+            db_job_id = f"notebook_{unique_id}"
+            supabase = get_supabase()
+            
+            res = supabase.table("usage_logs").select("*").eq("metadata->>job_id", db_job_id).execute()
+            if res.data and len(res.data) > 0:
+                log_entry = res.data[0]
+                metadata = log_entry.get("metadata", {})
+                annotations = metadata.get("annotations", {})
+                markdown_content = annotations.get("markdown", "")
+                student_name = metadata.get("student_name", "طالب متميز")
+                ai_title = metadata.get("title", "ملزمة دراسية ممتازة")
+                
+                if markdown_content:
+                    original_pdf_path = os.path.join(base_dir, "outputs", f"notebook_{unique_id}.pdf")
+                    preview_pdf_path = os.path.join(base_dir, "outputs", f"preview_notebook_{unique_id}.pdf")
+                    
+                    logger.info(f"[DOWNLOAD] Regenerating original PDF to {original_pdf_path}")
+                    from app.services.aesthetic_notebook_service import generate_aesthetic_notebook_pdf, generate_preview_pdf
+                    
+                    generate_aesthetic_notebook_pdf(
+                        output_path=original_pdf_path,
+                        continuous_markdown=markdown_content,
+                        student_name=student_name,
+                        lecture_title=ai_title,
+                        cheat_sheet=None,
+                        mcqs=None,
+                        comparisons=None,
+                    )
+                    
+                    logger.info(f"[DOWNLOAD] Regenerating preview PDF to {preview_pdf_path}")
+                    generate_preview_pdf(
+                        original_pdf_path=original_pdf_path,
+                        preview_pdf_path=preview_pdf_path,
+                        max_pages=3
+                    )
+                    
+                    if os.path.exists(path_1):
+                        resolved_path = path_1
+                    elif os.path.exists(path_2):
+                        resolved_path = path_2
+                else:
+                    logger.error(f"[DOWNLOAD] Found usage log for {db_job_id} but markdown content was empty.")
+            else:
+                logger.error(f"[DOWNLOAD] No usage log found in database for job_id={db_job_id}")
+        except Exception as regen_err:
+            logger.error(f"[DOWNLOAD] Failed to dynamically regenerate missing PDF: {str(regen_err)}", exc_info=True)
+            
     if not resolved_path:
         logger.error(f"[DOWNLOAD] Notebook not found for job_id={job_id}. Checked paths: {path_1} and {path_2}")
         raise HTTPException(status_code=404, detail="File not found")
