@@ -687,8 +687,9 @@ async def process_lecture(
             shutil.copyfileobj(audio_file.file, buffer)
     elif lecture_url:
         pass
-    else:
-        raise HTTPException(status_code=400, detail="Missing audio source")
+    elif not (pdf_temp_id or pdf_file):
+        # No audio, no URL, and no PDF → reject
+        raise HTTPException(status_code=400, detail="Missing audio source or document file")
 
     # Handle PDF — wait up to 10 seconds for it to appear from Go Uploader shared volume
     if pdf_temp_id:
@@ -719,34 +720,61 @@ async def process_lecture(
             yield f"data: {json.dumps({'type': 'progress', 'step': '0/5', 'message': '🚀 بدأنا العمل! جاري تحضير المحرك...'}, ensure_ascii=False)}\n\n"
             await asyncio.sleep(0.1)
 
+            # Detect if this is a document-only mode (no audio, no URL)
+            is_document_only = (audio_path is None) and (not lecture_url)
+
             # 1. Finalize Audio Path (Download if URL)
             if lecture_url and not audio_path:
                 yield f"data: {json.dumps({'type': 'progress', 'step': '0/5', 'message': '🔗 جاري تحميل المحاضرة من الرابط...'}, ensure_ascii=False)}\n\n"
                 audio_path = await asyncio.to_thread(download_audio_from_link, lecture_url.strip(), upload_dir, unique_id)
-            else:
+                is_document_only = False
+            elif not is_document_only:
                 yield f"data: {json.dumps({'type': 'progress', 'step': '0/5', 'message': '📥 تم استلام وتجهيز الملفات بنجاح.'}, ensure_ascii=False)}\n\n"
             
             if pdf_path:
-                yield f"data: {json.dumps({'type': 'progress', 'step': '0/5', 'message': '📑 تم تحليل ملفات العرض المرفقة.'}, ensure_ascii=False)}\n\n"
+                if is_document_only:
+                    yield f"data: {json.dumps({'type': 'progress', 'step': '0/5', 'message': '📄 تم استلام الملف! جاري التحليل الذكي للوثيقة...'}, ensure_ascii=False)}\n\n"
+                else:
+                    yield f"data: {json.dumps({'type': 'progress', 'step': '0/5', 'message': '📑 تم تحليل ملفات العرض المرفقة.'}, ensure_ascii=False)}\n\n"
+            elif is_document_only:
+                yield f"data: {json.dumps({'type': 'error', 'message': 'يرجى إرفاق ملف PDF أو PPTX أو ملف صوتي للمعالجة.'}, ensure_ascii=False)}\n\n"
+                return
 
-            # 2. Quota Check (dynamic by actual duration)
+            # 2. Quota Check (dynamic by actual duration or page count)
             is_audio_trimmed = False
             duration_seconds = 0
-            
-            yield f"data: {json.dumps({'type': 'progress', 'step': '0/5', 'message': '📏 جاري فحص مدة المحاضرة وحساب الحصة...'}, ensure_ascii=False)}\n\n"
-            
-            try:
-                import subprocess
-                cmd = ["ffprobe", "-v", "error", "-show_entries", "format=duration", "-of", "default=noprint_wrappers=1:nokey=1", audio_path]
-                duration_str = (await asyncio.to_thread(subprocess.check_output, cmd)).decode().strip()
-                duration_seconds = float(duration_str)
-            except Exception:
-                duration_seconds = os.path.getsize(audio_path) / (128000 / 8)
-
             import math
-            calculated_cost = math.ceil(duration_seconds / 60)
-            if calculated_cost < 1:
-                calculated_cost = 1
+
+            if is_document_only:
+                # Calculate cost based on PDF page count
+                yield f"data: {json.dumps({'type': 'progress', 'step': '0/5', 'message': '📏 جاري حساب حجم الوثيقة وتكلفة المعالجة...'}, ensure_ascii=False)}\n\n"
+                try:
+                    if pdf_path and pdf_path.lower().endswith(".pptx"):
+                        from app.services.pptx_converter import extract_text_from_pptx
+                        pptx_pages_cost = await asyncio.to_thread(extract_text_from_pptx, pdf_path)
+                        num_pages = len(pptx_pages_cost)
+                    elif pdf_path:
+                        pages_cost = await asyncio.to_thread(extract_pages_from_pdf, pdf_path)
+                        num_pages = len(pages_cost)
+                    else:
+                        num_pages = 10
+                    # 1 minute per 2 slides/pages, minimum 3 minutes
+                    calculated_cost = max(3, math.ceil(num_pages / 2))
+                except Exception:
+                    calculated_cost = 5
+            else:
+                yield f"data: {json.dumps({'type': 'progress', 'step': '0/5', 'message': '📏 جاري فحص مدة المحاضرة وحساب الحصة...'}, ensure_ascii=False)}\n\n"
+                try:
+                    import subprocess
+                    cmd = ["ffprobe", "-v", "error", "-show_entries", "format=duration", "-of", "default=noprint_wrappers=1:nokey=1", audio_path]
+                    duration_str = (await asyncio.to_thread(subprocess.check_output, cmd)).decode().strip()
+                    duration_seconds = float(duration_str)
+                except Exception:
+                    duration_seconds = os.path.getsize(audio_path) / (128000 / 8)
+
+                calculated_cost = math.ceil(duration_seconds / 60)
+                if calculated_cost < 1:
+                    calculated_cost = 1
 
             # Early Quota Check
             from app.services.subscription_service import get_user_subscription_info
@@ -800,31 +828,35 @@ async def process_lecture(
                 yield f"data: {json.dumps({'type': 'error', 'message': 'تم إلغاء المهمة.'}, ensure_ascii=False)}\n\n"
                 return
 
-            # 1. Transcribe
-            yield f"data: {json.dumps({'type': 'progress', 'step': '1/5', 'time_estimate': 180, 'message': '🎧 1/5 جاري تفريغ الصوت آلياً... نعدك بدقة عالية!'}, ensure_ascii=False)}\n\n"
-            
-            import queue
-            progress_q = queue.Queue()
-            def audio_progress_cb(msg):
-                progress_q.put(msg)
+            # 1. Transcribe (skip in document-only mode)
+            if is_document_only:
+                transcript = ""
+                yield f"data: {json.dumps({'type': 'progress', 'step': '1/5', 'message': '📄 1/5 وضع الوثيقة فقط: سيتم توليد الملخص مباشرة من الملف...'}, ensure_ascii=False)}\n\n"
+            else:
+                yield f"data: {json.dumps({'type': 'progress', 'step': '1/5', 'time_estimate': 180, 'message': '🎧 1/5 جاري تفريغ الصوت آلياً... نعدك بدقة عالية!'}, ensure_ascii=False)}\n\n"
                 
-            transcription_task = asyncio.create_task(asyncio.to_thread(transcribe_audio, audio_path, audio_progress_cb))
-            
-            last_audio_msg = 'لمّاح يستمع بتركيز... جاري تحويل الكلام لنص بدقة عالية!'
-            while not transcription_task.done():
-                try:
-                    while True:
-                        last_audio_msg = progress_q.get_nowait()
-                        yield f"data: {json.dumps({'type': 'progress', 'step': '1/5', 'message': f'🎧 1/5 لمّاح يستمع... {last_audio_msg}'}, ensure_ascii=False)}\n\n"
-                except queue.Empty:
-                    pass
+                import queue
+                progress_q = queue.Queue()
+                def audio_progress_cb(msg):
+                    progress_q.put(msg)
+                    
+                transcription_task = asyncio.create_task(asyncio.to_thread(transcribe_audio, audio_path, audio_progress_cb))
                 
-                # Ping every 3 seconds to keep connection alive for huge files (2.5+ hours)
-                yield f"data: {json.dumps({'type': 'progress', 'step': '1/5', 'message': f'🎧 1/5 لمّاح يعمل... {last_audio_msg}'}, ensure_ascii=False)}\n\n"
-                await asyncio.sleep(3)
-                
-            transcript = transcription_task.result()
-            yield f"data: {json.dumps({'type': 'transcript', 'text': transcript}, ensure_ascii=False)}\n\n"
+                last_audio_msg = 'لمّاح يستمع بتركيز... جاري تحويل الكلام لنص بدقة عالية!'
+                while not transcription_task.done():
+                    try:
+                        while True:
+                            last_audio_msg = progress_q.get_nowait()
+                            yield f"data: {json.dumps({'type': 'progress', 'step': '1/5', 'message': f'🎧 1/5 لمّاح يستمع... {last_audio_msg}'}, ensure_ascii=False)}\n\n"
+                    except queue.Empty:
+                        pass
+                    
+                    # Ping every 3 seconds to keep connection alive for huge files (2.5+ hours)
+                    yield f"data: {json.dumps({'type': 'progress', 'step': '1/5', 'message': f'🎧 1/5 لمّاح يعمل... {last_audio_msg}'}, ensure_ascii=False)}\n\n"
+                    await asyncio.sleep(3)
+                    
+                transcript = transcription_task.result()
+                yield f"data: {json.dumps({'type': 'transcript', 'text': transcript}, ensure_ascii=False)}\n\n"
             
             # 2. Document Handling
             pdf_context = []
@@ -914,7 +946,7 @@ async def process_lecture(
         finally:
             # Cleanup
             try:
-                if os.path.exists(audio_path): os.remove(audio_path)
+                if audio_path and os.path.exists(audio_path): os.remove(audio_path)
                 if pdf_path and os.path.exists(pdf_path): os.remove(pdf_path)
                 if 'actual_pdf_path' in locals() and actual_pdf_path and actual_pdf_path != pdf_path and os.path.exists(actual_pdf_path):
                     os.remove(actual_pdf_path)
