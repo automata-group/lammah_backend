@@ -152,4 +152,10 @@ async def get_only_transcript(
                 try: os.remove(audio_path)
                 except: pass
 
-    return StreamingResponse(event_stream(), media_type="text/event-stream")
+    return StreamingResponse(event_stream(), media_type="text/event-stream", headers={
+        "X-Accel-Buffering": "no",
+        "Cache-Control": "no-cache, no-store",
+        "Connection": "keep-alive",
+        "Alt-Svc": "clear",
+        "X-Content-Type-Options": "nosniff",
+    })

@@ -127,7 +127,8 @@ class AIOrchestrator:
 
         # 3. STEP: EXAMINER (BATCH ASSESSMENT)
         logger.info("[ORCHESTRATOR] Starting Batch Assessment Processing...")
-        transcript_chunks = self._chunk_text(transcript, chunk_size=20000)
+        source_text = transcript if transcript else "\n".join(pdf_context)
+        transcript_chunks = self._chunk_text(source_text, chunk_size=20000)
         
         assessment_tasks = []
         async def process_examiner_chunk(chunk, idx):

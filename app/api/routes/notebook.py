@@ -558,8 +558,10 @@ async def process_notebook(
 
     return StreamingResponse(event_stream(), media_type="text/event-stream", headers={
         "X-Accel-Buffering": "no",
-        "Cache-Control": "no-cache",
+        "Cache-Control": "no-cache, no-store",
         "Connection": "keep-alive",
+        "Alt-Svc": "clear",
+        "X-Content-Type-Options": "nosniff",
     })
 
 @router.get("/download/{job_id}.pdf")

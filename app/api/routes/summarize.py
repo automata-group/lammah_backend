@@ -22,17 +22,23 @@ from app.services.ai.factory import get_llm_for_user
 
 router = APIRouter()
 
-async def generate_ai_title(llm, transcript: str) -> str:
+async def generate_ai_title(llm, transcript: str, pdf_context: Optional[List[str]] = None) -> str:
+    from datetime import datetime
     try:
-        sample_text = transcript[:4000] if transcript else ""
+        sample_text = ""
+        if transcript:
+            sample_text = transcript[:4000]
+        elif pdf_context:
+            sample_text = "\n".join(pdf_context)[:4000]
+            
         if not sample_text:
             return f"محاضرة {datetime.now().strftime('%Y-%m-%d %H:%M')}"
         title_prompt = (
-            "أنت خبير تلخيص وعنونة محاضرات. بناءً على هذا النص المفرغ من المحاضرة، "
-            "استنتج عنواناً باللغة العربية يكون موجزاً ومحترفاً جداً ولا يتجاوز 3 إلى 5 كلمات للمحاضرة. "
+            "أنت خبير تلخيص وعنونة محاضرات ومستندات. بناءً على هذا النص، "
+            "استنتج عنواناً باللغة العربية يكون موجزاً ومحترفاً جداً ولا يتجاوز 3 إلى 5 كلمات للمحاضرة/الملف. "
             "لا تضع أي مقدمات، جمل تمهيدية، علامات تنصيص، أو نقطة في النهاية. "
             "أعطني العنوان مباشرة فقط.\n\n"
-            f"نص المحاضرة:\n{sample_text}"
+            f"النص:\n{sample_text}"
         )
         title_response = await asyncio.to_thread(llm.invoke, title_prompt)
         ai_title = title_response.content.strip().replace('"', '').replace('«', '').replace('»', '')
@@ -41,7 +47,6 @@ async def generate_ai_title(llm, transcript: str) -> str:
             return ai_title
     except Exception as e:
         logger.error(f"Error generating AI title: {e}")
-    from datetime import datetime
     return f"محاضرة {datetime.now().strftime('%Y-%m-%d %H:%M')}"
 
 class LectureRow(BaseModel):
@@ -192,7 +197,7 @@ async def background_worker(row: LectureRow, user_id: str, plan_name: str, histo
 
 
         # Generate AI Title
-        ai_title = await generate_ai_title(llm, transcript)
+        ai_title = await generate_ai_title(llm, transcript, pdf_context)
 
         update_progress("تم", "✅ المعالجة اكتملت بنجاح", is_done=True, result={
             "title": ai_title,
@@ -552,7 +557,7 @@ async def process_batch_lectures(
                     annotations["flashcards"] = annotations["flashcards"][:2]
 
             # Generate AI Title
-            ai_title = await generate_ai_title(llm, transcript)
+            ai_title = await generate_ai_title(llm, transcript, pdf_context)
             
             # Deduct quota + save history
             history_meta = {
@@ -611,8 +616,10 @@ async def process_batch_lectures(
 
     return StreamingResponse(event_stream(), media_type="text/event-stream", headers={
         "X-Accel-Buffering": "no",
-        "Cache-Control": "no-cache",
+        "Cache-Control": "no-cache, no-store",
         "Connection": "keep-alive",
+        "Alt-Svc": "clear",
+        "X-Content-Type-Options": "nosniff",
     })
 
 @router.post("/process-lecture")
@@ -703,6 +710,9 @@ async def process_lecture(
         if os.path.exists(pdf_path):
             logger.info(f"[DEBUG] Found PDF temp file: {pdf_path} (size: {os.path.getsize(pdf_path)} bytes)")
         else:
+            if not (audio_path or audio_file or lecture_url):
+                logger.error(f"[ERROR] Temp PDF file NOT found for document-only mode. Checked: {pdf_path}")
+                raise HTTPException(status_code=400, detail="temp_file_missing")
             logger.warning(f"[WARN] PDF temp file not found after {max_pdf_wait}s: {pdf_path} — continuing without slides.")
             pdf_path = None
     elif pdf_file:
@@ -851,9 +861,10 @@ async def process_lecture(
                     except queue.Empty:
                         pass
                     
-                    # Ping every 3 seconds to keep connection alive for huge files (2.5+ hours)
+                    # Ping every 2 seconds — SSE keepalive comment prevents QUIC/proxy timeout
+                    yield f": ping\n\n"
                     yield f"data: {json.dumps({'type': 'progress', 'step': '1/5', 'message': f'🎧 1/5 لمّاح يعمل... {last_audio_msg}'}, ensure_ascii=False)}\n\n"
-                    await asyncio.sleep(3)
+                    await asyncio.sleep(2)
                     
                 transcript = transcription_task.result()
                 yield f"data: {json.dumps({'type': 'transcript', 'text': transcript}, ensure_ascii=False)}\n\n"
@@ -887,9 +898,11 @@ async def process_lecture(
             AI_TIMEOUT_SECONDS = 600  # 10 minutes deadline for large lectures
             elapsed = 0
             while not anno_task.done() and elapsed < AI_TIMEOUT_SECONDS:
+                # SSE keepalive comment + progress — prevents QUIC/proxy timeout during long AI processing
+                yield f": ping\n\n"
                 yield f"data: {json.dumps({'type': 'progress', 'step': '4/5', 'message': f'🧠 4/5 لمّاح يفكّر... ({elapsed}s)'}, ensure_ascii=False)}\n\n"
-                await asyncio.sleep(4)
-                elapsed += 4
+                await asyncio.sleep(3)
+                elapsed += 3
             
             if not anno_task.done():
                 anno_task.cancel()
@@ -926,7 +939,7 @@ async def process_lecture(
  
             # 5. Save History & Finalize
             # Generate AI Title
-            ai_title = await generate_ai_title(llm, transcript)
+            ai_title = await generate_ai_title(llm, transcript, pdf_context)
             
             history_meta = {
                 "title": ai_title,
@@ -954,8 +967,10 @@ async def process_lecture(
 
     return StreamingResponse(event_stream(), media_type="text/event-stream", headers={
         "X-Accel-Buffering": "no",
-        "Cache-Control": "no-cache",
+        "Cache-Control": "no-cache, no-store",
         "Connection": "keep-alive",
+        "Alt-Svc": "clear",
+        "X-Content-Type-Options": "nosniff",
     })
 
 @router.get("/download/{job_id}.pdf")
