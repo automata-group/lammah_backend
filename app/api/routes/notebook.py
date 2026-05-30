@@ -148,8 +148,10 @@ async def process_notebook(
         
     elif lecture_urls or lecture_url:
         pass
+    elif pdf_temp_id or pdf_file:
+        pass
     else:
-        raise HTTPException(status_code=400, detail="Missing audio source")
+        raise HTTPException(status_code=400, detail="Missing source files: please provide either audio, URL, or document.")
 
     if pdf_temp_id:
         pdf_path = os.path.join(temp_dir, pdf_temp_id)
@@ -196,37 +198,55 @@ async def process_notebook(
             else:
                 yield f"data: {json.dumps({'type': 'progress', 'step': '1/5', 'message': '📥 تم استلام وتجهيز الملفات.'}, ensure_ascii=False)}\n\n"
 
-            if not audio_paths:
-                yield f"data: {json.dumps({'type': 'error', 'message': 'لم يتم العثور على أي ملف صوتي أو فشل تحميل الروابط.'}, ensure_ascii=False)}\n\n"
-                return
-
-            # calculate total duration in minutes
-            total_seconds = 0.0
+            # calculate cost in minutes
             import subprocess
             import math
             
-            yield f"data: {json.dumps({'type': 'progress', 'step': '1/5', 'message': '📏 جاري حساب مدة المحاضرة وحصتك المتبقية...'}, ensure_ascii=False)}\n\n"
+            calculated_cost = 5  # default flat cost
             
-            for path in audio_paths:
-                try:
-                    cmd = ["ffprobe", "-v", "error", "-show_entries", "format=duration", "-of", "default=noprint_wrappers=1:nokey=1", path]
-                    duration_str = (await asyncio.to_thread(subprocess.check_output, cmd)).decode().strip()
-                    total_seconds += float(duration_str)
-                except Exception as e:
-                    logger.warning(f"ffprobe failed for {path}: {e}. Falling back to file size calculation.")
-                    if os.path.exists(path):
-                        total_seconds += os.path.getsize(path) / (128000 / 8)
-            
-            calculated_cost = math.ceil(total_seconds / 60)
-            if calculated_cost < 1:
-                calculated_cost = 1
+            if audio_paths:
+                total_seconds = 0.0
+                yield f"data: {json.dumps({'type': 'progress', 'step': '1/5', 'message': '📏 جاري حساب مدة المحاضرة وحصتك المتبقية...'}, ensure_ascii=False)}\n\n"
+                for path in audio_paths:
+                    try:
+                        cmd = ["ffprobe", "-v", "error", "-show_entries", "format=duration", "-of", "default=noprint_wrappers=1:nokey=1", path]
+                        duration_str = (await asyncio.to_thread(subprocess.check_output, cmd)).decode().strip()
+                        total_seconds += float(duration_str)
+                    except Exception as e:
+                        logger.warning(f"ffprobe failed for {path}: {e}. Falling back to file size calculation.")
+                        if os.path.exists(path):
+                            total_seconds += os.path.getsize(path) / (128000 / 8)
+                calculated_cost = math.ceil(total_seconds / 60)
+                if calculated_cost < 1:
+                    calculated_cost = 1
+            else:
+                # Document-only: calculate pages to determine cost
+                yield f"data: {json.dumps({'type': 'progress', 'step': '1/5', 'message': '📏 جاري تحليل صفحات العرض وحساب التكلفة...'}, ensure_ascii=False)}\n\n"
+                if pdf_path:
+                    try:
+                        if pdf_path.lower().endswith(".pptx"):
+                            from app.services.pptx_converter import extract_text_from_pptx
+                            pptx_pages = await asyncio.to_thread(extract_text_from_pptx, pdf_path)
+                            num_pages = len(pptx_pages)
+                        else:
+                            pages = await asyncio.to_thread(extract_pages_from_pdf, pdf_path)
+                            num_pages = len(pages)
+                        
+                        # Charge 1 minute per 2 slides/pages, minimum 3 minutes
+                        calculated_cost = max(3, math.ceil(num_pages / 2))
+                    except Exception as page_err:
+                        logger.error(f"Failed to count document pages: {page_err}")
+                        calculated_cost = 5
+                else:
+                    calculated_cost = 5
 
             from app.services.subscription_service import get_user_subscription_info
             sub_info = get_user_subscription_info(user_id)
             remaining_quota = sub_info.get("quota_remaining", 0)
             
             if remaining_quota < calculated_cost:
-                yield f"data: {json.dumps({'type': 'error', 'message': f'🚫 رصيدك الحالي ({remaining_quota} دقيقة) لا يكفي لتوليد الدفتر لهذه الملفات الصوتية (المطلوب: {calculated_cost} دقيقة). يرجى شحن رصيدك أو ترقية اشتراكك.'}, ensure_ascii=False)}\n\n"
+                quota_msg = f"🚫 رصيدك الحالي ({remaining_quota} دقيقة) لا يكفي لتوليد الدفتر للملف المرفق (المطلوب: {calculated_cost} دقيقة)."
+                yield f"data: {json.dumps({'type': 'error', 'message': quota_msg}, ensure_ascii=False)}\n\n"
                 return
 
             # 2. Queueing
@@ -241,25 +261,28 @@ async def process_notebook(
             while job.status == JobStatus.QUEUED:
                 await asyncio.sleep(4)
 
-            # 3. Transcribing
-            yield f"data: {json.dumps({'type': 'progress', 'step': '3/5', 'message': '🎧 جاري استماع وتفريغ كلام المحاضر بدقة متناهية...'}, ensure_ascii=False)}\n\n"
-            transcripts = []
-            for idx, path in enumerate(audio_paths):
-                if len(audio_paths) > 1:
-                    yield f"data: {json.dumps({'type': 'progress', 'step': '3/5', 'message': f'🎧 جاري تفريغ ملف الصوت #{idx + 1} من {len(audio_paths)}...'}, ensure_ascii=False)}\n\n"
-                t = await asyncio.to_thread(transcribe_audio, path)
-                if t:
+            # 3. Transcribing / Slides Analysis
+            if audio_paths:
+                yield f"data: {json.dumps({'type': 'progress', 'step': '3/5', 'message': '🎧 جاري استماع وتفريغ كلام المحاضر بدقة متناهية...'}, ensure_ascii=False)}\n\n"
+                transcripts = []
+                for idx, path in enumerate(audio_paths):
                     if len(audio_paths) > 1:
-                        transcripts.append(f"--- [محتوى الملف الصوتي #{idx + 1}] ---\n{t}\n")
-                    else:
-                        transcripts.append(t)
-            
-            transcript = "\n\n".join(transcripts)
+                        yield f"data: {json.dumps({'type': 'progress', 'step': '3/5', 'message': f'🎧 جاري تفريغ ملف الصوت #{idx + 1} من {len(audio_paths)}...'}, ensure_ascii=False)}\n\n"
+                    t = await asyncio.to_thread(transcribe_audio, path)
+                    if t:
+                        if len(audio_paths) > 1:
+                            transcripts.append(f"--- [محتوى الملف الصوتي #{idx + 1}] ---\n{t}\n")
+                        else:
+                            transcripts.append(t)
+                transcript = "\n\n".join(transcripts)
+            else:
+                yield f"data: {json.dumps({'type': 'progress', 'step': '3/5', 'message': '📑 جاري قراءة وتحليل ملف العرض (سندرس الشرائح مباشرةً)...'}, ensure_ascii=False)}\n\n"
+                transcript = ""
 
             # 4. Context Extraction
             pdf_context = []
             if pdf_path:
-                yield f"data: {json.dumps({'type': 'progress', 'step': '3/5', 'message': '📑 جاري تحليل واستخلاص محتوى الشرائح...'}, ensure_ascii=False)}\n\n"
+                yield f"data: {json.dumps({'type': 'progress', 'step': '3.5/5', 'message': '📑 جاري استخلاص وقراءة نصوص الشرائح...'}, ensure_ascii=False)}\n\n"
                 if pdf_path.lower().endswith(".pptx"):
                     from app.services.pptx_converter import extract_text_from_pptx
                     pptx_pages = await asyncio.to_thread(extract_text_from_pptx, pdf_path)
@@ -312,31 +335,38 @@ async def process_notebook(
                 depth_note = "المحاضرة طويلة ومفصلة، غطِّ كل نقطة بعمق وشمولية تامة. "
 
             # Calculate target length instruction dynamically based on transcript word count
-            if word_count < 1000:
+            # If transcript is empty, we base it on slide count or a reasonable size
+            effective_word_count = word_count if transcript else 1500
+            if effective_word_count < 1000:
                 length_instruction = (
-                    "RULE 6 — ADAPTIVE LENGTH: Since the lecture is short, write a concise but comprehensive notebook. "
+                    "RULE 6 — ADAPTIVE LENGTH: Since the source content is short, write a concise but comprehensive notebook. "
                     "The English section should be around 400-600 words, and the Arabic section around 400-600 words. "
                     "Do not compromise on quality, but do not force artificial fluff."
                 )
-            elif word_count < 3000:
+            elif effective_word_count < 3000:
                 length_instruction = (
                     "RULE 6 — ADAPTIVE LENGTH: Write a moderately detailed notebook. "
                     "The English section should be around 800-1200 words, and the Arabic section around 800-1200 words. "
-                    "Ensure everything explained in the audio is covered."
+                    "Ensure everything explained in the source content is covered."
                 )
             else:
                 length_instruction = (
-                    "RULE 6 — ADAPTIVE LENGTH: The lecture is very detailed. Write an extremely comprehensive notebook. "
+                    "RULE 6 — ADAPTIVE LENGTH: The source content is very detailed. Write an extremely comprehensive notebook. "
                     "The English section should be at least 1500-2500 words, and the Arabic section at least 1500-2500 words. "
                     "Cover every sub-concept and explanation thoroughly."
                 )
+
+            source_instruction = ""
+            if not transcript:
+                source_instruction = "⚠️ هام جداً: المحاضرة لا تحتوي على تسجيل صوتي. يجب عليك توليد الملزمة الدراسية والشرح والمقارنات والأسئلة بالكامل بناءً على 'محتوى شرائح المحاضرة' المرفق بالأسفل فقط! قم بتغطية كل شريحة بالتفصيل وفسر المفاهيم الواردة فيها."
 
             # STEP 1: Generate comprehensive bilingual Markdown study notebook
             yield f"data: {json.dumps({'type': 'progress', 'step': '4/5', 'message': '🧠 محرك لمّاح الذكي يكتب محتوى الدفتر الدراسي ثنائي اللغة بالتفصيل...'}, ensure_ascii=False)}\n\n"
 
             prompt_step1 = (
                 "أنت 'محرك لمّاح الدراسي' — ذكاء اصطناعي متخصص في إعداد ملازم ودفاتر دراسية جامعية احترافية فائقة الدقة والشمولية والروعة للبيع والتسويق.\n"
-                f"{depth_note}\n\n"
+                f"{depth_note}\n"
+                f"{source_instruction}\n\n"
                 "══════════════════════════════════════\n"
                 "🚨 STRICT BILINGUAL STRUCTURE — MANDATORY RULES (100% ENFORCED) 🚨\n"
                 "══════════════════════════════════════\n"
