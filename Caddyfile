@@ -1,5 +1,8 @@
 {
     email omar@lammah.site
+    servers {
+        protocols h1 h2
+    }
 }
 
 # إعدادات التشغيل المحلي (على اللابتوب)

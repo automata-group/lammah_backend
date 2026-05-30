@@ -354,11 +354,11 @@ def _para(c, text, st, font_sz=FSIZ, lh=LINE_H, color=C_BODY, bold=False, indent
 
 # ── Section Heading (H1) ──────────────────────────────────────────────────────
 def _h1(c, st, title):
-    if st.y - 50 < BOTTOM: st.new_page(c)
-    st.y -= 14
     t = _clean(str(title))[:65]
     is_rtl = _has_ar(t)
     st.is_rtl = is_rtl
+    if st.y - 50 < BOTTOM: st.new_page(c)
+    st.y -= 14
     td, _ = _bidi(t)
     c.setFont(FONT_BOLD, 15)
     tw = c.stringWidth(td, FONT_BOLD, 15)
@@ -374,11 +374,11 @@ def _h1(c, st, title):
 
 # ── Sub-heading (H2) ──────────────────────────────────────────────────────────
 def _h2(c, st, title):
-    if st.y - 40 < BOTTOM: st.new_page(c)
-    st.y -= 8
     t = _clean(str(title))[:70]
     is_rtl = _has_ar(t)
     st.is_rtl = is_rtl
+    if st.y - 40 < BOTTOM: st.new_page(c)
+    st.y -= 8
     td, _ = _bidi(t)
     c.setFont(FONT_BOLD, 13)
     tw = c.stringWidth(td, FONT_BOLD, 13)
@@ -397,11 +397,11 @@ def _h2(c, st, title):
 
 # ── H3 (Exam Summary Header) ─────────────────────────────────────────────────
 def _h3(c, st, title):
-    if st.y - 30 < BOTTOM: st.new_page(c)
-    st.y -= 6
     t = _clean(str(title))[:80]
     is_rtl = _has_ar(t)
     st.is_rtl = is_rtl
+    if st.y - 30 < BOTTOM: st.new_page(c)
+    st.y -= 6
     td, _ = _bidi(t)
     c.setFont(FONT_BOLD, 11.5)
     tw = c.stringWidth(td, FONT_BOLD, 11.5)
@@ -436,6 +436,10 @@ def _cornell_box(c, st, text, kind="note"):
     else:
         cue = lbl_ar if is_arabic_text else lbl_en
         body = text.strip()
+
+    # Clean the callout body of leading emojis or duplicate key prefixes (e.g. ملاحظة:)
+    body = re.sub(r'^[💡🧪⚡✅📌⚠📊✨🔒\-•\s]+', '', body).strip()
+    body = re.sub(r'^(?:ملاحظة|توضيح|تنبيه|تذكّر|تذكر|هام للامتحان|Note|Remember|Important|Warning|Tip|Key Point)\s*(?:هامة|هام)?\s*[:：]?\s*', '', body, flags=re.IGNORECASE).strip()
 
     # Estimate height based on body text length
     est_lines = max(2, len(body) // 40 + 2)
@@ -657,11 +661,16 @@ def _render(c, st, text):
             i += 1
             continue
 
-        # Count leading # for headings
-        level = 0
-        while level < len(s) and s[level] == "#":
-            level += 1
-        body = s[level:].strip() if level else s
+        # Count leading # for headings, supporting optional bullets (*, -, •), checkbox, or bold (**) prefixes
+        heading_match = re.match(r'^(?:[-*•\s]|\*\*|\[\s\]|\[[xX]\])*\s*(#{1,6})\s*(.*)$', s)
+        if heading_match:
+            level = len(heading_match.group(1))
+            body = heading_match.group(2).strip()
+            # Clear remaining hashes/bold stars/bullets from heading body
+            body = body.lstrip("#*•- \t").rstrip("#* \t")
+        else:
+            level = 0
+            body = s
 
         if level == 1:
             _h1(c, st, body)
