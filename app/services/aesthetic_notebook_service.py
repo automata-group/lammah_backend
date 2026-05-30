@@ -121,25 +121,32 @@ BOTTOM    = 62
 # ── Arabic BiDi Helper ────────────────────────────────────────────────────────
 _AR = re.compile(r'[\u0600-\u06FF\u0750-\u077F\uFB50-\uFDFF\uFE70-\uFEFF]')
 
+# Invisible Unicode control characters that can break heading/line detection
+_CTRL_STRIP = re.compile(
+    r'[\u202a\u202b\u202c\u202d\u202e\u200e\u200f\ufeff'
+    r'\u200b\u200c\u200d\u2066\u2067\u2068\u2069\u061c]'
+)
+
+def _strip_ctrl(t):
+    """Remove invisible Unicode directional/control characters."""
+    return _CTRL_STRIP.sub('', t)
+
 def _has_ar(t): return bool(_AR.search(t))
+
+def _is_rtl_para(t):
+    """Determine if a paragraph is primarily RTL (Arabic).
+    Skips leading punctuation/numbers/symbols to find the first real character."""
+    cleaned = re.sub(r'^[\s\d\W]+', '', _strip_ctrl(t))
+    return bool(_AR.search(cleaned[0])) if cleaned else False
 
 def _bidi(text):
     if not text: return "", False
+    text = _strip_ctrl(text)
     if _has_ar(text):
         try:
             reshaped = arabic_reshaper.reshape(text)
             bidi_text = get_display(reshaped)
-            # Remove ALL directional and invisible Unicode control characters
-            _CTRL_CHARS = [
-                '\u202a', '\u202b', '\u202c', '\u202d', '\u202e',  # LRE, RLE, PDF, LRO, RLO
-                '\u200e', '\u200f',  # LRM, RLM
-                '\ufeff',            # BOM / ZWNBSP
-                '\u200b', '\u200c', '\u200d',  # ZWSP, ZWNJ, ZWJ
-                '\u2066', '\u2067', '\u2068', '\u2069',  # LRI, RLI, FSI, PDI
-                '\u061c',  # Arabic Letter Mark
-            ]
-            for char in _CTRL_CHARS:
-                bidi_text = bidi_text.replace(char, '')
+            bidi_text = _strip_ctrl(bidi_text)
             return bidi_text, True
         except Exception:
             return text, True
@@ -172,12 +179,13 @@ class _S:
         self.y = H - MARGIN - 18
         self.page_num = page_num
         self.student_name = student_name
-        self.is_rtl = is_rtl
+        self.main_rtl = is_rtl   # Document-level RTL (never changes after init)
+        self.is_rtl = is_rtl     # Current paragraph RTL (changes per paragraph)
 
     def new_page(self, c):
         c.showPage()
         self.page_num += 1
-        _bg(c, is_rtl=self.is_rtl)
+        _bg(c, is_rtl=self.main_rtl)   # Use document-level, not per-para
         self._footer(c)
         self.y = H - MARGIN - 18
 
@@ -189,8 +197,8 @@ class _S:
         c.setFont(FONT_REG, 7.5)
         c.setFillColor(C_MUTED)
         
-        # English vs Arabic footers
-        if not self.is_rtl:
+        # Use document-level direction for footer language
+        if not self.main_rtl:
             brand, _ = _bidi("Lammah Study Notebook")
             c.drawString(MARGIN, BOTTOM - 20, brand)
             attr, _ = _bidi(f"Prepared by: {self.student_name}")
@@ -269,9 +277,14 @@ def _para(c, text, st, font_sz=FSIZ, lh=LINE_H, color=C_BODY, bold=False, indent
                 cur_words, cur_w = [word], ww
         if cur_words: lines.append(" ".join(cur_words))
 
-        # Detect paragraph language
-        para_is_rtl = _has_ar(p)
+        # Detect paragraph language using the first real character
+        # (ignores leading punctuation/numbers so English bullets don't become RTL)
+        para_is_rtl = _is_rtl_para(p)
         st.is_rtl = para_is_rtl
+
+        # Compute x boundaries once per paragraph
+        x_base = MARGIN + indent
+        avail_right = x_base + avail   # right bound of available area
 
         for li, line_str in enumerate(lines):
             if st.y < BOTTOM + lh: st.new_page(c)
@@ -282,9 +295,9 @@ def _para(c, text, st, font_sz=FSIZ, lh=LINE_H, color=C_BODY, bold=False, indent
                     c.setStrokeColor(C_GOLD)
                     c.setLineWidth(1.0)
                     if para_is_rtl:
-                        px = MARGIN + indent + avail - bul_ind + 2
+                        px = avail_right - bul_ind + 2
                     else:
-                        px = MARGIN + indent + 2
+                        px = x_base + 2
                     c.roundRect(px, st.y - 1, 9, 9, 1.5, fill=0, stroke=1)
                     if is_checked:
                         c.setStrokeColor(C_GOLD)
@@ -296,9 +309,9 @@ def _para(c, text, st, font_sz=FSIZ, lh=LINE_H, color=C_BODY, bold=False, indent
                     c.setFillColor(C_GOLD)
                     c.setFont(FONT_BOLD, font_sz + 1)
                     if para_is_rtl:
-                        px = MARGIN + indent + avail - bul_ind + 2
+                        px = avail_right - bul_ind + 2
                     else:
-                        px = MARGIN + indent + 2
+                        px = x_base + 2
                     c.drawString(px, st.y, pfx_d)
 
             # Highlights
@@ -306,16 +319,21 @@ def _para(c, text, st, font_sz=FSIZ, lh=LINE_H, color=C_BODY, bold=False, indent
             hl += [m.group(1) for m in re.finditer(r'<span[^>]*>(.*?)</span>', line_str)]
 
             clean_l = _clean(line_str)
-            disp, is_rtl = _bidi(clean_l)
+            disp, _ = _bidi(clean_l)
             is_bold_line  = line_str.count("**") >= 2
             dfn = FONT_BOLD if (bold or is_bold_line) else fn
 
             c.setFont(dfn, font_sz)
             lw = c.stringWidth(disp, dfn, font_sz)
-            x_base = MARGIN + indent
+            if para_is_rtl:
+                # Add safe visual width lower bound for Arabic strings (0.60pt per char)
+                lw = max(lw, len(disp) * (font_sz * 0.60))
             
-            # Align line based on paragraph-level language direction
-            x = (x_base + avail_w - bul_ind - lw - 16) if para_is_rtl else (x_base + bul_ind)
+            # Align text to left for LTR, right for RTL (with a safe 6pt buffer for Arabic stringWidth underestimation)
+            if para_is_rtl:
+                x = avail_right - bul_ind - lw - 6
+            else:
+                x = x_base + bul_ind
 
             # Draw highlighter rectangles
             for hw in hl:
@@ -603,7 +621,8 @@ def _render(c, st, text):
     i = 0
     while i < len(lines_list):
         seg = lines_list[i]
-        s = seg.strip()
+        # Strip invisible Unicode control chars FIRST so # detection works correctly
+        s = _strip_ctrl(seg).strip()
         
         if not s:
             if in_code_block:
@@ -638,6 +657,7 @@ def _render(c, st, text):
             i += 1
             continue
 
+        # Count leading # for headings
         level = 0
         while level < len(s) and s[level] == "#":
             level += 1
@@ -982,7 +1002,10 @@ def _draw_mcqs(c, st, mcqs: list):
             c.roundRect(px, st.y - 1, 9, 9, 1.5, fill=0, stroke=1)
             item_d, _ = _bidi(item)
             itw = c.stringWidth(item_d, FONT_REG, 9)
-            c.drawString(W - MARGIN - itw - 32, st.y - 1, item_d)
+            # Add safe character-based minimum width bound (0.60pt per char for 9pt font)
+            itw = max(itw, len(item_d) * (9 * 0.60))
+            # Safe 38pt offset to prevent overlap due to Arabic stringWidth underestimation
+            c.drawString(W - MARGIN - itw - 38, st.y - 1, item_d)
         else:
             px = MARGIN + 8
             c.roundRect(px, st.y - 1, 9, 9, 1.5, fill=0, stroke=1)
