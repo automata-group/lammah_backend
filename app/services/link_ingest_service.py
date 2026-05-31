@@ -159,8 +159,6 @@ def download_audio_from_link(lecture_url: str, upload_dir: str, unique_id: str) 
         raise ValueError("الرابط غير صالح. يرجى إدخال رابط صحيح يبدأ بـ http أو https.")
 
     lower_url = lecture_url.lower()
-    if "youtube.com" in lower_url or "youtu.be" in lower_url:
-        raise ValueError("🚫 ميزة تحميل روابط اليوتيوب غير متاحة حالياً - ستتوفر قريباً! يرجى رفع الملف الصوتي مباشرة من جهازك. 🎥")
 
     if "drive.google.com" in lower_url or "google.com/drive" in lower_url:
         raise ValueError("🚫 عذراً، روابط Google Drive غير مدعومة لأسباب أمنية. يرجى استخدام روابط يوتيوب فقط! 🎥")
@@ -245,6 +243,7 @@ def download_audio_from_link(lecture_url: str, upload_dir: str, unique_id: str) 
     if invidious_path:
         return invidious_path
 
+    logger.error(f"❌ YouTube/Link download failed for URL {lecture_url}. Last error: {last_error}")
     err_lower = last_error.lower()
     if "sign in" in err_lower or "bot" in err_lower or "403" in err_lower:
         raise RuntimeError(
