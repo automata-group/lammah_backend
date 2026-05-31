@@ -214,3 +214,5 @@ def download_youtube_audio(youtube_url: str, upload_dir: str, unique_id: str) ->
     raise RuntimeError(
         f"❌ فشل جلب المحاضرة. آخر خطأ: {last_error[:300]}"
     )
+
+# Force rebuild trigger 1
