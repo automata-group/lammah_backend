@@ -509,6 +509,31 @@ def _cornell_box(c, st, text, kind="note"):
 def _code_card(c, st, code_lines, lang=""):
     if not code_lines: return
     
+    # Check if this code block is in the Arabic translation (has any Arabic text)
+    is_arabic_code = any(_has_ar(line) for line in code_lines)
+    
+    if is_arabic_code:
+        # Render each line on the ruled lines directly, without the black box
+        for line in code_lines:
+            if st.y - LINE_H < BOTTOM: st.new_page(c)
+            has_arabic = _has_ar(line)
+            if has_arabic:
+                c.setFont(FONT_REG, 9.5)
+                c.setFillColor(C_BODY)
+                clean_line = _clean(line)
+                disp, _ = _bidi(clean_line)
+                lw = c.stringWidth(disp, FONT_REG, 9.5)
+                c.drawString(W - MARGIN - lw - 12, st.y - 4, disp)
+            else:
+                c.setFont("Courier", 9)
+                c.setFillColor(HexColor("#3F2F20"))
+                indent_spaces = len(line) - len(line.lstrip(' '))
+                x_pos = MARGIN + 16 + indent_spaces * 5.4
+                c.drawString(x_pos, st.y - 4, line.strip())
+            
+            st.y -= LINE_H
+        return
+
     # Determine height of the code card
     card_lh = 16
     padding = 20
