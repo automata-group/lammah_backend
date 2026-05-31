@@ -506,71 +506,291 @@ def _cornell_box(c, st, text, kind="note"):
     st.y = box_y - 12
 
 # ── Code & Formula Card ──────────────────────────────────────────────────────
-def _code_card(c, st, code_lines, lang=""):
-    if not code_lines: return
+def _draw_cell(c, st, text, x, w, h, font, size, color, align_rtl=True):
+    c.setFont(font, size)
+    c.setFillColor(color)
     
-    # Check if this code block is in the Arabic translation (has any Arabic text)
-    is_arabic_code = any(_has_ar(line) for line in code_lines)
+    # Word wrapping
+    words = str(text).split()
+    lines = []
+    cur_words = []
+    cur_w = 0.0
+    sp_w = c.stringWidth(" ", font, size)
     
-    if is_arabic_code:
-        # Render each line on the ruled lines directly, without the black box
-        for line in code_lines:
-            if st.y - LINE_H < BOTTOM: st.new_page(c)
-            has_arabic = _has_ar(line)
-            if has_arabic:
-                c.setFont(FONT_REG, 9.5)
-                c.setFillColor(C_BODY)
-                clean_line = _clean(line)
-                disp, _ = _bidi(clean_line)
-                lw = c.stringWidth(disp, FONT_REG, 9.5)
-                c.drawString(W - MARGIN - lw - 12, st.y - 4, disp)
-            else:
-                c.setFont("Courier", 9)
-                c.setFillColor(HexColor("#3F2F20"))
-                indent_spaces = len(line) - len(line.lstrip(' '))
-                x_pos = MARGIN + 16 + indent_spaces * 5.4
-                c.drawString(x_pos, st.y - 4, line.strip())
-            
-            st.y -= LINE_H
-        return
+    for word in words:
+        cl = _clean(word)
+        ww = c.stringWidth(cl, font, size)
+        gap = sp_w if cur_words else 0.0
+        if cur_w + gap + ww <= w - 12:
+            cur_words.append(word)
+            cur_w += gap + ww
+        else:
+            if cur_words:
+                lines.append(" ".join(cur_words))
+            cur_words = [word]
+            cur_w = ww
+    if cur_words:
+        lines.append(" ".join(cur_words))
+        
+    # Draw lines vertically centered in the row height
+    total_text_h = len(lines) * (size + 3)
+    start_y = st.y - h/2 + total_text_h/2 - 2
+    
+    for li, line_str in enumerate(lines[:3]): # limit to 3 lines
+        disp, is_rtl = _bidi(line_str)
+        lw = c.stringWidth(disp, font, size)
+        if is_rtl and align_rtl:
+            c.drawString(x + w - lw - 6, start_y - li * (size + 3), disp)
+        else:
+            c.drawString(x + 6, start_y - li * (size + 3), disp)
 
-    # Determine height of the code card
-    card_lh = 16
-    padding = 20
-    card_h = len(code_lines) * card_lh + padding * 2
-    if lang:
-        card_h += 16  # extra space for language title
+def _draw_study_planner(c, st, lecture_title, continuous_markdown):
+    # Set page background and footer for Page 2
+    _bg(c, is_rtl=st.main_rtl)
+    st._footer(c)
+    
+    st.y = H - MARGIN - 18
+    
+    # Page Heading
+    title_text = "جدول خطة المذاكرة المقترحة" if st.main_rtl else "Recommended Study Planner"
+    _h1(c, st, title_text)
+    
+    sub_text = "جدول زمني مقترح لتقسيم دراسة المحاضرة واستيعابها خلال 3 خطوات" if st.main_rtl else "Suggested 3-step schedule to partition and master this lecture"
+    sub_d, _ = _bidi(sub_text)
+    c.setFont(FONT_REG, 9)
+    c.setFillColor(C_MUTED)
+    sw = c.stringWidth(sub_d, FONT_REG, 9)
+    if st.main_rtl:
+        c.drawString(W - MARGIN - sw - 8, st.y, sub_d)
+    else:
+        c.drawString(MARGIN + 8, st.y, sub_d)
+    st.y -= 34
+    
+    # Extract topics/chapters
+    topics = []
+    for line in continuous_markdown.split("\n"):
+        line = _strip_ctrl(line).strip()
+        if line.startswith("## "):
+            t = _clean(line.lstrip("#").strip())
+            if t and t not in topics:
+                topics.append(t)
+                if len(topics) >= 3:
+                    break
+    while len(topics) < 3:
+        topics.append("مراجعة وتثبيت المفاهيم" if st.main_rtl else "Review and consolidate concepts")
         
-    if st.y - card_h < BOTTOM: st.new_page(c)
+    plan_data = [
+        {
+            "day": "الخطوة 1" if st.main_rtl else "Step 1",
+            "focus": topics[0],
+            "task": "قراءة الفصول الأولى والتركيز على فهم وحفظ المصطلحات الأكاديمية." if st.main_rtl else "Read early sections and focus on understanding core terminology."
+        },
+        {
+            "day": "الخطوة 2" if st.main_rtl else "Step 2",
+            "focus": topics[1],
+            "task": "استيعاب ومراجعة جداول المقارنة الذكية وصناديق الملاحظات الهامة." if st.main_rtl else "Study comparison aspects and analyze key note callout boxes."
+        },
+        {
+            "day": "الخطوة 3" if st.main_rtl else "Step 3",
+            "focus": topics[2],
+            "task": "مراجعة خلاصة ليلة الامتحان وحل أسئلة خيارات التقييم الذاتي." if st.main_rtl else "Review exam cheat sheet and solve self-test practice questions."
+        }
+    ]
     
-    card_y = st.y - card_h
+    col_day = TXT_W * 0.18
+    col_focus = TXT_W * 0.34
+    col_task = TXT_W * 0.38
+    col_chk = TXT_W * 0.10
     
-    # Draw dark rounded box
-    c.setFillColor(HexColor("#1A1510"))  # Premium dark charcoal brown
-    c.roundRect(MARGIN, card_y, TXT_W, card_h, 6, fill=1, stroke=0)
-    c.setStrokeColor(HexColor("#3A3025"))  # Muted outline
-    c.setLineWidth(1.0)
-    c.roundRect(MARGIN, card_y, TXT_W, card_h, 6, fill=0, stroke=1)
-    
-    cy = card_y + card_h - padding
-    
-    # Draw language header if available
-    if lang:
-        c.setFont("Courier-Bold", 8)
-        c.setFillColor(HexColor("#B45309"))  # Accent color
-        hdr, _ = _bidi(f"[ {lang.upper()} ]")
-        c.drawString(MARGIN + 12, cy - 2, hdr)
-        cy -= 18
+    if st.main_rtl:
+        x_chk = W - MARGIN - col_chk
+        x_task = W - MARGIN - col_chk - col_task
+        x_focus = W - MARGIN - col_chk - col_task - col_focus
+        x_day = MARGIN
+    else:
+        x_day = MARGIN
+        x_focus = MARGIN + col_day
+        x_task = MARGIN + col_day + col_focus
+        x_chk = MARGIN + col_day + col_focus + col_task
         
-    # Render each code line
-    c.setFont("Courier", 8.5)
-    c.setFillColor(HexColor("#E6D6BD"))  # Elegant cream code color
-    for line in code_lines:
-        l_text = line.replace("\t", "    ")
-        c.drawString(MARGIN + 16, cy - 8, l_text[:85])
-        cy -= card_lh
+    row_h = 56
+    
+    # Draw table header row
+    c.setFillColor(C_BLUE)
+    c.rect(MARGIN, st.y - 26, TXT_W, 26, fill=1, stroke=0)
+    c.setFillColor(C_GOLD)
+    c.rect(MARGIN, st.y - 30, TXT_W, 4, fill=1, stroke=0)
+    
+    h_day = "الخطوة / اليوم" if st.main_rtl else "Step / Day"
+    h_focus = "التركيز الدراسي" if st.main_rtl else "Study Focus"
+    h_task = "النشاط المقترح" if st.main_rtl else "Suggested Activity"
+    h_chk = "إنجاز" if st.main_rtl else "Status"
+    
+    def draw_header_cell(text, x, w):
+        c.setFont(FONT_BOLD, 9.5)
+        c.setFillColor(HexColor("#FDFBF7"))
+        d, rtl = _bidi(text)
+        tw = c.stringWidth(d, FONT_BOLD, 9.5)
+        if rtl:
+            c.drawString(x + w - tw - 8, st.y - 19, d)
+        else:
+            c.drawString(x + 8, st.y - 19, d)
+            
+    draw_header_cell(h_day, x_day, col_day)
+    draw_header_cell(h_focus, x_focus, col_focus)
+    draw_header_cell(h_task, x_task, col_task)
+    draw_header_cell(h_chk, x_chk, col_chk)
+    
+    st.y -= 30
+    
+    for i, r in enumerate(plan_data):
+        bg = HexColor("#FDFBF7") if i % 2 == 0 else HexColor("#F7F1E8")
+        c.setFillColor(bg)
+        c.rect(MARGIN, st.y - row_h, TXT_W, row_h, fill=1, stroke=0)
         
-    st.y = card_y - 12
+        c.setStrokeColor(C_DIV)
+        c.setLineWidth(0.5)
+        c.rect(MARGIN, st.y - row_h, TXT_W, row_h, fill=0, stroke=1)
+        
+        c.line(MARGIN + col_day, st.y - row_h, MARGIN + col_day, st.y)
+        c.line(MARGIN + col_day + col_focus, st.y - row_h, MARGIN + col_day + col_focus, st.y)
+        c.line(MARGIN + col_day + col_focus + col_task, st.y - row_h, MARGIN + col_day + col_focus + col_task, st.y)
+        
+        _draw_cell(c, st, r["day"], x_day, col_day, row_h, FONT_BOLD, 9.5, C_GOLD)
+        _draw_cell(c, st, r["focus"], x_focus, col_focus, row_h, FONT_REG, 9, C_BLUE)
+        _draw_cell(c, st, r["task"], x_task, col_task, row_h, FONT_REG, 8.5, C_BODY)
+        
+        c.setStrokeColor(C_GOLD)
+        c.setLineWidth(1.0)
+        c.roundRect(x_chk + col_chk/2 - 6, st.y - row_h + row_h/2 - 6, 12, 12, 2.5, fill=0, stroke=1)
+        
+        st.y -= row_h
+
+def _extract_concepts(continuous_markdown, cheat_sheet):
+    concepts = []
+    if cheat_sheet:
+        for item in cheat_sheet:
+            term = item.get("term", "").strip()
+            if term:
+                concepts.append(term)
+    if len(concepts) < 5 and continuous_markdown:
+        for line in continuous_markdown.split("\n"):
+            line = _strip_ctrl(line).strip()
+            if line.startswith("## ") or line.startswith("### "):
+                title = line.lstrip("#").strip()
+                title = _clean(title)
+                if title and title not in concepts:
+                    concepts.append(title)
+                    if len(concepts) >= 6:
+                        break
+    seen = set()
+    final_concepts = []
+    for c in concepts:
+        c_clean = re.sub(r'^[💡🧪⚡✅📌⚠📊✨🔒\-•\s]+', '', c).strip()
+        if c_clean and c_clean not in seen:
+            seen.add(c_clean)
+            final_concepts.append(c_clean)
+            
+    if not final_concepts:
+        final_concepts = ["شرح المفاهيم", "المصطلحات الهامة", "تطبيقات ونماذج"]
+        
+    return final_concepts[:5]
+
+def _draw_visual_mind_map(c, st, lecture_title, continuous_markdown, cheat_sheet):
+    st.new_page(c)
+    
+    title_text = "خريطة المفاهيم البصرية" if st.main_rtl else "Visual Concept Mind Map"
+    _h1(c, st, title_text)
+    
+    sub_text = "مخطط مفاهيمي يوضح ترابط هيكل المحاضرة وعناصرها الأساسية" if st.main_rtl else "Concept diagram showing relationships between the main lecture sections"
+    sub_d, _ = _bidi(sub_text)
+    c.setFont(FONT_REG, 9)
+    c.setFillColor(C_MUTED)
+    sw = c.stringWidth(sub_d, FONT_REG, 9)
+    if st.main_rtl:
+        c.drawString(W - MARGIN - sw - 8, st.y, sub_d)
+    else:
+        c.drawString(MARGIN + 8, st.y, sub_d)
+    st.y -= 28
+    
+    concepts = _extract_concepts(continuous_markdown, cheat_sheet)
+    num_nodes = len(concepts)
+    
+    board_h = 320
+    board_y = st.y - board_h - 10
+    c.setFillColor(HexColor("#FDFBF7"))
+    c.roundRect(MARGIN, board_y, TXT_W, board_h, 8, fill=1, stroke=0)
+    c.setStrokeColor(C_BOX_BD)
+    c.setLineWidth(0.8)
+    c.roundRect(MARGIN, board_y, TXT_W, board_h, 8, fill=0, stroke=1)
+    
+    cx = W / 2
+    cy = board_y + board_h / 2
+    
+    positions = []
+    if num_nodes == 1:
+        positions = [(cx, cy + 90)]
+    elif num_nodes == 2:
+        positions = [(cx - 130, cy), (cx + 130, cy)]
+    elif num_nodes == 3:
+        positions = [(cx, cy + 90), (cx - 130, cy - 50), (cx + 130, cy - 50)]
+    elif num_nodes == 4:
+        positions = [(cx - 130, cy + 70), (cx + 130, cy + 70), (cx - 130, cy - 70), (cx + 130, cy - 70)]
+    else:
+        positions = [
+            (cx, cy + 95),
+            (cx - 140, cy + 25),
+            (cx + 140, cy + 25),
+            (cx - 100, cy - 75),
+            (cx + 100, cy - 75)
+        ]
+        
+    c.setStrokeColor(C_GOLD)
+    c.setLineWidth(1.2)
+    for px, py in positions:
+        c.line(cx, cy, px, py)
+        c.setFillColor(C_GOLD)
+        c.circle(px, py, 3, fill=1, stroke=0)
+        
+    c.setFillColor(C_BLUE)
+    c.setStrokeColor(HexColor("#1A2B5E"))
+    c.setLineWidth(1.5)
+    
+    center_text = _clean(lecture_title)
+    if len(center_text) > 28:
+        center_text = center_text[:25] + "..."
+    ct_d, _ = _bidi(center_text)
+    
+    ct_w = c.stringWidth(ct_d, FONT_BOLD, 10.5)
+    box_w = max(110, ct_w + 24)
+    box_h = 36
+    
+    c.roundRect(cx - box_w/2, cy - box_h/2, box_w, box_h, 6, fill=1, stroke=1)
+    
+    c.setFillColor(HexColor("#FDFBF7"))
+    c.setFont(FONT_BOLD, 9.5)
+    c.drawString(cx - ct_w/2, cy - 3.5, ct_d)
+    
+    for idx, (px, py) in enumerate(positions):
+        concept_text = concepts[idx]
+        if len(concept_text) > 24:
+            concept_text = concept_text[:21] + "..."
+        con_d, _ = _bidi(concept_text)
+        
+        con_w = c.stringWidth(con_d, FONT_BOLD, 9)
+        n_w = max(80, con_w + 16)
+        n_h = 24
+        
+        c.setFillColor(HexColor("#F7F1E8"))
+        c.setStrokeColor(C_BOX_BD)
+        c.setLineWidth(1.0)
+        c.roundRect(px - n_w/2, py - n_h/2, n_w, n_h, 4, fill=1, stroke=1)
+        
+        c.setFillColor(C_BODY)
+        c.setFont(FONT_BOLD, 8)
+        c.drawString(px - con_w/2, py - 2.5, con_d)
+        
+    st.y = board_y - 20
 
 # ── Callout Box (Backwards Compatibility Wrapper) ────────────────────────────
 def _callout(c, st, text, kind="note"):
@@ -657,7 +877,6 @@ def _render(c, st, text):
 
         if s.startswith("```"):
             if in_code_block:
-                _code_card(c, st, code_lines, code_lang)
                 in_code_block = False
                 code_lines = []
             else:
@@ -667,7 +886,6 @@ def _render(c, st, text):
             continue
 
         if in_code_block:
-            code_lines.append(seg)
             i += 1
             continue
 
@@ -1154,11 +1372,19 @@ def generate_aesthetic_notebook_pdf(
     # 1. Cover Page
     _cover(cv, lecture_title, student_name)
 
-    # 2. Main Content
+    # 2. Main Content Init
     is_main_rtl = _has_ar(continuous_markdown[:2000]) if continuous_markdown else True
     st = _S(page_num=2, student_name=student_name, is_rtl=is_main_rtl)
-    _bg(cv, is_rtl=is_main_rtl)
-    st._footer(cv)
+
+    # 2a. Suggested Study Planner (Page 2)
+    _draw_study_planner(cv, st, lecture_title, continuous_markdown)
+
+    # 2b. Visual Concept Mind Map (Page 3)
+    _draw_visual_mind_map(cv, st, lecture_title, continuous_markdown, cheat_sheet)
+
+    # 2c. Continuous Markdown (Main Content starting on Page 4)
+    st.new_page(cv)
+    st.y = H - MARGIN - 18
     _render(cv, st, continuous_markdown)
 
     # 3. Comparison Tables (inline with content flow)
