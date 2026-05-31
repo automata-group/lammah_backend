@@ -345,15 +345,16 @@ async def process_notebook(
                 )
             elif effective_word_count < 3000:
                 length_instruction = (
-                    "RULE 6 — ADAPTIVE LENGTH: Write a moderately detailed notebook. "
-                    "The English section should be around 800-1200 words, and the Arabic section around 800-1200 words. "
+                    "RULE 6 — ADAPTIVE LENGTH: Write a highly detailed notebook. "
+                    "The English section should be around 1000-1800 words, and the Arabic section around 1000-1800 words. "
                     "Ensure everything explained in the source content is covered."
                 )
             else:
                 length_instruction = (
                     "RULE 6 — ADAPTIVE LENGTH: The source content is very detailed. Write an extremely comprehensive notebook. "
-                    "The English section should be at least 1500-2500 words, and the Arabic section at least 1500-2500 words. "
-                    "Cover every sub-concept and explanation thoroughly."
+                    "The English section should be at least 3000-6000 words, and the Arabic section at least 3000-6000 words. "
+                    "Do NOT summarize briefly. Provide extreme detail, examples, discussions, and context. "
+                    "Let the output scale naturally and take as many pages as needed (even 20-40 pages) to cover all details thoroughly."
                 )
 
             source_instruction = ""
@@ -519,7 +520,7 @@ async def process_notebook(
                 generate_preview_pdf,
                 original_pdf_path=output_pdf_path,
                 preview_pdf_path=preview_pdf_path,
-                max_pages=3
+                max_pages=5
             )
 
             # 7. Quota Deduction & History Save
@@ -636,7 +637,7 @@ def download_notebook(job_id: str):
                     generate_preview_pdf(
                         original_pdf_path=original_pdf_path,
                         preview_pdf_path=preview_pdf_path,
-                        max_pages=3
+                        max_pages=5
                     )
                     
                     if os.path.exists(path_1):

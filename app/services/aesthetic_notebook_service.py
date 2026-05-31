@@ -506,165 +506,7 @@ def _cornell_box(c, st, text, kind="note"):
     st.y = box_y - 12
 
 # ── Code & Formula Card ──────────────────────────────────────────────────────
-def _draw_cell(c, st, text, x, w, h, font, size, color, align_rtl=True):
-    c.setFont(font, size)
-    c.setFillColor(color)
-    
-    # Word wrapping
-    words = str(text).split()
-    lines = []
-    cur_words = []
-    cur_w = 0.0
-    sp_w = c.stringWidth(" ", font, size)
-    
-    for word in words:
-        cl = _clean(word)
-        ww = c.stringWidth(cl, font, size)
-        gap = sp_w if cur_words else 0.0
-        if cur_w + gap + ww <= w - 12:
-            cur_words.append(word)
-            cur_w += gap + ww
-        else:
-            if cur_words:
-                lines.append(" ".join(cur_words))
-            cur_words = [word]
-            cur_w = ww
-    if cur_words:
-        lines.append(" ".join(cur_words))
-        
-    # Draw lines vertically centered in the row height
-    total_text_h = len(lines) * (size + 3)
-    start_y = st.y - h/2 + total_text_h/2 - 2
-    
-    for li, line_str in enumerate(lines[:3]): # limit to 3 lines
-        disp, is_rtl = _bidi(line_str)
-        lw = c.stringWidth(disp, font, size)
-        if is_rtl and align_rtl:
-            c.drawString(x + w - lw - 6, start_y - li * (size + 3), disp)
-        else:
-            c.drawString(x + 6, start_y - li * (size + 3), disp)
 
-def _draw_study_planner(c, st, lecture_title, continuous_markdown):
-    # Set page background and footer for Page 2
-    _bg(c, is_rtl=st.main_rtl)
-    st._footer(c)
-    
-    st.y = H - MARGIN - 18
-    
-    # Page Heading
-    title_text = "جدول خطة المذاكرة المقترحة" if st.main_rtl else "Recommended Study Planner"
-    _h1(c, st, title_text)
-    
-    sub_text = "جدول زمني مقترح لتقسيم دراسة المحاضرة واستيعابها خلال 3 خطوات" if st.main_rtl else "Suggested 3-step schedule to partition and master this lecture"
-    sub_d, _ = _bidi(sub_text)
-    c.setFont(FONT_REG, 9)
-    c.setFillColor(C_MUTED)
-    sw = c.stringWidth(sub_d, FONT_REG, 9)
-    if st.main_rtl:
-        c.drawString(W - MARGIN - sw - 8, st.y, sub_d)
-    else:
-        c.drawString(MARGIN + 8, st.y, sub_d)
-    st.y -= 34
-    
-    # Extract topics/chapters
-    topics = []
-    for line in continuous_markdown.split("\n"):
-        line = _strip_ctrl(line).strip()
-        if line.startswith("## "):
-            t = _clean(line.lstrip("#").strip())
-            if t and t not in topics:
-                topics.append(t)
-                if len(topics) >= 3:
-                    break
-    while len(topics) < 3:
-        topics.append("مراجعة وتثبيت المفاهيم" if st.main_rtl else "Review and consolidate concepts")
-        
-    plan_data = [
-        {
-            "day": "الخطوة 1" if st.main_rtl else "Step 1",
-            "focus": topics[0],
-            "task": "قراءة الفصول الأولى والتركيز على فهم وحفظ المصطلحات الأكاديمية." if st.main_rtl else "Read early sections and focus on understanding core terminology."
-        },
-        {
-            "day": "الخطوة 2" if st.main_rtl else "Step 2",
-            "focus": topics[1],
-            "task": "استيعاب ومراجعة جداول المقارنة الذكية وصناديق الملاحظات الهامة." if st.main_rtl else "Study comparison aspects and analyze key note callout boxes."
-        },
-        {
-            "day": "الخطوة 3" if st.main_rtl else "Step 3",
-            "focus": topics[2],
-            "task": "مراجعة خلاصة ليلة الامتحان وحل أسئلة خيارات التقييم الذاتي." if st.main_rtl else "Review exam cheat sheet and solve self-test practice questions."
-        }
-    ]
-    
-    col_day = TXT_W * 0.18
-    col_focus = TXT_W * 0.34
-    col_task = TXT_W * 0.38
-    col_chk = TXT_W * 0.10
-    
-    if st.main_rtl:
-        x_chk = W - MARGIN - col_chk
-        x_task = W - MARGIN - col_chk - col_task
-        x_focus = W - MARGIN - col_chk - col_task - col_focus
-        x_day = MARGIN
-    else:
-        x_day = MARGIN
-        x_focus = MARGIN + col_day
-        x_task = MARGIN + col_day + col_focus
-        x_chk = MARGIN + col_day + col_focus + col_task
-        
-    row_h = 56
-    
-    # Draw table header row
-    c.setFillColor(C_BLUE)
-    c.rect(MARGIN, st.y - 26, TXT_W, 26, fill=1, stroke=0)
-    c.setFillColor(C_GOLD)
-    c.rect(MARGIN, st.y - 30, TXT_W, 4, fill=1, stroke=0)
-    
-    h_day = "الخطوة / اليوم" if st.main_rtl else "Step / Day"
-    h_focus = "التركيز الدراسي" if st.main_rtl else "Study Focus"
-    h_task = "النشاط المقترح" if st.main_rtl else "Suggested Activity"
-    h_chk = "إنجاز" if st.main_rtl else "Status"
-    
-    def draw_header_cell(text, x, w):
-        c.setFont(FONT_BOLD, 9.5)
-        c.setFillColor(HexColor("#FDFBF7"))
-        d, rtl = _bidi(text)
-        tw = c.stringWidth(d, FONT_BOLD, 9.5)
-        if rtl:
-            c.drawString(x + w - tw - 8, st.y - 19, d)
-        else:
-            c.drawString(x + 8, st.y - 19, d)
-            
-    draw_header_cell(h_day, x_day, col_day)
-    draw_header_cell(h_focus, x_focus, col_focus)
-    draw_header_cell(h_task, x_task, col_task)
-    draw_header_cell(h_chk, x_chk, col_chk)
-    
-    st.y -= 30
-    
-    for i, r in enumerate(plan_data):
-        bg = HexColor("#FDFBF7") if i % 2 == 0 else HexColor("#F7F1E8")
-        c.setFillColor(bg)
-        c.rect(MARGIN, st.y - row_h, TXT_W, row_h, fill=1, stroke=0)
-        
-        c.setStrokeColor(C_DIV)
-        c.setLineWidth(0.5)
-        c.rect(MARGIN, st.y - row_h, TXT_W, row_h, fill=0, stroke=1)
-        
-        c.line(MARGIN + col_day, st.y - row_h, MARGIN + col_day, st.y)
-        c.line(MARGIN + col_day + col_focus, st.y - row_h, MARGIN + col_day + col_focus, st.y)
-        c.line(MARGIN + col_day + col_focus + col_task, st.y - row_h, MARGIN + col_day + col_focus + col_task, st.y)
-        
-        _draw_cell(c, st, r["day"], x_day, col_day, row_h, FONT_BOLD, 9.5, C_GOLD)
-        _draw_cell(c, st, r["focus"], x_focus, col_focus, row_h, FONT_REG, 9, C_BLUE)
-        _draw_cell(c, st, r["task"], x_task, col_task, row_h, FONT_REG, 8.5, C_BODY)
-        
-        c.setStrokeColor(C_GOLD)
-        c.setLineWidth(1.0)
-        c.roundRect(x_chk + col_chk/2 - 6, st.y - row_h + row_h/2 - 6, 12, 12, 2.5, fill=0, stroke=1)
-        
-        st.y -= row_h
 
 def _extract_concepts(continuous_markdown, cheat_sheet):
     concepts = []
@@ -697,7 +539,9 @@ def _extract_concepts(continuous_markdown, cheat_sheet):
     return final_concepts[:5]
 
 def _draw_visual_mind_map(c, st, lecture_title, continuous_markdown, cheat_sheet):
-    st.new_page(c)
+    _bg(c, is_rtl=st.main_rtl)
+    st._footer(c)
+    st.y = H - MARGIN - 18
     
     title_text = "خريطة المفاهيم البصرية" if st.main_rtl else "Visual Concept Mind Map"
     _h1(c, st, title_text)
@@ -1376,13 +1220,10 @@ def generate_aesthetic_notebook_pdf(
     is_main_rtl = _has_ar(continuous_markdown[:2000]) if continuous_markdown else True
     st = _S(page_num=2, student_name=student_name, is_rtl=is_main_rtl)
 
-    # 2a. Suggested Study Planner (Page 2)
-    _draw_study_planner(cv, st, lecture_title, continuous_markdown)
-
-    # 2b. Visual Concept Mind Map (Page 3)
+    # 2a. Visual Concept Mind Map (Page 2)
     _draw_visual_mind_map(cv, st, lecture_title, continuous_markdown, cheat_sheet)
 
-    # 2c. Continuous Markdown (Main Content starting on Page 4)
+    # 2b. Continuous Markdown (Main Content starting on Page 3)
     st.new_page(cv)
     st.y = H - MARGIN - 18
     _render(cv, st, continuous_markdown)
