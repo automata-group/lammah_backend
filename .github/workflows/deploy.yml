@@ -53,9 +53,64 @@ jobs:
             mkdir -p ~/lammah_backend
             cd ~/lammah_backend
 
+            # Write YouTube cookies from secret (bypasses VPS IP block completely)
+            if [ -n "${{ secrets.YOUTUBE_COOKIES }}" ]; then
+              printf '%s' "${{ secrets.YOUTUBE_COOKIES }}" > youtube_cookies.txt
+              chmod 600 youtube_cookies.txt
+              echo "YouTube cookies file written successfully."
+            else
+              echo "WARNING: YOUTUBE_COOKIES secret not set. YouTube downloads may fail on this server IP."
+            fi
+
             # Write docker-compose.yml
             cat > docker-compose.yml << 'COMPOSE_EOF'
             services:
+              warp:
+                image: caomingjun/warp:latest
+                restart: unless-stopped
+                cap_add:
+                  - NET_ADMIN
+                  - MKNOD
+                sysctls:
+                  - net.ipv6.conf.all.disable_ipv6=0
+                  - net.ipv4.conf.all.src_valid_mark=1
+                devices:
+                  - /dev/net/tun:/dev/net/tun
+                device_cgroup_rules:
+                  - 'c 10:200 rwm'
+                environment:
+                  - WARP_SLEEP=5
+                volumes:
+                  - warp_data:/var/lib/cloudflare-warp
+                healthcheck:
+                  test: ["CMD", "curl", "-sf", "--proxy", "socks5://127.0.0.1:1080", "https://cloudflare.com/cdn-cgi/trace"]
+                  interval: 30s
+                  timeout: 20s
+                  retries: 5
+                  start_period: 30s
+
+              ytdl-service:
+                image: ghcr.io/automata-group/lammah_ytdl_service:latest
+                restart: unless-stopped
+                ports:
+                  - "8001:8001"
+                volumes:
+                  - shared_uploads:/app/uploads
+                  - ./youtube_cookies.txt:/app/youtube_cookies.txt:ro
+                environment:
+                  - PORT=8001
+                  - UPLOAD_DIR=/app/uploads
+                  - YOUTUBE_PROXY=socks5://warp:1080
+                  - YOUTUBE_COOKIES_PATH=/app/youtube_cookies.txt
+                depends_on:
+                  - warp
+                healthcheck:
+                  test: ["CMD", "curl", "-f", "http://localhost:8001/health"]
+                  interval: 30s
+                  timeout: 10s
+                  retries: 3
+                  start_period: 10s
+
               backend:
                 image: ghcr.io/automata-group/lammah_backend:latest
                 restart: unless-stopped
@@ -64,6 +119,7 @@ jobs:
                 volumes:
                   - ./outputs:/app/outputs
                   - shared_uploads:/app/uploads
+                  - ./youtube_cookies.txt:/app/youtube_cookies.txt:ro
                 environment:
                   - SUPABASE_URL=$SUPABASE_URL
                   - SUPABASE_KEY=$SUPABASE_KEY
@@ -75,6 +131,11 @@ jobs:
                   - WHISPER_API_KEY=$WHISPER_API_KEY
                   - TEMP_DIR=/app/uploads/temp
                   - UPLOAD_DIR=/app/uploads
+                  - YOUTUBE_DOWNLOADER_URL=http://ytdl-service:8001
+                  - YOUTUBE_COOKIES_PATH=/app/youtube_cookies.txt
+                depends_on:
+                  ytdl-service:
+                    condition: service_healthy
                 healthcheck:
                   test: ["CMD", "curl", "-f", "http://localhost:8000/api/v1/health"]
                   interval: 30s
@@ -100,6 +161,7 @@ jobs:
 
             volumes:
               shared_uploads:
+              warp_data:
             COMPOSE_EOF
 
             # Write .env
