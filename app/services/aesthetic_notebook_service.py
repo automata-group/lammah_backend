@@ -175,17 +175,26 @@ def _bg(c, is_rtl=True):
 
 # ── Page State ────────────────────────────────────────────────────────────────
 class _S:
-    def __init__(self, page_num=1, student_name="طالب متميز", is_rtl=True):
+    def __init__(self, page_num=1, student_name="طالب متميز", is_rtl=True, is_free_trial=False):
         self.y = H - MARGIN - 18
         self.page_num = page_num
         self.student_name = student_name
         self.main_rtl = is_rtl   # Document-level RTL (never changes after init)
         self.is_rtl = is_rtl     # Current paragraph RTL (changes per paragraph)
+        self.is_free_trial = is_free_trial
 
     def new_page(self, c):
         c.showPage()
         self.page_num += 1
         _bg(c, is_rtl=self.main_rtl)   # Use document-level, not per-para
+        if self.is_free_trial:
+            c.saveState()
+            c.setFont("HW-Reg", 18)
+            c.setFillColor(HexColor("#888888"))
+            c.setFillAlpha(0.2)
+            wm_text = get_display(arabic_reshaper.reshape("Created by Free Trial - اشترك للحصول على الملزمة كاملة وبدون علامة"))
+            c.drawString(40, H / 2, wm_text)
+            c.restoreState()
         self._footer(c)
         self.y = H - MARGIN - 18
 
@@ -1209,19 +1218,36 @@ def generate_aesthetic_notebook_pdf(
     cheat_sheet: list = None,
     mcqs: list = None,
     comparisons: list = None,
+    is_free_trial: bool = False,
 ) -> str:
     os.makedirs(os.path.dirname(output_path), exist_ok=True)
     cv = canvas.Canvas(output_path, pagesize=A4)
 
     # 1. Cover Page
     _cover(cv, lecture_title, student_name)
+    if is_free_trial:
+        cv.saveState()
+        cv.setFont("HW-Reg", 18)
+        cv.setFillColor(HexColor("#888888"))
+        cv.setFillAlpha(0.2)
+        wm_text = get_display(arabic_reshaper.reshape("Created by Free Trial - اشترك للحصول على الملزمة كاملة وبدون علامة"))
+        cv.drawString(40, H / 2, wm_text)
+        cv.restoreState()
 
     # 2. Main Content Init
     is_main_rtl = _has_ar(continuous_markdown[:2000]) if continuous_markdown else True
-    st = _S(page_num=2, student_name=student_name, is_rtl=is_main_rtl)
+    st = _S(page_num=2, student_name=student_name, is_rtl=is_main_rtl, is_free_trial=is_free_trial)
 
     # 2a. Visual Concept Mind Map (Page 2)
     _draw_visual_mind_map(cv, st, lecture_title, continuous_markdown, cheat_sheet)
+    if is_free_trial:
+        cv.saveState()
+        cv.setFont("HW-Reg", 18)
+        cv.setFillColor(HexColor("#888888"))
+        cv.setFillAlpha(0.2)
+        wm_text = get_display(arabic_reshaper.reshape("Created by Free Trial - اشترك للحصول على الملزمة كاملة وبدون علامة"))
+        cv.drawString(40, H / 2, wm_text)
+        cv.restoreState()
 
     # 2b. Continuous Markdown (Main Content starting on Page 3)
     st.new_page(cv)

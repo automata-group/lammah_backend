@@ -49,6 +49,40 @@ async def generate_ai_title(llm, transcript: str, pdf_context: Optional[List[str
         logger.error(f"Error generating AI title: {e}")
     return f"محاضرة {datetime.now().strftime('%Y-%m-%d %H:%M')}"
 
+def trim_audio_to_5_mins(input_path: str) -> str:
+    """
+    Trims the input audio file to the first 5 minutes (300 seconds) using ffmpeg
+    if it is longer than 5 minutes. Returns the new file path or the original if it fails.
+    """
+    if not input_path or not os.path.exists(input_path):
+        return input_path
+    
+    # Check current duration using ffprobe
+    try:
+        cmd = ["ffprobe", "-v", "error", "-show_entries", "format=duration", "-of", "default=noprint_wrappers=1:nokey=1", input_path]
+        duration_str = subprocess.check_output(cmd).decode().strip()
+        duration = float(duration_str)
+        if duration <= 300:
+            logger.info(f"[TRIM] Audio duration ({duration}s) is <= 5 minutes. Skipping trim.")
+            return input_path
+    except Exception as e:
+        logger.warning(f"[TRIM] Failed to probe duration for {input_path}: {e}")
+        # Proceed with trimming anyway to be safe
+
+    output_path = f"{os.path.splitext(input_path)[0]}_trimmed_5m.mp3"
+    try:
+        logger.info(f"[TRIM] Trimming audio to 5 minutes: {input_path} -> {output_path}")
+        subprocess.run([
+            "ffmpeg", "-y", "-ss", "0", "-t", "300", "-i", input_path,
+            "-c:a", "libmp3lame", "-b:a", "128k", output_path
+        ], check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        if os.path.exists(output_path):
+            logger.info(f"✂️ Successfully trimmed audio to 5 minutes: {output_path}")
+            return output_path
+    except Exception as e:
+        logger.error(f"Failed to trim audio: {e}")
+    return input_path
+
 class LectureRow(BaseModel):
     row_id: str
     audio_temp_id: Optional[str] = None
@@ -125,25 +159,40 @@ async def background_worker(row: LectureRow, user_id: str, plan_name: str, histo
                 pdf_path = os.path.join(upload_dir, f"{unique_id}_{row.pdf_temp_id}")
                 shutil.move(temp_p, pdf_path)
 
-        if not audio_path: raise Exception("No audio source provided.")
+        is_document_only = (audio_path is None)
 
-        # No trimming — all users get full audio processing
-        is_audio_trimmed = False
+        if not audio_path and not pdf_path:
+            raise Exception("No source files provided. Please upload either audio or a document.")
+
+        # Trimming audio to 5 minutes if free trial
+        if is_free_trial and audio_path:
+            trimmed = trim_audio_to_5_mins(audio_path)
+            if trimmed != audio_path:
+                try:
+                    os.remove(audio_path)
+                except:
+                    pass
+                audio_path = trimmed
+                
+        is_audio_trimmed = is_free_trial
 
         # 4. Queue and Process
         update_progress("2/5", "🎟️ في طابور المعالجة...")
         job = await queue_manager.enqueue(
             user_id=user_id,
             plan_name=plan_name,
-            payload={"audio_path": audio_path, "pdf_path": pdf_path, "unique_id": unique_id, "is_audio_trimmed": False}
+            payload={"audio_path": audio_path, "pdf_path": pdf_path, "unique_id": unique_id, "is_audio_trimmed": is_audio_trimmed}
         )
 
         while job.status == JobStatus.QUEUED:
             await asyncio.sleep(4)
         
-        # 5. Transcription
-        update_progress("3/5", "🎧 جاري تحويل الكلام إلى نص بدقة عالية...")
-        transcript = await asyncio.to_thread(transcribe_audio, audio_path)
+        # 5. Transcription (skip if document-only)
+        if is_document_only:
+            transcript = ""
+        else:
+            update_progress("3/5", "🎧 جاري تحويل الكلام إلى نص بدقة عالية...")
+            transcript = await asyncio.to_thread(transcribe_audio, audio_path)
         
         # 6. PDF and AI
         pdf_context = []
@@ -152,11 +201,17 @@ async def background_worker(row: LectureRow, user_id: str, plan_name: str, histo
                 update_progress("3/5", "📑 جاري استخراج محتوى شرائح البوربوينت...")
                 from app.services.pptx_converter import extract_text_from_pptx
                 pptx_pages = await asyncio.to_thread(extract_text_from_pptx, pdf_path)
-                pdf_context = [f"--- الشريحة {p['page_number']} ---\n{p['text']}" for p in pptx_pages[:150]]
+                logger.info(f"[PROCESS_LECTURE] PPTX extracted {len(pptx_pages)} slides from {pdf_path}")
+                if is_free_trial:
+                    pptx_pages = pptx_pages[:6]
+                pdf_context = [f"--- الشريحة {p['page_number']} ---\n{p['text']}" for p in pptx_pages]
             else:
                 update_progress("3/5", "🔍 جاري تحليل محتوى الشرائح...")
                 pages = await asyncio.to_thread(extract_pages_from_pdf, pdf_path)
-                pdf_context = [p['text'] for p in pages[:150]]
+                logger.info(f"[PROCESS_LECTURE] PDF extracted {len(pages)} pages from {pdf_path}")
+                if is_free_trial:
+                    pages = pages[:6]
+                pdf_context = [p['text'] for p in pages]
 
 
         update_progress("4/5", "🧠 لمّاح يفكّر الآن... جاري استنتاج أهم النقاط...")
@@ -167,12 +222,12 @@ async def background_worker(row: LectureRow, user_id: str, plan_name: str, histo
         # Trial Limits
         if is_free_trial:
             if isinstance(annotations.get("slide_explanations"), list):
-                annotations["slide_explanations"] = annotations["slide_explanations"][:2]
+                annotations["slide_explanations"] = annotations["slide_explanations"][:6]
                 annotations["slides_locked"] = True
             if isinstance(annotations.get("expected_questions"), list):
-                annotations["expected_questions"] = annotations["expected_questions"][:2]
+                annotations["expected_questions"] = annotations["expected_questions"][:6]
             if isinstance(annotations.get("flashcards"), list):
-                annotations["flashcards"] = annotations["flashcards"][:2]
+                annotations["flashcards"] = annotations["flashcards"][:6]
 
         # 7. Annotation and Finalize
         download_url = None
@@ -638,6 +693,7 @@ async def process_lecture(
     Returns a StreamingResponse immediately to provide real-time background updates.
     """
     logger.info(f"🚀 [PROCESS_LECTURE] Request received: audio_temp_id={audio_temp_id}, pdf_temp_id={pdf_temp_id}, url={lecture_url}")
+    is_free_trial = profile.get("current_plan_id") is None or profile.get("current_plan_id") == "free"
     
     if lecture_url:
         lower_url = lecture_url.strip().lower()
@@ -741,6 +797,16 @@ async def process_lecture(
             elif not is_document_only:
                 yield f"data: {json.dumps({'type': 'progress', 'step': '0/5', 'message': '📥 تم استلام وتجهيز الملفات بنجاح.'}, ensure_ascii=False)}\n\n"
             
+            # Trim audio file if free trial
+            if not is_document_only and is_free_trial and audio_path:
+                trimmed = trim_audio_to_5_mins(audio_path)
+                if trimmed != audio_path:
+                    try:
+                        os.remove(audio_path)
+                    except:
+                        pass
+                    audio_path = trimmed
+            
             if pdf_path:
                 if is_document_only:
                     yield f"data: {json.dumps({'type': 'progress', 'step': '0/5', 'message': '📄 تم استلام الملف! جاري التحليل الذكي للوثيقة...'}, ensure_ascii=False)}\n\n"
@@ -751,7 +817,7 @@ async def process_lecture(
                 return
 
             # 2. Quota Check (dynamic by actual duration or page count)
-            is_audio_trimmed = False
+            is_audio_trimmed = is_free_trial
             duration_seconds = 0
             import math
 
@@ -781,6 +847,9 @@ async def process_lecture(
                     duration_seconds = float(duration_str)
                 except Exception:
                     duration_seconds = os.path.getsize(audio_path) / (128000 / 8)
+
+                if is_free_trial:
+                    duration_seconds = min(duration_seconds, 300)
 
                 calculated_cost = math.ceil(duration_seconds / 60)
                 if calculated_cost < 1:
@@ -872,17 +941,18 @@ async def process_lecture(
             # 2. Document Handling
             pdf_context = []
             if pdf_path:
+                max_pages = 6 if is_free_trial else 150
                 if pdf_path.lower().endswith(".pptx"):
                     yield f"data: {json.dumps({'type': 'progress', 'step': '2/5', 'message': '📑 2/5 اكتشفنا ملف بوربوينت! جاري استخراج محتوى الشرائح...'}, ensure_ascii=False)}\n\n"
                     from app.services.pptx_converter import extract_text_from_pptx
                     pptx_pages = await asyncio.to_thread(extract_text_from_pptx, pdf_path)
                     logger.info(f"[PROCESS_LECTURE] PPTX extracted {len(pptx_pages)} slides from {pdf_path}")
-                    pdf_context = [f"--- الشريحة {p['page_number']} ---\n{p['text']}" for p in pptx_pages[:150]]
+                    pdf_context = [f"--- الشريحة {p['page_number']} ---\n{p['text']}" for p in pptx_pages[:max_pages]]
                 else:
                     yield f"data: {json.dumps({'type': 'progress', 'step': '2/5', 'message': '🔍 2/5 جاري قراءة محتوى الشرائح بدقة هندسية...'}, ensure_ascii=False)}\n\n"
                     pdf_pages = await asyncio.to_thread(extract_pages_from_pdf, pdf_path)
                     logger.info(f"[PROCESS_LECTURE] PDF extracted {len(pdf_pages)} pages from {pdf_path}")
-                    pdf_context = [f"--- Page {p['page_number']} ---\n{p['text']}" for p in pdf_pages[:150]]
+                    pdf_context = [f"--- Page {p['page_number']} ---\n{p['text']}" for p in pdf_pages[:max_pages]]
 
                 if not pdf_context:
                     logger.warning(f"[PROCESS_LECTURE] pdf_context is EMPTY after extraction — file may be image-based or corrupted: {pdf_path}")
@@ -910,6 +980,16 @@ async def process_lecture(
                 annotations = {"highlights": [], "sticky_notes": [], "slide_explanations": [], "mcqs": [], "flashcards": []}
             else:
                 annotations = await anno_task
+
+            # Trial Limits
+            if is_free_trial:
+                if isinstance(annotations.get("slide_explanations"), list):
+                    annotations["slide_explanations"] = annotations["slide_explanations"][:6]
+                    annotations["slides_locked"] = True
+                if isinstance(annotations.get("expected_questions"), list):
+                    annotations["expected_questions"] = annotations["expected_questions"][:6]
+                if isinstance(annotations.get("flashcards"), list):
+                    annotations["flashcards"] = annotations["flashcards"][:6]
             
 
             # 4. Final PDF
@@ -934,7 +1014,7 @@ async def process_lecture(
                     os.makedirs(os.path.dirname(output_pdf_path), exist_ok=True)
                     
                     from app.services.pdf_annotator import annotate_pdf
-                    await asyncio.to_thread(annotate_pdf, actual_pdf_path, output_pdf_path, annotations, False)
+                    await asyncio.to_thread(annotate_pdf, actual_pdf_path, output_pdf_path, annotations, is_free_trial)
                     download_url = f"/api/v1/summarize/download/{job.job_id}.pdf"
  
             # 5. Save History & Finalize

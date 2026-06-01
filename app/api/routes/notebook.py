@@ -9,8 +9,9 @@ from datetime import datetime
 from typing import Optional
 from fastapi import APIRouter, File, UploadFile, Form, Depends, Request, HTTPException
 from fastapi.responses import StreamingResponse, FileResponse
+import subprocess
 
-from app.core.auth_guard import check_premium_plans
+from app.core.auth_guard import check_premium_plans, check_quota
 from app.services.audio_service import transcribe_audio
 from app.services.pdf_service import extract_pages_from_pdf
 from app.services.subscription_service import use_lecture_quota, log_usage_failure, get_supabase
@@ -23,6 +24,40 @@ from langchain_openai import ChatOpenAI
 from app.core.config import settings
 
 router = APIRouter()
+
+def trim_audio_to_5_mins(input_path: str) -> str:
+    """
+    Trims the input audio file to the first 5 minutes (300 seconds) using ffmpeg
+    if it is longer than 5 minutes. Returns the new file path or the original if it fails.
+    """
+    if not input_path or not os.path.exists(input_path):
+        return input_path
+    
+    # Check current duration using ffprobe
+    try:
+        cmd = ["ffprobe", "-v", "error", "-show_entries", "format=duration", "-of", "default=noprint_wrappers=1:nokey=1", input_path]
+        duration_str = subprocess.check_output(cmd).decode().strip()
+        duration = float(duration_str)
+        if duration <= 300:
+            logger.info(f"[TRIM] Audio duration ({duration}s) is <= 5 minutes. Skipping trim.")
+            return input_path
+    except Exception as e:
+        logger.warning(f"[TRIM] Failed to probe duration for {input_path}: {e}")
+        # Proceed with trimming anyway to be safe
+
+    output_path = f"{os.path.splitext(input_path)[0]}_trimmed_5m.mp3"
+    try:
+        logger.info(f"[TRIM] Trimming audio to 5 minutes: {input_path} -> {output_path}")
+        subprocess.run([
+            "ffmpeg", "-y", "-ss", "0", "-t", "300", "-i", input_path,
+            "-c:a", "libmp3lame", "-b:a", "128k", output_path
+        ], check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        if os.path.exists(output_path):
+            logger.info(f"✂️ Successfully trimmed audio to 5 minutes: {output_path}")
+            return output_path
+    except Exception as e:
+        logger.error(f"Failed to trim audio: {e}")
+    return input_path
 
 # Helper: Instantiate primary Lammah model or fallback Gemini model
 def get_notebook_llm(user_id: str):
@@ -59,10 +94,10 @@ async def process_notebook(
     lecture_urls: Optional[str] = Form(None),
     lecture_title: Optional[str] = Form(None),
     student_name: Optional[str] = Form(None),
-    profile=Depends(check_premium_plans)
+    profile=Depends(check_quota)
 ):
     """
-    Aesthetic ruled notebook generator endpoint for Premium users.
+    Aesthetic ruled notebook generator endpoint for Premium and Free Trial users.
     Supports single or multiple audio files / URLs and outputs a premium watermarked PDF.
     """
     user_id = profile["id"]
@@ -84,9 +119,41 @@ async def process_notebook(
                     "user_message": "🚫 عذراً، روابط Zoom غير مدعومة لأسباب أمنية. يرجى استخدام روابط يوتيوب فقط! 🎥"
                 })
 
-    active_sub = profile.get("active_subscription")
-    plan_name = active_sub.get("subscription_plans", {}).get("name", "شهري - برو") if active_sub else "شهري - برو"
-    # Use the form-submitted name if provided and non-empty, otherwise fall back to profile name
+    # Determine subscription status to check if user is free trial or premium
+    active_sub = None
+    supabase = get_supabase()
+    try:
+        from datetime import timezone
+        sub_result = supabase.table("user_subscriptions") \
+            .select("*, subscription_plans(*)") \
+            .eq("user_id", user_id) \
+            .eq("status", "active") \
+            .gte("expires_at", datetime.now(timezone.utc).isoformat()) \
+            .order("created_at", desc=True) \
+            .limit(1) \
+            .execute()
+        active_sub = sub_result.data[0] if sub_result.data else None
+    except Exception as e:
+        logger.error(f"Error fetching subscription in process_notebook: {e}")
+
+    is_free_trial = (active_sub is None) or (active_sub.get("subscription_plans", {}).get("name") == "free")
+
+    if not is_free_trial:
+        plan = active_sub.get("subscription_plans", {})
+        plan_name = plan.get("name", "")
+        plan_price = float(plan.get("price_ils", 0))
+        
+        # Enforce only the 100 shekels Gold plan ("باقة الفصل الدراسي (الذهبية)")
+        if plan_price < 100.0 and "الذهبية" not in plan_name:
+            raise HTTPException(status_code=403, detail={
+                "user_message": "🚫 ميزة إنشاء وتوليد دفاتر البائعين للمتجر متاحة حصرياً لمشتركي (باقة الفصل الدراسي - 100 شيكل) فقط. يرجى ترقية باقتك للبدء في جني الأرباح! 💰🚀"
+            })
+        profile["active_subscription"] = active_sub
+        plan_name = plan.get("name", "شهري - برو")
+    else:
+        plan_name = "مجاني"
+
+    student_major = profile.get("major") or "عام"
     profile_name = profile.get("full_name") or "طالب متميز"
     student_name = (student_name.strip() if student_name and student_name.strip() else None) or profile_name
 
@@ -199,6 +266,19 @@ async def process_notebook(
             else:
                 yield f"data: {json.dumps({'type': 'progress', 'step': '1/5', 'message': '📥 تم استلام وتجهيز الملفات.'}, ensure_ascii=False)}\n\n"
 
+            # Trim audio files to 5 minutes if it is a free trial
+            if is_free_trial and audio_paths:
+                trimmed_paths = []
+                for idx, path in enumerate(audio_paths):
+                    trimmed = trim_audio_to_5_mins(path)
+                    if trimmed != path:
+                        try:
+                            os.remove(path)
+                        except:
+                            pass
+                    trimmed_paths.append(trimmed)
+                audio_paths = trimmed_paths
+
             # calculate cost in minutes
             import subprocess
             import math
@@ -217,6 +297,8 @@ async def process_notebook(
                         logger.warning(f"ffprobe failed for {path}: {e}. Falling back to file size calculation.")
                         if os.path.exists(path):
                             total_seconds += os.path.getsize(path) / (128000 / 8)
+                if is_free_trial:
+                    total_seconds = min(total_seconds, 300)
                 calculated_cost = math.ceil(total_seconds / 60)
                 if calculated_cost < 1:
                     calculated_cost = 1
@@ -233,6 +315,8 @@ async def process_notebook(
                             pages = await asyncio.to_thread(extract_pages_from_pdf, pdf_path)
                             num_pages = len(pages)
                         
+                        if is_free_trial:
+                            num_pages = min(num_pages, 6)
                         # Charge 1 minute per 2 slides/pages, minimum 3 minutes
                         calculated_cost = max(3, math.ceil(num_pages / 2))
                     except Exception as page_err:
@@ -256,7 +340,7 @@ async def process_notebook(
             job = await queue_manager.enqueue(
                 user_id=user_id,
                 plan_name=plan_name,
-                payload={"audio_path": representative_path, "pdf_path": pdf_path, "unique_id": unique_id, "is_audio_trimmed": False}
+                payload={"audio_path": representative_path, "pdf_path": pdf_path, "unique_id": unique_id, "is_audio_trimmed": is_free_trial}
             )
 
             while job.status == JobStatus.QUEUED:
@@ -284,15 +368,16 @@ async def process_notebook(
             pdf_context = []
             if pdf_path:
                 yield f"data: {json.dumps({'type': 'progress', 'step': '3.5/5', 'message': '📑 جاري استخلاص وقراءة نصوص الشرائح...'}, ensure_ascii=False)}\n\n"
+                max_slides = 6 if is_free_trial else 150
                 if pdf_path.lower().endswith(".pptx"):
                     from app.services.pptx_converter import extract_text_from_pptx
                     pptx_pages = await asyncio.to_thread(extract_text_from_pptx, pdf_path)
                     logger.info(f"[NOTEBOOK] PPTX extracted {len(pptx_pages)} slides from {pdf_path}")
-                    pdf_context = [f"--- الشريحة {p['page_number']} ---\n{p['text']}" for p in pptx_pages[:150]]
+                    pdf_context = [f"--- الشريحة {p['page_number']} ---\n{p['text']}" for p in pptx_pages[:max_slides]]
                 else:
                     pages = await asyncio.to_thread(extract_pages_from_pdf, pdf_path)
                     logger.info(f"[NOTEBOOK] PDF extracted {len(pages)} pages from {pdf_path}")
-                    pdf_context = [p['text'] for p in pages[:150]]
+                    pdf_context = [p['text'] for p in pages[:max_slides]]
 
                 if not pdf_context:
                     logger.warning(f"[NOTEBOOK] pdf_context is EMPTY after extraction — file may be image-based or corrupted: {pdf_path}")
@@ -482,6 +567,10 @@ async def process_notebook(
                 cheat_sheet = parsed.get("cheat_sheet", [])
                 mcqs = parsed.get("mcqs", [])
                 comparisons = parsed.get("comparisons", [])
+                if is_free_trial:
+                    cheat_sheet = cheat_sheet[:6]
+                    mcqs = mcqs[:2]
+                    comparisons = comparisons[:1]
                 logger.info(f"[NOTEBOOK] Call 2 Parsed: {len(cheat_sheet)} cheat items, {len(mcqs)} MCQs, {len(comparisons)} comparisons.")
             except Exception as parse_err:
                 logger.error(f"[NOTEBOOK] Call 2 JSON parse failed: {parse_err}. Raw JSON content: {raw_json_content}")
@@ -505,6 +594,7 @@ async def process_notebook(
                 cheat_sheet=cheat_sheet,
                 mcqs=mcqs,
                 comparisons=comparisons,
+                is_free_trial=is_free_trial,
             )
             
             await asyncio.to_thread(
