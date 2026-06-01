@@ -366,69 +366,30 @@ async def process_notebook(
             yield f"data: {json.dumps({'type': 'progress', 'step': '4/5', 'message': '🧠 محرك لمّاح الذكي يكتب محتوى الدفتر الدراسي ثنائي اللغة بالتفصيل...'}, ensure_ascii=False)}\n\n"
 
             prompt_step1 = (
-                "أنت 'محرك لمّاح الدراسي' — ذكاء اصطناعي متخصص في إعداد ملازم ودفاتر دراسية جامعية احترافية فائقة الدقة والشمولية والروعة للبيع والتسويق.\n"
+                "You are 'Lammah Academic Engine' — an elite academic assistant and expert in synthesizing university lectures. "
+                "Your task is to transform the provided lecture transcript into a 'Premium Study Guide'. It must be highly organized, visually clean, devoid of fluff, and perfectly structured for students to rely on entirely for their exams.\n\n"
+                f"Context: The student's major is {student_major}. Tailor your explanations, tone, and analogies to perfectly suit a student in this specific field.\n\n"
                 f"{depth_note}\n"
                 f"{source_instruction}\n\n"
                 "══════════════════════════════════════\n"
-                "🚨 STRICT BILINGUAL STRUCTURE — MANDATORY RULES (100% ENFORCED) 🚨\n"
+                "🎯 STRICT GUIDELINES (100% ENFORCED):\n"
                 "══════════════════════════════════════\n"
-                "\n"
-                "RULE 1 — TWO COMPLETELY SEPARATE SECTIONS, SEQUENTIAL ORDER:\n"
-                "  - You must generate BOTH Section 1 (English) and Section 2 (Arabic) in a single response.\n"
-                "  - Do NOT stop after Section 1, and do NOT write notes, status updates, or placeholders about Section 2. You must output the full English section and then immediately transition to the full Arabic section.\n"
-                "  ▶ SECTION 1: Complete English Study Notebook\n"
-                "    - Write the ENTIRE first section in English ONLY.\n"
-                "    - Cover EVERY idea, concept, example, and detail from the transcript with maximum depth.\n"
-                "    - Use ## for chapter headings.\n"
-                "    - For each sub-section (### heading), you MUST structure the explanation into these 8 bolded parts sequentially:\n"
-                "      **1. Big Picture:** (short overview of what this topic is about and why it matters)\n"
-                "      **2. Simple Explanation:** (explain the topic simply using analogies/metaphors as if explaining to a 10-year-old)\n"
-                "      **3. Deeper Understanding:** (advanced university/exam level technical details)\n"
-                "      **4. Important Points:** (bullet points of key definitions, formulas, rules, or concepts)\n"
-                "      **5. Exam Focus:** (parts/questions most likely to appear in exams or quizzes)\n"
-                "      **6. Common Mistakes:** (common errors students make in this topic and how to avoid them)\n"
-                "      **7. Mini Summary:** (brief revision summary of the topic)\n"
-                "      **8. Active Recall:** (5 challenging questions to test understanding of this section)\n"
-                "    - Mark important terms: <mark>term</mark>\n"
-                "    - Use English callouts: 💡 Note: / ⚠ Exam Alert: / 📌 Remember:\n"
-                "    - DO NOT write a single Arabic word in this section.\n"
-                "    - The English section must be at least 1200 words long and deeply detailed.\n"
-                "\n"
-                "  ▶ SECTION 2: الترجمة والشرح الكامل بالعربية\n"
-                "    - يبدأ هذا القسم فقط بعد انتهاء القسم الإنجليزي بالكامل.\n"
-                "    - اكتب هذا القسم بالكامل باللغة العربية الفصحى فقط دون أي كلمات إنجليزية.\n"
-                "    - نفس العناوين والترتيب والأقسام الموجودة في القسم الإنجليزي تماماً (ترجمة متوازية).\n"
-                "    - ## للعناوين الرئيسية.\n"
-                "    - تحت كل عنوان فرعي (###)، يجب هيكلة الشرح إلى 8 أجزاء بخط عريض بالترتيب التالي:\n"
-                "      **1. الصورة العامة (Big Picture):** (نظرة عامة والجدوى منها)\n"
-                "      **2. الشرح المبسّط (Simple Explanation):** (شرح مبسط باستخدام تشبيهات وأمثلة واضحة لطفل عمره 10 سنوات)\n"
-                "      **3. الفهم العميق (Deeper Understanding):** (شرح تقني عميق بمستوى الجامعات والامتحانات)\n"
-                "      **4. النقاط الهامة (Important Points):** (نقاط مخرزة للتعريفات والقوانين والمفاهيم الأساسية)\n"
-                "      **5. تركيز الامتحان (Exam Focus):** (الأجزاء الأكثر توقعاً في الاختبارات والأسئلة)\n"
-                "      **6. الأخطاء الشائعة (Common Mistakes):** (الأخطاء التي يقع فيها الطلاب وكيفية تجنبها)\n"
-                "      **7. الملخص الموجز (Mini Summary):** (ملخص مراجعة سريع للموضوع)\n"
-                "      **8. الاسترجاع النشط (Active Recall):** (5 أسئلة صعبة مع إجاباتها لمراجعة الفهم)\n"
-                "    - ضع المصطلحات المهمة داخل: <mark>المصطلح</mark>\n"
-                "    - استخدم التنبيهات العربية: 💡 ملاحظة: / ⚠ هام للامتحان: / 📌 تذكّر:\n"
-                "    - القسم العربي يجب ألا يقل عن 1200 كلمة أيضاً.\n"
-                "\n"
-                "RULE 2 — NO LINE-BY-LINE MIXING: NEVER alternate between Arabic and English within the body.\n"
-                "RULE 3 — NO NUMBERED HEADINGS (avoid '1.1' or '2.'). Use clean Markdown: ## Title (not ## 2. Title).\n"
-                "RULE 4 — NO DENSE PARAGRAPHS: Break everything into bullet points and numbered lists.\n"
-                "RULE 5 — NO 'بروفيسور': Always use 'الدكتور' or 'المحاضر'.\n"
-                f"{length_instruction}\n"
-                "RULE 7 — RICHNESS: Every section must have sub-points, examples, and explanations. No skeleton outlines.\n"
-                "RULE 8 — PEDAGOGICAL STUDY STRUCTURE: For each major sub-section (### heading) in both English (Section 1) and Arabic (Section 2), structure the study content using the following 8 components for ultimate study efficiency and exam preparation:\n"
-                "  1. **Big Picture** / **الصورة العامة**: A short overview of what this topic is about and why it matters.\n"
-                "  2. **Simple Explanation** / **الشرح المبسّط**: Explain the topic simply using analogies, metaphors, and clear examples (as if explaining to a 10-year-old).\n"
-                "  3. **Deeper Understanding** / **الفهم العميق**: Explain the same topic at an advanced university/exam level with all technical depth.\n"
-                "  4. **Important Points** / **النقاط الهامة**: List key definitions, formulas, rules, concepts, diagrams, or examples using bullet points.\n"
-                "  5. **Exam Focus** / **تركيز الامتحان**: Highlight what parts/questions are most likely to appear in exams or quizzes.\n"
-                "  6. **Common Mistakes** / **الأخطاء الشائعة**: Warn about common errors students make in this topic and how to avoid them.\n"
-                "  7. **Mini Summary** / **الملخص الموجز**: A brief revision summary of the topic.\n"
-                "  8. **Active Recall** / **الاسترجاع النشط**: List 5 challenging questions (with brief solutions or key points to recall) from this section.\n"
-                "  Format these components clearly in the markdown as bolded bullet points or bolded subheadings (e.g., '**1. Big Picture:**' / '**1. الصورة العامة:**') under each ### sub-section.\n"
-                "\n"
+                "1. Smart Bilingual Style:\n"
+                "   - Write the core explanations in clear, smooth, and academic Arabic.\n"
+                "   - MANDATORY: ALL technical, scientific, programming, or specific domain terms MUST be written in English. Provide the Arabic translation in parentheses ONLY upon the first mention. (e.g., 'تعتبر الـ Data Structures (هياكل البيانات) أساسية...').\n"
+                "   - NEVER generate separate Arabic and English sections. Integrate them naturally as university students actually study.\n\n"
+                "2. Minimalist & Clean Structure:\n"
+                "   - Use ## for main topics and ### for subtopics.\n"
+                "   - STRICTLY avoid walls of text. Use bullet points and numbered lists extensively for readability.\n\n"
+                "3. Section Components (For every ## main topic, use these exactly):\n"
+                "   - 💡 **الفكرة الجوهرية (Core Idea):** 2-3 lines summarizing the essence of the topic.\n"
+                "   - 🧠 **الشرح والتفصيل (Deep Dive):** Comprehensive explanation covering all details and examples mentioned by the professor.\n"
+                "   - 🔑 **المصطلحات الأساسية (Key Terms):** A bulleted list of English terms and their concise Arabic definitions.\n"
+                "   - ⚠️ **نقاط امتحان (Exam Tips):** Highlight areas the professor emphasized or common pitfalls.\n"
+                "   - 💬 **اقتباسات المحاضر (Professor's Quotes):** Extract 1-2 exact, notable sentences, jokes, or literal advice the professor said, wrapped in quotes. This adds a personalized, human touch proving the guide is authentic.\n\n"
+                "4. Comprehensiveness:\n"
+                "   - Do not summarize by omitting facts. Include every rule, example, and detail. Your job is to structure and clarify, not to delete information.\n"
+                f"   - {length_instruction}\n"
                 "══════════════════════════════════════\n"
                 "LECTURE TRANSCRIPT:\n"
                 "══════════════════════════════════════\n"
@@ -456,37 +417,36 @@ async def process_notebook(
             yield f"data: {json.dumps({'type': 'progress', 'step': '4.5/5', 'message': '🧠 محرك لمّاح يستخلص خلاصة ليلة الامتحان وأسئلة المراجعة...'}, ensure_ascii=False)}\n\n"
 
             prompt_step2 = (
-                "أنت 'محرك لمّاح الدراسي' — ذكاء اصطناعي متخصص في استخلاص المخرجات المهيكلة والتلخيصات الذكية للملازم الدراسية.\n"
-                "بناءً على نص الدفتر الدراسي (Markdown) المرفق بالأسفل، يجب عليك توليد مخرجات JSON تحتوي بدقة على المفاتيح التالية (cheat_sheet, mcqs, comparisons) ودون حذف أو تجاهل أي منها:\n"
-                "1. خلاصة ليلة الامتحان (cheat_sheet): حصر جميع القوانين والمصطلحات والرموز الواردة في الدفتر مع تعريف مختصر من سطر واحد (من 10 إلى 25 مصطلحاً).\n"
-                "2. جداول المقارنة الذكية (comparisons): جدول مقارنة ذكي واحد على الأقل يقارن بين أهم مفهومين أو وسيلتين أو قانونين في الدفتر. ممنوع إبقاء هذا الحقل فارغاً.\n"
-                "3. أسئلة اختبر نفسك (mcqs): ما لا يقل عن 5 أسئلة اختيار من متعدد خياراتها (أ، ب، ج، د) وتغطي كامل الدفتر بشكل ذكي ودقيق.\n\n"
+                "You are 'Lammah Academic Engine' — an expert in extracting structured, high-yield study materials for university exam preparation.\n"
+                "Based ONLY on the provided Markdown Study Guide, generate a precise JSON output containing the following keys (cheat_sheet, mcqs, comparisons):\n\n"
+                "1. cheat_sheet: A list of the 10-20 most critical concepts or formulas. The 'term' must be in English. The 'brief_definition' must be in Arabic, written in a 'Capsule' style (highly concise, direct, one short line for quick revision).\n"
+                "2. comparisons: Extract at least one smart comparison table contrasting the most easily confused concepts in this lecture. Use clear keywords.\n"
+                "3. mcqs: Create 5 multiple-choice questions (A, B, C, D) at a medium-to-hard university level. The questions MUST test deep understanding and application, not just basic recall. Integrate English terms naturally within the Arabic question body.\n\n"
                 "══════════════════════════════════════\n"
-                "⚠️ قواعد المخرجات الإلزامية:\n"
+                "⚠️ STRICT JSON FORMAT RULE:\n"
                 "══════════════════════════════════════\n"
-                "يجب عليك إرجاع المخرجات بصيغة JSON فقط ولا تكتب أي كود أو تعليق خارج الـ JSON. "
-                "يجب أن يكون الـ JSON صالحاً ومطابقاً للنموذج التالي 100%:\n\n"
+                "Your output MUST be ONLY valid JSON. No markdown formatting outside the JSON, no intro, no outro.\n"
                 "{\n"
                 '  "cheat_sheet": [\n'
-                '    {"term": "مصطلح أو قانون", "brief_definition": "تعريف بسطر واحد وموجز جداً"}\n'
+                '    {"term": "English Term", "brief_definition": "تعريف عربي موجز جداً"}\n'
                 '  ],\n'
                 '  "mcqs": [\n'
                 '    {\n'
-                '      "question": "نص السؤال الشامل من صلب المحاضرة",\n'
-                '      "choices": ["أ) ...", "ب) ...", "ج) ...", "د) ..."],\n'
+                '      "question": "نص السؤال العربي المدمج بكلمات إنجليزية بمستوى جامعي",\n'
+                '      "choices": ["أ) خيار 1", "ب) خيار 2", "ج) خيار 3", "د) خيار 4"],\n'
                 '      "answer": "أ"\n'
                 '    }\n'
                 '  ],\n'
                 '  "comparisons": [\n'
                 '    {\n'
-                '      "title": "عنوان المقارنة الذكية",\n'
+                '      "title": "مقارنة ذكية بين ... و ...",\n'
                 '      "headers": ["المفهوم الأول", "المفهوم الثاني"],\n'
                 '      "rows": [["وجه المقارنة", "قيمة أ", "قيمة ب"]]\n'
                 '    }\n'
                 '  ]\n'
                 "}\n\n"
                 "══════════════════════════════════════\n"
-                "نص الدفتر الدراسي (Markdown) المستخلص:\n"
+                "MARKDOWN STUDY GUIDE:\n"
                 "══════════════════════════════════════\n"
                 f"{markdown_content}\n"
             )
