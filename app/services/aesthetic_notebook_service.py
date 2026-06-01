@@ -1361,3 +1361,307 @@ def generate_preview_pdf(original_pdf_path, preview_pdf_path, max_pages=3):
     except Exception as e:
         logger.error(f"[NOTEBOOK] Preview failed: {e}")
         return original_pdf_path
+
+
+# ── Course & Podcast Notebook Generator ────────────────────────────────────────
+def _draw_workbook_lines(c, st, num_lines=3):
+    c.saveState()
+    c.setStrokeColor(HexColor("#D3C7B3"))
+    c.setLineWidth(0.8)
+    c.setDash([4, 4])  # dashed line style
+    for _ in range(num_lines):
+        if st.y - 26 < BOTTOM:
+            st.new_page(c)
+            c.setStrokeColor(HexColor("#D3C7B3"))
+            c.setDash([4, 4])
+        st.y -= 26
+        c.line(MARGIN + 20, st.y, W - MARGIN - 20, st.y)
+    c.restoreState()
+    st.y -= 12
+
+
+def _cover_podcast(c, title, student_name, stats: dict = None):
+    _bg(c, is_rtl=True)
+
+    # Top decorative header bar
+    c.setFillColor(HexColor("#111827")) # Dark charcoal/slate
+    c.rect(0, H - 180, W, 180, fill=1, stroke=0)
+    c.setFillColor(C_GOLD)
+    c.rect(0, H - 184, W, 4, fill=1, stroke=0)
+
+    # Brand name
+    brand, _ = _bidi("دفتر لمّاح للدورات والبودكاست")
+    c.setFillColor(HexColor("#FDFBF7"))
+    c.setFont(FONT_BOLD, 15)
+    bw = c.stringWidth(brand, FONT_BOLD, 15)
+    c.drawString(W / 2 - bw / 2, H - 90, brand)
+
+    sub, _ = _bidi("نسخة متميزة للإنتاجية والتطوير الشخصي")
+    c.setFont(FONT_REG, 10)
+    sw = c.stringWidth(sub, FONT_REG, 10)
+    c.setFillColor(HexColor("#FCD34D"))
+    c.drawString(W / 2 - sw / 2, H - 120, sub)
+
+    # Title
+    c.setFillColor(C_BODY)
+    c.setFont(FONT_BOLD, 18)
+    clean_t = _clean(str(title))
+    td, _ = _bidi(clean_t)
+    tw = c.stringWidth(td, FONT_BOLD, 18)
+    c.drawString(W / 2 - tw / 2, H - 240, td)
+
+    # Underline
+    c.setStrokeColor(C_GOLD)
+    c.setLineWidth(1.5)
+    c.line(W / 2 - 100, H - 250, W / 2 + 100, H - 250)
+
+    # Stats Panel
+    panel_y = H - 280
+    panel_lbl, _ = _bidi("مؤشرات المحتوى والإنتاجية (Content Insights)")
+    c.setFont(FONT_BOLD, 9.5)
+    c.setFillColor(C_MUTED)
+    pl_w = c.stringWidth(panel_lbl, FONT_BOLD, 9.5)
+    c.drawString(W / 2 - pl_w / 2, panel_y, panel_lbl)
+
+    box_w, box_h = 165, 52
+    col1_x = W / 2 - box_w - 6
+    col2_x = W / 2 + 6
+    row1_y = panel_y - 68
+    row2_y = row1_y - 60
+
+    if not stats:
+        stats = {}
+    num_takeaways = stats.get("num_takeaways", 5)
+    num_concepts = stats.get("num_concepts", 4)
+    num_action_steps = stats.get("num_action_steps", 3)
+    est_read_time = stats.get("est_read_time", 10)
+
+    cards = [
+        (col2_x, row1_y, str(num_takeaways), "استنتاج رئيسي (Key Takeaways)"),
+        (col1_x, row1_y, str(num_concepts), "مفهوم تم تفكيكه (Concepts)"),
+        (col2_x, row2_y, str(num_action_steps), "خطوة عمل للتطبيق (Action Steps)"),
+        (col1_x, row2_y, f"{est_read_time} دقيقة", "وقت القراءة المقدر (Reading Time)")
+    ]
+
+    for x, y, val, lbl in cards:
+        c.setFillColor(C_BOX_BG)
+        c.setStrokeColor(C_BOX_BD)
+        c.setLineWidth(0.8)
+        c.roundRect(x, y, box_w, box_h, 8, fill=1, stroke=1)
+        
+        accent_clr = C_TEAL if x == col1_x else C_GOLD
+        c.setFillColor(accent_clr)
+        c.rect(x + box_w - 4, y + 4, 3, box_h - 8, fill=1, stroke=0)
+        
+        val_d, _ = _bidi(val)
+        c.setFont(FONT_BOLD, 15)
+        c.setFillColor(C_BLUE)
+        vw = c.stringWidth(val_d, FONT_BOLD, 15)
+        c.drawString(x + box_w / 2 - vw / 2 - 2, y + 26, val_d)
+        
+        lbl_d, _ = _bidi(lbl)
+        c.setFont(FONT_REG, 7.5)
+        c.setFillColor(C_BODY)
+        lw = c.stringWidth(lbl_d, FONT_REG, 7.5)
+        c.drawString(x + box_w / 2 - lw / 2 - 2, y + 10, lbl_d)
+
+    # Metadata
+    bw2, bh2 = 330, 140
+    bx = W / 2 - bw2 / 2
+    by = 180
+    c.setFillColor(C_BOX_BG)
+    c.roundRect(bx, by, bw2, bh2, 12, fill=1, stroke=0)
+    c.setStrokeColor(C_BOX_BD)
+    c.setLineWidth(0.8)
+    c.roundRect(bx, by, bw2, bh2, 12, fill=0, stroke=1)
+    
+    c.setFillColor(C_BLUE)
+    c.rect(bx + bw2 - 5, by + 10, 4, bh2 - 20, fill=1, stroke=0)
+
+    rows = [
+        ("إعداد البائع:", student_name),
+        ("المنصة الناشرة:", "منصة لمّاح الرقمية"),
+        ("حقوق الملكية:", "محفوظة للبائع والمنصة"),
+    ]
+    for i, (lbl, val) in enumerate(rows):
+        row_y = by + bh2 - 35 - i * 38
+        lbl_d, _ = _bidi(lbl)
+        val_d, _ = _bidi(val)
+        c.setFont(FONT_BOLD, 10)
+        c.setFillColor(C_BLUE)
+        c.drawRightString(bx + bw2 - 14, row_y, lbl_d)
+        c.setFont(FONT_REG, 9.5)
+        c.setFillColor(C_BODY)
+        c.drawRightString(bx + bw2 - 14, row_y - 15, val_d)
+
+    note, _ = _bidi("صُنع بكل حب واحترافية بواسطة محرك لمّاح للإنتاجية")
+    c.setFillColor(C_MUTED)
+    c.setFont(FONT_REG, 8.5)
+    nw = c.stringWidth(note, FONT_REG, 8.5)
+    c.drawString(W / 2 - nw / 2, 42, note)
+    c.showPage()
+
+
+def generate_course_podcast_notebook_pdf(
+    output_path: str,
+    student_name: str = "طالب متميز",
+    lecture_title: str = "دفتر إنتاجية مميز",
+    is_free_trial: bool = False,
+    big_picture: str = None,
+    concept_breakdown: list = None,
+    key_takeaways: list = None,
+    actionable_blueprint: list = None,
+    roadblocks_solutions: list = None,
+    reflection_prompts: list = None,
+    shareable_quotes: list = None,
+    resources_tools: list = None,
+    stats: dict = None,
+) -> str:
+    os.makedirs(os.path.dirname(output_path), exist_ok=True)
+    cv = canvas.Canvas(output_path, pagesize=A4)
+
+    # 1. Cover Page
+    _cover_podcast(cv, lecture_title, student_name, stats=stats)
+    if is_free_trial:
+        cv.saveState()
+        cv.setFont("HW-Reg", 18)
+        cv.setFillColor(HexColor("#888888"))
+        cv.setFillAlpha(0.2)
+        wm_text = get_display(arabic_reshaper.reshape("Created by Free Trial - اشترك للحصول على الملزمة كاملة وبدون علامة"))
+        cv.drawString(40, H / 2, wm_text)
+        cv.restoreState()
+
+    # 2. Main Content Setup
+    st = _S(page_num=2, student_name=student_name, is_rtl=True, is_free_trial=is_free_trial)
+    _bg(cv, is_rtl=True)
+    st._footer(cv)
+
+    # Section 1: الخلاصة الجوهرية (The Big Picture)
+    if big_picture:
+        _h1(cv, st, "الخلاصة الجوهرية (The Big Picture)")
+        # Draw a beautiful highlighted callout box for the big picture
+        box_h = 60 + (len(big_picture) // 50) * 16
+        if st.y - box_h < BOTTOM: st.new_page(cv)
+        box_y = st.y - box_h
+        cv.setFillColor(HexColor("#FDFBF7"))
+        cv.setStrokeColor(HexColor("#D9C9B5"))
+        cv.setLineWidth(0.8)
+        cv.roundRect(MARGIN, box_y, TXT_W, box_h, 6, fill=1, stroke=1)
+        
+        cv.setFillColor(C_GOLD)
+        cv.rect(W - MARGIN - 4, box_y + 4, 3, box_h - 8, fill=1, stroke=0)
+        
+        inner_s = _S(st.page_num, st.student_name)
+        inner_s.y = box_y + box_h - 18
+        _para(cv, big_picture, inner_s, font_sz=10.5, lh=20, color=C_BODY, indent=12, max_w=TXT_W - 24)
+        st.y = box_y - 24
+
+    # Section 2: تفكيك المفاهيم (Concept Breakdown)
+    if concept_breakdown:
+        _h1(cv, st, "تفكيك المفاهيم (Concept Breakdown)")
+        for item in concept_breakdown:
+            term = item.get("term", "")
+            definition = item.get("definition", "")
+            if not term: continue
+            
+            if st.y - 65 < BOTTOM: st.new_page(cv)
+            
+            # Subtitle
+            _h2(cv, st, term)
+            
+            # Paragraph explanation
+            _para(cv, definition, st, font_sz=10, lh=18, color=C_BODY, indent=12)
+            st.y -= 14
+
+    # Section 3: أهم الاستنتاجات (Key Takeaways)
+    if key_takeaways:
+        if st.y - 120 < BOTTOM: st.new_page(cv)
+        _h1(cv, st, "أهم الاستنتاجات (Key Takeaways)")
+        for take in key_takeaways:
+            _para(cv, f"- {take}", st, font_sz=10.5, lh=20, color=C_BODY, indent=6)
+        st.y -= 16
+
+    # Section 4: خطة العمل والتطبيق (Actionable Blueprint)
+    if actionable_blueprint:
+        if st.y - 140 < BOTTOM: st.new_page(cv)
+        _h1(cv, st, "خطة العمل والتطبيق (Actionable Blueprint)")
+        for i, step in enumerate(actionable_blueprint):
+            _para(cv, f"{i+1}. {step}", st, font_sz=10.5, lh=20, color=C_BODY, indent=6)
+        st.y -= 16
+
+    # Section 5: عقبات وحلول (Roadblocks & Solutions)
+    if roadblocks_solutions:
+        if st.y - 150 < BOTTOM: st.new_page(cv)
+        _h1(cv, st, "عقبات وحلول (Roadblocks & Solutions)")
+        for item in roadblocks_solutions:
+            rb = item.get("roadblock", "")
+            sol = item.get("solution", "")
+            if not rb: continue
+            
+            box_h = 75 + (len(rb + sol) // 50) * 16
+            if st.y - box_h < BOTTOM: st.new_page(cv)
+            
+            box_y = st.y - box_h
+            cv.setFillColor(C_BOX_BG)
+            cv.roundRect(MARGIN, box_y, TXT_W, box_h, 8, fill=1, stroke=0)
+            cv.setStrokeColor(C_BOX_BD)
+            cv.setLineWidth(0.8)
+            cv.roundRect(MARGIN, box_y, TXT_W, box_h, 8, fill=0, stroke=1)
+            
+            # Accent bar
+            cv.setFillColor(HexColor("#DC2626")) # Red accent for roadblock
+            cv.rect(W - MARGIN - 4, box_y + 4, 3, box_h - 8, fill=1, stroke=0)
+            
+            inner_s = _S(st.page_num, st.student_name)
+            inner_s.y = box_y + box_h - 18
+            _para(cv, f"⚠️ **العقبة:** {rb}", inner_s, font_sz=9.5, lh=16, color=C_BODY, indent=12, max_w=TXT_W - 24)
+            inner_s.y -= 8
+            _para(cv, f"✅ **الحل:** {sol}", inner_s, font_sz=9.5, lh=16, color=C_TEAL, indent=12, max_w=TXT_W - 24)
+            
+            st.y = box_y - 18
+
+    # Section 6: أسئلة للتفكير الذاتي (Reflection Prompts)
+    if reflection_prompts:
+        if st.y - 160 < BOTTOM: st.new_page(cv)
+        _h1(cv, st, "أسئلة للتفكير الذاتي (Reflection Prompts)")
+        for i, q in enumerate(reflection_prompts):
+            if st.y - 120 < BOTTOM: st.new_page(cv)
+            _para(cv, f"{i+1}. {q}", st, font_sz=11, lh=20, color=C_BLUE, bold=True, indent=6)
+            st.y -= 6
+            _draw_workbook_lines(cv, st, num_lines=3)
+            st.y -= 8
+
+    # Section 7: اقتباسات للإلهام (Shareable Quotes)
+    if shareable_quotes:
+        if st.y - 120 < BOTTOM: st.new_page(cv)
+        _h1(cv, st, "اقتباسات للإلهام (Shareable Quotes)")
+        for quote in shareable_quotes:
+            box_h = 55 + (len(quote) // 50) * 16
+            if st.y - box_h < BOTTOM: st.new_page(cv)
+            
+            box_y = st.y - box_h
+            cv.setFillColor(HexColor("#FDFBF7"))
+            cv.setStrokeColor(HexColor("#E3D9C9"))
+            cv.setLineWidth(0.8)
+            cv.roundRect(MARGIN, box_y, TXT_W, box_h, 6, fill=1, stroke=1)
+            
+            # Accent bar
+            cv.setFillColor(C_GOLD)
+            cv.rect(W - MARGIN - 4, box_y + 4, 3, box_h - 8, fill=1, stroke=0)
+            
+            inner_s = _S(st.page_num, st.student_name)
+            inner_s.y = box_y + box_h - 18
+            _para(cv, f"💬 “{quote}”", inner_s, font_sz=10, lh=18, color=HexColor("#5C4D3C"), bold=True, indent=12, max_w=TXT_W - 24)
+            
+            st.y = box_y - 18
+
+    # Section 8: المراجع والأدوات (Resources & Tools)
+    if resources_tools:
+        if st.y - 100 < BOTTOM: st.new_page(cv)
+        _h1(cv, st, "المراجع والأدوات (Resources & Tools)")
+        for item in resources_tools:
+            _para(cv, f"📌 {item}", st, font_sz=10.5, lh=20, color=C_BODY, indent=6)
+
+    cv.save()
+    logger.info(f"[NOTEBOOK] Podcast/Course PDF generated → {output_path}")
+    return output_path
