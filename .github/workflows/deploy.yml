@@ -96,7 +96,7 @@ jobs:
                   - "8001:8001"
                 volumes:
                   - shared_uploads:/app/uploads
-                  - ./youtube_cookies.txt:/app/youtube_cookies.txt:ro
+                  - ./youtube_cookies.txt:/app/youtube_cookies.txt
                 environment:
                   - PORT=8001
                   - UPLOAD_DIR=/app/uploads
@@ -119,7 +119,7 @@ jobs:
                 volumes:
                   - ./outputs:/app/outputs
                   - shared_uploads:/app/uploads
-                  - ./youtube_cookies.txt:/app/youtube_cookies.txt:ro
+                  - ./youtube_cookies.txt:/app/youtube_cookies.txt
                 environment:
                   - SUPABASE_URL=$SUPABASE_URL
                   - SUPABASE_KEY=$SUPABASE_KEY
