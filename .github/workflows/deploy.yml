@@ -10,6 +10,7 @@ env:
   REGISTRY: ghcr.io
   BACKEND_IMAGE: automata-group/lammah_backend
   UPLOADER_IMAGE: automata-group/lammah_uploader
+  YTDL_IMAGE: automata-group/lammah_ytdl_service
 
 jobs:
   build:
@@ -35,6 +36,13 @@ jobs:
           context: .
           push: true
           tags: ${{ env.REGISTRY }}/${{ env.BACKEND_IMAGE }}:latest
+
+      - name: Build and push YTDL Service image
+        uses: docker/build-push-action@v5
+        with:
+          context: ./ytdl-service
+          push: true
+          tags: ${{ env.REGISTRY }}/${{ env.YTDL_IMAGE }}:latest
 
   deploy:
     needs: build
