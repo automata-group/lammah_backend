@@ -26,11 +26,6 @@ def _build_ydl_opts(
         "nocheckcertificate": True,
         "extract_flat": False,
         "force_keyframes_at_cuts": True,
-        "http_headers": {
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36",
-            "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-            "Accept-Language": "en-US,en;q=0.9,ar;q=0.8",
-        },
         "postprocessors": [{
             "key": "FFmpegExtractAudio",
             "preferredcodec": "mp3",
@@ -45,7 +40,6 @@ def _build_ydl_opts(
         opts["extractor_args"] = {
             "youtube": {
                 "player_client": player_clients,
-                "skip": ["webpage", "configs"],
             }
         }
 
@@ -176,12 +170,15 @@ def download_youtube_audio(youtube_url: str, upload_dir: str, unique_id: str) ->
     cookies_file = cookies_path if os.path.exists(cookies_path) else None
 
     strategies = [
-        {"name": "proxy + cookies (android)",   "proxy": proxy, "cookies": cookies_file, "clients": ["android", "web_embedded"]},
-        {"name": "proxy + cookies (web)",        "proxy": proxy, "cookies": cookies_file, "clients": ["web", "web_embedded"]},
-        {"name": "proxy only (android)",         "proxy": proxy, "cookies": None,         "clients": ["android", "web_embedded"]},
-        {"name": "proxy only (tv_embedded)",     "proxy": proxy, "cookies": None,         "clients": ["tv_embedded"]},
-        {"name": "direct + cookies (android)",   "proxy": None,  "cookies": cookies_file, "clients": ["android", "web_embedded"]},
-        {"name": "direct only (web_embedded)",   "proxy": None,  "cookies": None,         "clients": ["web_embedded"]},
+        # Best: WARP proxy with auto client selection (proven to work)
+        {"name": "proxy only (auto client)",          "proxy": proxy, "cookies": None,         "clients": None},
+        {"name": "proxy + cookies (auto client)",      "proxy": proxy, "cookies": cookies_file, "clients": None},
+        # Direct fallbacks
+        {"name": "direct (auto client)",               "proxy": None,  "cookies": None,         "clients": None},
+        {"name": "direct + cookies (auto client)",     "proxy": None,  "cookies": cookies_file, "clients": None},
+        # Specific clients
+        {"name": "proxy + ios client",                 "proxy": proxy, "cookies": None,         "clients": ["ios"]},
+        {"name": "proxy + mweb client",                "proxy": proxy, "cookies": None,         "clients": ["mweb"]},
     ]
 
     last_error = ""
