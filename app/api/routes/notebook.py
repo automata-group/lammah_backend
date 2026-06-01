@@ -37,6 +37,7 @@ def get_notebook_llm(user_id: str):
             openai_api_key=settings.OPENROUTER_API_KEY,
             base_url="https://openrouter.ai/api/v1",
             temperature=0.25,
+            max_tokens=4096,
             request_timeout=120,
             max_retries=1,
             default_headers={
@@ -352,9 +353,9 @@ async def process_notebook(
             else:
                 length_instruction = (
                     "RULE 6 — ADAPTIVE LENGTH: The source content is very detailed. Write an extremely comprehensive notebook. "
-                    "The English section should be at least 3000-6000 words, and the Arabic section at least 3000-6000 words. "
+                    "The English section should be around 1200-1800 words, and the Arabic section around 1200-1800 words. "
                     "Do NOT summarize briefly. Provide extreme detail, examples, discussions, and context. "
-                    "Let the output scale naturally and take as many pages as needed (even 20-40 pages) to cover all details thoroughly."
+                    "Let the output scale naturally and take as many pages as needed to cover all details thoroughly."
                 )
 
             source_instruction = ""
@@ -373,10 +374,21 @@ async def process_notebook(
                 "══════════════════════════════════════\n"
                 "\n"
                 "RULE 1 — TWO COMPLETELY SEPARATE SECTIONS, SEQUENTIAL ORDER:\n"
+                "  - You must generate BOTH Section 1 (English) and Section 2 (Arabic) in a single response.\n"
+                "  - Do NOT stop after Section 1, and do NOT write notes, status updates, or placeholders about Section 2. You must output the full English section and then immediately transition to the full Arabic section.\n"
                 "  ▶ SECTION 1: Complete English Study Notebook\n"
                 "    - Write the ENTIRE first section in English ONLY.\n"
                 "    - Cover EVERY idea, concept, example, and detail from the transcript with maximum depth.\n"
-                "    - Use ## for chapter headings, ### for sub-sections, and bullet points / numbered lists throughout.\n"
+                "    - Use ## for chapter headings.\n"
+                "    - For each sub-section (### heading), you MUST structure the explanation into these 8 bolded parts sequentially:\n"
+                "      **1. Big Picture:** (short overview of what this topic is about and why it matters)\n"
+                "      **2. Simple Explanation:** (explain the topic simply using analogies/metaphors as if explaining to a 10-year-old)\n"
+                "      **3. Deeper Understanding:** (advanced university/exam level technical details)\n"
+                "      **4. Important Points:** (bullet points of key definitions, formulas, rules, or concepts)\n"
+                "      **5. Exam Focus:** (parts/questions most likely to appear in exams or quizzes)\n"
+                "      **6. Common Mistakes:** (common errors students make in this topic and how to avoid them)\n"
+                "      **7. Mini Summary:** (brief revision summary of the topic)\n"
+                "      **8. Active Recall:** (5 challenging questions to test understanding of this section)\n"
                 "    - Mark important terms: <mark>term</mark>\n"
                 "    - Use English callouts: 💡 Note: / ⚠ Exam Alert: / 📌 Remember:\n"
                 "    - DO NOT write a single Arabic word in this section.\n"
@@ -386,7 +398,16 @@ async def process_notebook(
                 "    - يبدأ هذا القسم فقط بعد انتهاء القسم الإنجليزي بالكامل.\n"
                 "    - اكتب هذا القسم بالكامل باللغة العربية الفصحى فقط دون أي كلمات إنجليزية.\n"
                 "    - نفس العناوين والترتيب والأقسام الموجودة في القسم الإنجليزي تماماً (ترجمة متوازية).\n"
-                "    - ## للعناوين الرئيسية، ### للعناوين الفرعية، ونقاط مخرزة وقوائم مرقمة في كل مكان.\n"
+                "    - ## للعناوين الرئيسية.\n"
+                "    - تحت كل عنوان فرعي (###)، يجب هيكلة الشرح إلى 8 أجزاء بخط عريض بالترتيب التالي:\n"
+                "      **1. الصورة العامة (Big Picture):** (نظرة عامة والجدوى منها)\n"
+                "      **2. الشرح المبسّط (Simple Explanation):** (شرح مبسط باستخدام تشبيهات وأمثلة واضحة لطفل عمره 10 سنوات)\n"
+                "      **3. الفهم العميق (Deeper Understanding):** (شرح تقني عميق بمستوى الجامعات والامتحانات)\n"
+                "      **4. النقاط الهامة (Important Points):** (نقاط مخرزة للتعريفات والقوانين والمفاهيم الأساسية)\n"
+                "      **5. تركيز الامتحان (Exam Focus):** (الأجزاء الأكثر توقعاً في الاختبارات والأسئلة)\n"
+                "      **6. الأخطاء الشائعة (Common Mistakes):** (الأخطاء التي يقع فيها الطلاب وكيفية تجنبها)\n"
+                "      **7. الملخص الموجز (Mini Summary):** (ملخص مراجعة سريع للموضوع)\n"
+                "      **8. الاسترجاع النشط (Active Recall):** (5 أسئلة صعبة مع إجاباتها لمراجعة الفهم)\n"
                 "    - ضع المصطلحات المهمة داخل: <mark>المصطلح</mark>\n"
                 "    - استخدم التنبيهات العربية: 💡 ملاحظة: / ⚠ هام للامتحان: / 📌 تذكّر:\n"
                 "    - القسم العربي يجب ألا يقل عن 1200 كلمة أيضاً.\n"
