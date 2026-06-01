@@ -12,6 +12,7 @@ def _build_ydl_opts(
     proxy: str | None = None,
     cookies_file: str | None = None,
     player_clients: list[str] | None = None,
+    use_oauth2: bool = False,
 ) -> dict:
     """Build yt-dlp options dict consistent with ytdl-service."""
     output_template = os.path.join(upload_dir, f"{unique_id}_%(id)s.%(ext)s")
@@ -48,6 +49,12 @@ def _build_ydl_opts(
                 "skip": ["webpage", "configs"],
             }
         }
+    if use_oauth2:
+        opts["username"] = "oauth2"
+        opts["password"] = ""
+        opts["cachedir"] = os.path.join(upload_dir, "yt_dlp_cache")
+        opts["no_interactive"] = True
+
     po_token = os.getenv("YOUTUBE_PO_TOKEN")
     if po_token:
         visitor_data = os.getenv("YOUTUBE_VISITOR_DATA", "")
@@ -175,22 +182,32 @@ def download_youtube_audio(youtube_url: str, upload_dir: str, unique_id: str) ->
     cookies_file = cookies_path if os.path.exists(cookies_path) else None
 
     strategies = [
-        {"proxy": proxy, "cookies": cookies_file, "clients": ["android", "web_embedded"]},
-        {"proxy": proxy, "cookies": None,         "clients": ["android", "web_embedded"]},
-        {"proxy": None,  "cookies": cookies_file, "clients": ["web_embedded", "web"]},
-        {"proxy": None,  "cookies": None,         "clients": ["web_embedded"]},
+        {"name": "oauth2 auth + proxy", "proxy": proxy, "cookies": None, "clients": ["android", "web_embedded"], "use_oauth2": True},
+        {"name": "oauth2 auth direct",  "proxy": None,  "cookies": None, "clients": ["android", "web_embedded"], "use_oauth2": True},
+        {"name": "proxy + cookies",     "proxy": proxy, "cookies": cookies_file, "clients": ["android", "web_embedded"], "use_oauth2": False},
+        {"name": "proxy only",          "proxy": proxy, "cookies": None,         "clients": ["android", "web_embedded"], "use_oauth2": False},
+        {"name": "direct + cookies",    "proxy": None,  "cookies": cookies_file, "clients": ["web_embedded", "web"],     "use_oauth2": False},
+        {"name": "direct only",         "proxy": None,  "cookies": None,         "clients": ["web_embedded"],             "use_oauth2": False},
     ]
 
     last_error = ""
     for s in strategies:
         try:
-            opts = _build_ydl_opts(upload_dir, unique_id, s["proxy"], s["cookies"], s["clients"])
+            logger.info(f"[Local yt-dlp Strategy] {s['name']}")
+            opts = _build_ydl_opts(
+                upload_dir=upload_dir,
+                unique_id=unique_id,
+                proxy=s["proxy"],
+                cookies_file=s["cookies"],
+                player_clients=s["clients"],
+                use_oauth2=s.get("use_oauth2", False)
+            )
             result = _safe_ydl_download(opts, youtube_url)
-            logger.info(f"Downloaded via yt-dlp: {result}")
+            logger.info(f"Downloaded via yt-dlp strategy '{s['name']}': {result}")
             return result
         except Exception as e:
             last_error = str(e)
-            logger.warning(f"yt-dlp strategy proxy={bool(s['proxy'])} cookies={bool(s['cookies'])} failed: {last_error[:200]}")
+            logger.warning(f"yt-dlp strategy '{s['name']}' failed: {last_error[:200]}")
             time.sleep(1)
 
     # ===== 3. Invidious fallback =====
