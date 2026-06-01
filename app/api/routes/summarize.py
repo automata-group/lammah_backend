@@ -996,6 +996,69 @@ async def download_annotated_pdf(job_id: str):
     return FileResponse(resolved_path, media_type="application/pdf")
 
 
+@router.post("/youtube-to-mp3")
+async def youtube_to_mp3(
+    url: str = Form(...),
+    bg_tasks: BackgroundTasks = BackgroundTasks(),
+    profile=Depends(get_user_profile)
+):
+    """
+    Independent endpoint to download YouTube audio as an MP3 file directly.
+    """
+    logger.info(f"📥 [YOUTUBE_TO_MP3] Download requested for URL: {url} by user {profile['id']}")
+    
+    unique_id = str(uuid.uuid4())[:8]
+    base_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))))
+    upload_dir_env = os.getenv("UPLOAD_DIR", "backend/uploads")
+    upload_dir = upload_dir_env if os.path.isabs(upload_dir_env) else os.path.normpath(os.path.join(base_dir, upload_dir_env))
+    
+    # Validation
+    lower_url = url.lower()
+    if not ("youtube.com" in lower_url or "youtu.be" in lower_url):
+        raise HTTPException(
+            status_code=400,
+            detail={"user_message": "🚫 يرجى إدخال رابط يوتيوب (YouTube) صالح فقط!"}
+        )
+
+    try:
+        from app.services.youtube_downloader_service import download_youtube_audio
+        
+        # Download YouTube audio
+        mp3_path = await asyncio.to_thread(download_youtube_audio, url.strip(), upload_dir, unique_id)
+        
+        if not mp3_path or not os.path.exists(mp3_path):
+            raise Exception("فشل تنزيل ملف الصوت من الرابط.")
+            
+        filename = os.path.basename(mp3_path)
+        
+        def remove_file(path: str):
+            try:
+                if os.path.exists(path):
+                    os.remove(path)
+                    logger.info(f"🗑️ [YOUTUBE_TO_MP3] Temp file deleted: {path}")
+            except Exception as e:
+                logger.error(f"Error removing temp file: {e}")
+                
+        bg_tasks.add_task(remove_file, mp3_path)
+        
+        from fastapi.responses import FileResponse
+        return FileResponse(
+            path=mp3_path,
+            filename=filename,
+            media_type="audio/mpeg"
+        )
+        
+    except Exception as e:
+        logger.error(f"❌ [YOUTUBE_TO_MP3] Failed: {e}")
+        error_msg = str(e)
+        if "فشل جلب المحاضرة" in error_msg or "يوتيوب يمنع" in error_msg:
+            raise HTTPException(status_code=400, detail={"user_message": error_msg})
+        raise HTTPException(
+            status_code=500,
+            detail={"user_message": f"فشل تحويل وتنزيل المقطع الصوتي: {error_msg}"}
+        )
+
+
 @router.post("/upload-temp")
 async def upload_temp(
     file: UploadFile = File(...),
