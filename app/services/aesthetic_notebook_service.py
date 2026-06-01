@@ -155,6 +155,21 @@ def _bidi(text):
 def _clean(s):
     return re.sub(r'\*\*|<mark>|</mark>|<span[^>]*>|</span>', '', s)
 
+def _has_keyword(s, keywords):
+    for k in keywords:
+        if k in ["💡", "⚠", "📌"]:
+            if k in s:
+                return True
+        elif _has_ar(k):
+            pattern = rf"(?<![\w\u0600-\u06FF]){re.escape(k)}(?![\w\u0600-\u06FF])"
+            if re.search(pattern, s):
+                return True
+        else:
+            pattern = rf"\b{re.escape(k)}\b"
+            if re.search(pattern, s, re.IGNORECASE):
+                return True
+    return False
+
 # ── Lined Paper Background ────────────────────────────────────────────────────
 def _bg(c, is_rtl=True):
     c.setFillColor(C_BG)
@@ -390,14 +405,13 @@ def _h2(c, st, title):
     c.setFillColor(C_GOLD)
     if is_rtl:
         c.drawString(W - MARGIN - tw - 20, st.y, td)
-        c.setStrokeColor(C_GOLD)
-        c.setLineWidth(1.2)
-        c.line(W - MARGIN - tw - 22, st.y - 3, W - MARGIN - 16, st.y - 3)
     else:
         c.drawString(MARGIN + 20, st.y, td)
-        c.setStrokeColor(C_GOLD)
-        c.setLineWidth(1.2)
-        c.line(MARGIN + 16, st.y - 3, MARGIN + tw + 22, st.y - 3)
+    
+    # Clean full-width line under the heading for a premium look, avoiding mixed-direction misalignment
+    c.setStrokeColor(C_GOLD)
+    c.setLineWidth(1.0)
+    c.line(MARGIN, st.y - 4, W - MARGIN, st.y - 4)
     st.y -= 22
 
 # ── H3 (Exam Summary Header) ─────────────────────────────────────────────────
@@ -427,7 +441,8 @@ def _cornell_box(c, st, text, kind="note"):
     labels = {
         "exam": ("Exam Alert", "تنبيه هام"),
         "note": ("Key Note", "ملاحظة هامة"),
-        "remember": ("Remember", "تذكّر")
+        "remember": ("Remember", "تذكّر"),
+        "trap": ("Exam Trap", "فخ امتحاني")
     }
     lbl_en, lbl_ar = labels.get(kind, ("Note", "ملاحظة"))
     
@@ -442,9 +457,11 @@ def _cornell_box(c, st, text, kind="note"):
         cue = lbl_ar if is_arabic_text else lbl_en
         body = text.strip()
 
+    cue = cue.replace("**", "").replace("*", "").strip()
+
     # Clean the callout body of leading emojis or duplicate key prefixes (e.g. ملاحظة:)
     body = re.sub(r'^[💡🧪⚡✅📌⚠📊✨🔒\-•\s]+', '', body).strip()
-    body = re.sub(r'^(?:ملاحظة|توضيح|تنبيه|تذكّر|تذكر|هام للامتحان|Note|Remember|Important|Warning|Tip|Key Point)\s*(?:هامة|هام)?\s*[:：]?\s*', '', body, flags=re.IGNORECASE).strip()
+    body = re.sub(r'^(?:ملاحظة|توضيح|تنبيه|تذكّر|تذكر|هام للامتحان|فخ امتحاني|Note|Remember|Important|Warning|Tip|Key Point|Exam Trap)\s*(?:هامة|هام)?\s*[:：]?\s*', '', body, flags=re.IGNORECASE).strip()
 
     # Estimate height based on body text length
     est_lines = max(2, len(body) // 40 + 2)
@@ -454,14 +471,16 @@ def _cornell_box(c, st, text, kind="note"):
     box_y = st.y - box_h
     
     # Draw Cornell box background
-    c.setFillColor(C_BOX_BG)
+    bg_color = HexColor("#FEF2F2") if kind == "trap" else C_BOX_BG
+    bd_color = HexColor("#FCA5A5") if kind == "trap" else C_BOX_BD
+    c.setFillColor(bg_color)
     c.roundRect(MARGIN, box_y, TXT_W, box_h, 6, fill=1, stroke=0)
-    c.setStrokeColor(C_BOX_BD)
+    c.setStrokeColor(bd_color)
     c.setLineWidth(0.8)
     c.roundRect(MARGIN, box_y, TXT_W, box_h, 6, fill=0, stroke=1)
     
     # Colors for dividers and highlights
-    colors = {"exam": C_GOLD, "note": C_BLUE, "remember": C_TEAL}
+    colors = {"exam": C_GOLD, "note": C_BLUE, "remember": C_TEAL, "trap": HexColor("#991B1B")}
     theme_clr = colors.get(kind, C_BLUE)
     
     # Cornell columns division: 28% for Cue column, 72% for Notes
@@ -517,133 +536,83 @@ def _cornell_box(c, st, text, kind="note"):
 # ── Code & Formula Card ──────────────────────────────────────────────────────
 
 
-def _extract_concepts(continuous_markdown, cheat_sheet):
-    concepts = []
-    if cheat_sheet:
-        for item in cheat_sheet:
-            term = item.get("term", "").strip()
-            if term:
-                concepts.append(term)
-    if len(concepts) < 5 and continuous_markdown:
-        for line in continuous_markdown.split("\n"):
-            line = _strip_ctrl(line).strip()
-            if line.startswith("## ") or line.startswith("### "):
-                title = line.lstrip("#").strip()
-                title = _clean(title)
-                if title and title not in concepts:
-                    concepts.append(title)
-                    if len(concepts) >= 6:
-                        break
-    seen = set()
-    final_concepts = []
-    for c in concepts:
-        c_clean = re.sub(r'^[💡🧪⚡✅📌⚠📊✨🔒\-•\s]+', '', c).strip()
-        if c_clean and c_clean not in seen:
-            seen.add(c_clean)
-            final_concepts.append(c_clean)
-            
-    if not final_concepts:
-        final_concepts = ["شرح المفاهيم", "المصطلحات الهامة", "تطبيقات ونماذج"]
-        
-    return final_concepts[:5]
-
-def _draw_visual_mind_map(c, st, lecture_title, continuous_markdown, cheat_sheet):
+def _draw_study_strategy_and_tldr(c, st, lecture_title, study_strategy=None, tldr=None):
     _bg(c, is_rtl=st.main_rtl)
     st._footer(c)
     st.y = H - MARGIN - 18
     
-    title_text = "خريطة المفاهيم البصرية" if st.main_rtl else "Visual Concept Mind Map"
-    _h1(c, st, title_text)
+    header_title = "دليل دراسة المحاضرة والزبدة السريعة" if st.main_rtl else "Study Guide & TL;DR"
+    _h1(c, st, header_title)
     
-    sub_text = "مخطط مفاهيمي يوضح ترابط هيكل المحاضرة وعناصرها الأساسية" if st.main_rtl else "Concept diagram showing relationships between the main lecture sections"
-    sub_d, _ = _bidi(sub_text)
-    c.setFont(FONT_REG, 9)
-    c.setFillColor(C_MUTED)
-    sw = c.stringWidth(sub_d, FONT_REG, 9)
-    if st.main_rtl:
-        c.drawString(W - MARGIN - sw - 8, st.y, sub_d)
-    else:
-        c.drawString(MARGIN + 8, st.y, sub_d)
-    st.y -= 28
-    
-    concepts = _extract_concepts(continuous_markdown, cheat_sheet)
-    num_nodes = len(concepts)
-    
-    board_h = 320
-    board_y = st.y - board_h - 10
+    if not study_strategy:
+        study_strategy = "هذه المحاضرة غنية بالمفاهيم الأساسية، ننصحك بالتركيز على مراجعة المصطلحات والأسئلة التدريبية لترسيخ الفهم."
+        
+    box_h = 75
+    box_y = st.y - box_h
     c.setFillColor(HexColor("#FDFBF7"))
-    c.roundRect(MARGIN, board_y, TXT_W, board_h, 8, fill=1, stroke=0)
-    c.setStrokeColor(C_BOX_BD)
+    c.setStrokeColor(HexColor("#D9C9B5"))
     c.setLineWidth(0.8)
-    c.roundRect(MARGIN, board_y, TXT_W, board_h, 8, fill=0, stroke=1)
+    c.roundRect(MARGIN, box_y, TXT_W, box_h, 6, fill=1, stroke=1)
     
-    cx = W / 2
-    cy = board_y + board_h / 2
+    # Draw side colored bar (Teal)
+    c.setFillColor(C_TEAL)
+    c.rect(W - MARGIN - 4, box_y + 4, 3, box_h - 8, fill=1, stroke=0)
     
-    positions = []
-    if num_nodes == 1:
-        positions = [(cx, cy + 90)]
-    elif num_nodes == 2:
-        positions = [(cx - 130, cy), (cx + 130, cy)]
-    elif num_nodes == 3:
-        positions = [(cx, cy + 90), (cx - 130, cy - 50), (cx + 130, cy - 50)]
-    elif num_nodes == 4:
-        positions = [(cx - 130, cy + 70), (cx + 130, cy + 70), (cx - 130, cy - 70), (cx + 130, cy - 70)]
-    else:
-        positions = [
-            (cx, cy + 95),
-            (cx - 140, cy + 25),
-            (cx + 140, cy + 25),
-            (cx - 100, cy - 75),
-            (cx + 100, cy - 75)
+    # Title
+    c.setFont(FONT_BOLD, 10)
+    c.setFillColor(C_TEAL)
+    t_text = get_display(arabic_reshaper.reshape("💡 نصيحة لمّاح الأكاديمية المقترحة للدراسة:"))
+    c.drawRightString(W - MARGIN - 12, box_y + box_h - 18, t_text)
+    
+    # Strategy Content
+    c.setFont(FONT_REG, 9)
+    c.setFillColor(C_BODY)
+    inner_s = _S(st.page_num, st.student_name)
+    inner_s.y = box_y + box_h - 32
+    _para(c, study_strategy, inner_s, font_sz=9, lh=15, color=C_BODY, indent=0, max_w=TXT_W - 24)
+    
+    st.y = box_y - 20
+    
+    # TL;DR Title
+    c.setFont(FONT_BOLD, 11)
+    c.setFillColor(C_BLUE)
+    tldr_title = "🚀 إذا كان امتحانك بعد 5 دقائق.. اقرأ هنا فقط!" if st.main_rtl else "🚀 Exam in 5 Minutes? Read this TL;DR!"
+    tldr_title_d, _ = _bidi(tldr_title)
+    c.drawString(MARGIN, st.y, tldr_title_d)
+    
+    c.setStrokeColor(C_GOLD)
+    c.setLineWidth(1.0)
+    c.line(MARGIN, st.y - 4, W - MARGIN, st.y - 4)
+    st.y -= 22
+    
+    # TL;DR Box
+    if not tldr:
+        tldr = [
+            "المفاهيم الأساسية الواردة في هذه المحاضرة جوهرية للامتحان.",
+            "احرص على مراجعة جدول المقارنة والأسئلة التطبيقية لترسيخ الفهم."
         ]
         
-    c.setStrokeColor(C_GOLD)
-    c.setLineWidth(1.2)
-    for px, py in positions:
-        c.line(cx, cy, px, py)
-        c.setFillColor(C_GOLD)
-        c.circle(px, py, 3, fill=1, stroke=0)
-        
-    c.setFillColor(C_BLUE)
-    c.setStrokeColor(HexColor("#1A2B5E"))
-    c.setLineWidth(1.5)
+    tldr_h = len(tldr) * 28 + 18
+    tldr_y = st.y - tldr_h
+    c.setFillColor(HexColor("#F7F1E8"))
+    c.setStrokeColor(HexColor("#D9C9B5"))
+    c.setLineWidth(0.8)
+    c.roundRect(MARGIN, tldr_y, TXT_W, tldr_h, 6, fill=1, stroke=1)
     
-    center_text = _clean(lecture_title)
-    if len(center_text) > 28:
-        center_text = center_text[:25] + "..."
-    ct_d, _ = _bidi(center_text)
+    # Draw side colored bar (Gold)
+    c.setFillColor(C_GOLD)
+    c.rect(W - MARGIN - 4, tldr_y + 4, 3, tldr_h - 8, fill=1, stroke=0)
     
-    ct_w = c.stringWidth(ct_d, FONT_BOLD, 10.5)
-    box_w = max(110, ct_w + 24)
-    box_h = 36
+    # Draw bullet points
+    c.setFont(FONT_REG, 9.5)
+    c.setFillColor(C_BODY)
     
-    c.roundRect(cx - box_w/2, cy - box_h/2, box_w, box_h, 6, fill=1, stroke=1)
-    
-    c.setFillColor(HexColor("#FDFBF7"))
-    c.setFont(FONT_BOLD, 9.5)
-    c.drawString(cx - ct_w/2, cy - 3.5, ct_d)
-    
-    for idx, (px, py) in enumerate(positions):
-        concept_text = concepts[idx]
-        if len(concept_text) > 24:
-            concept_text = concept_text[:21] + "..."
-        con_d, _ = _bidi(concept_text)
+    for i, pt in enumerate(tldr[:5]):
+        py = tldr_y + tldr_h - 22 - i * 28
+        pt_d, _ = _bidi(f"• {pt}")
+        c.drawString(W - MARGIN - 18 - c.stringWidth(pt_d, FONT_REG, 9.5), py, pt_d)
         
-        con_w = c.stringWidth(con_d, FONT_BOLD, 9)
-        n_w = max(80, con_w + 16)
-        n_h = 24
-        
-        c.setFillColor(HexColor("#F7F1E8"))
-        c.setStrokeColor(C_BOX_BD)
-        c.setLineWidth(1.0)
-        c.roundRect(px - n_w/2, py - n_h/2, n_w, n_h, 4, fill=1, stroke=1)
-        
-        c.setFillColor(C_BODY)
-        c.setFont(FONT_BOLD, 8)
-        c.drawString(px - con_w/2, py - 2.5, con_d)
-        
-    st.y = board_y - 20
+    st.y = tldr_y - 20
 
 # ── Callout Box (Backwards Compatibility Wrapper) ────────────────────────────
 def _callout(c, st, text, kind="note"):
@@ -771,64 +740,158 @@ def _render(c, st, text):
         elif level == 3:
             _h3(c, st, body)
         else:
-            is_exam    = any(k in s for k in ["هام للامتحان", "⚠", "امتحان", "مهم", "ركز",
-                                               "Exam Alert", "EXAM", "Important:", "WARNING:"])
-            is_note    = any(k in s for k in ["💡", "ملاحظة", "توضيح",
-                                               "Note:", "NOTE:", "Tip:", "TIP:"])
-            is_rem     = any(k in s for k in ["📌", "تذكّر", "تذكر",
-                                               "Remember:", "REMEMBER:", "Key Point:"])
+            is_trap    = _has_keyword(s, ["فخ امتحاني", "Exam Trap", "فخ"])
+            is_exam    = _has_keyword(s, ["هام للامتحان", "امتحان", "مهم", "ركز", "Exam Alert", "EXAM", "Important:", "WARNING:", "⚠"])
+            is_note    = _has_keyword(s, ["💡", "ملاحظة", "توضيح", "Note:", "NOTE:", "Tip:", "TIP:"])
+            is_rem     = _has_keyword(s, ["📌", "تذكّر", "تذكر", "Remember:", "REMEMBER:", "Key Point:"])
 
-            if is_exam and len(body) < 500:
-                _cornell_box(c, st, body, kind="exam")
-            elif is_rem and len(body) < 500:
-                _cornell_box(c, st, body, kind="remember")
-            elif is_note and len(body) < 500:
-                _cornell_box(c, st, body, kind="note")
+            if (is_trap or is_exam or is_note or is_rem) and len(s) < 500:
+                kind = "trap" if is_trap else ("exam" if is_exam else ("remember" if is_rem else "note"))
+                col_idx = s.find(":")
+                if col_idx != -1:
+                    cue_part = s[:col_idx].strip()
+                    body_part = s[col_idx + 1:].strip()
+                else:
+                    cue_part = ""
+                    body_part = s.strip()
+                
+                cleaned_body = body_part.replace("**", "").replace("*", "").strip()
+                if not cleaned_body or len(cleaned_body) < 3:
+                    next_i = i + 1
+                    swallowed = []
+                    while next_i < len(lines_list):
+                        next_line = _strip_ctrl(lines_list[next_i]).strip()
+                        if not next_line:
+                            next_i += 1
+                            continue
+                        if next_line.startswith("#") or next_line.startswith("---") or next_line.startswith("```"):
+                            break
+                        if any(emoji in next_line for emoji in ["💡", "⚠", "📌", "🔑"]):
+                            break
+                        swallowed.append(next_line)
+                        next_i += 1
+                        break
+                    
+                    if swallowed:
+                        body_part = " ".join(swallowed)
+                        i = next_i - 1
+                        
+                final_body = body_part.replace("**", "").replace("*", "").strip()
+                if final_body and len(final_body) >= 3:
+                    if col_idx != -1 and cue_part:
+                        cue_part = re.sub(r'^[💡🧪⚡✅📌⚠📊✨🔒\-•\s]+', '', cue_part)
+                        cue_part = cue_part.replace("**", "").replace("*", "").strip()
+                        box_text = f"{cue_part}: {body_part}"
+                    else:
+                        box_text = body_part
+                    _cornell_box(c, st, box_text, kind=kind)
+                else:
+                    _para(c, body, st)
             else:
                 _para(c, body, st)
         i += 1
 
 # ── Cover Page ────────────────────────────────────────────────────────────────
-def _cover(c, title, student_name):
+def _cover(c, title, student_name, stats: dict = None):
     # Cover is drawn RTL (Arabic platform base style) but cleaned of emojis
     _bg(c, is_rtl=True)
 
     # Top decorative header bar
     c.setFillColor(C_COVER_H)
-    c.rect(0, H - 200, W, 200, fill=1, stroke=0)
+    c.rect(0, H - 180, W, 180, fill=1, stroke=0)
     c.setFillColor(C_GOLD)
-    c.rect(0, H - 204, W, 4, fill=1, stroke=0)
+    c.rect(0, H - 184, W, 4, fill=1, stroke=0)
 
     # Brand name
     brand, _ = _bidi("دفتر الطالب المتفوق الجامعي")
     c.setFillColor(HexColor("#FDFBF7"))
     c.setFont(FONT_BOLD, 15)
     bw = c.stringWidth(brand, FONT_BOLD, 15)
-    c.drawString(W / 2 - bw / 2, H - 100, brand)
+    c.drawString(W / 2 - bw / 2, H - 90, brand)
 
     sub, _ = _bidi("منصة لمّاح — ملازم دراسية احترافية للبيع")
     c.setFont(FONT_REG, 10)
     sw = c.stringWidth(sub, FONT_REG, 10)
     c.setFillColor(HexColor("#FCD34D"))
-    c.drawString(W / 2 - sw / 2, H - 130, sub)
+    c.drawString(W / 2 - sw / 2, H - 120, sub)
 
     # Lecture Title
     c.setFillColor(C_BODY)
-    c.setFont(FONT_BOLD, 20)
+    c.setFont(FONT_BOLD, 18)
     clean_t = _clean(str(title))
     td, _ = _bidi(clean_t)
-    tw = c.stringWidth(td, FONT_BOLD, 20)
-    c.drawString(W / 2 - tw / 2, H - 290, td)
+    tw = c.stringWidth(td, FONT_BOLD, 18)
+    c.drawString(W / 2 - tw / 2, H - 240, td)
 
     # Gold underline under title
     c.setStrokeColor(C_GOLD)
     c.setLineWidth(1.5)
-    c.line(W / 2 - 100, H - 300, W / 2 + 100, H - 300)
+    c.line(W / 2 - 100, H - 250, W / 2 + 100, H - 250)
+
+    # ── Statistics Analytics Panel (Hook) ────────────────────────────────────
+    panel_y = H - 280
+    panel_lbl, _ = _bidi("تحليلات الملزمة الذكية (Notebook Analytics)")
+    c.setFont(FONT_BOLD, 9.5)
+    c.setFillColor(C_MUTED)
+    pl_w = c.stringWidth(panel_lbl, FONT_BOLD, 9.5)
+    c.drawString(W / 2 - pl_w / 2, panel_y, panel_lbl)
+    
+    # 2x2 Grid setup
+    box_w, box_h = 165, 52
+    col1_x = W / 2 - box_w - 6
+    col2_x = W / 2 + 6
+    
+    row1_y = panel_y - 68
+    row2_y = row1_y - 60
+    
+    if not stats:
+        stats = {
+            "num_key_terms": 8,
+            "num_mcqs": 5,
+            "num_comparisons": 1,
+            "est_study_time": 30
+        }
+        
+    cards = [
+        # Box 1
+        (col2_x, row1_y, str(stats.get("num_key_terms", 8)), "مصطلح أساسي (Key Terms)"),
+        # Box 2
+        (col1_x, row1_y, str(stats.get("num_mcqs", 5)), "سؤال تقييم (Practice MCQs)"),
+        # Box 3
+        (col2_x, row2_y, str(stats.get("num_comparisons", 1)), "جدول مقارنة (Comparisons)"),
+        # Box 4
+        (col1_x, row2_y, f"{stats.get('est_study_time', 30)} دقيقة", "وقت الدراسة المتوقع (Study Time)")
+    ]
+    
+    for x, y, val, lbl in cards:
+        c.setFillColor(C_BOX_BG)
+        c.setStrokeColor(C_BOX_BD)
+        c.setLineWidth(0.8)
+        c.roundRect(x, y, box_w, box_h, 8, fill=1, stroke=1)
+        
+        # Side accent (Teal for Col 1, Gold for Col 2)
+        accent_clr = C_TEAL if x == col1_x else C_GOLD
+        c.setFillColor(accent_clr)
+        c.rect(x + box_w - 4, y + 4, 3, box_h - 8, fill=1, stroke=0)
+        
+        # Value
+        val_d, _ = _bidi(val)
+        c.setFont(FONT_BOLD, 15)
+        c.setFillColor(C_BLUE)
+        vw = c.stringWidth(val_d, FONT_BOLD, 15)
+        c.drawString(x + box_w / 2 - vw / 2 - 2, y + 26, val_d)
+        
+        # Label
+        lbl_d, _ = _bidi(lbl)
+        c.setFont(FONT_REG, 7.5)
+        c.setFillColor(C_BODY)
+        lw = c.stringWidth(lbl_d, FONT_REG, 7.5)
+        c.drawString(x + box_w / 2 - lw / 2 - 2, y + 10, lbl_d)
 
     # Metadata box
-    bw2, bh2 = 330, 170
+    bw2, bh2 = 330, 140
     bx = W / 2 - bw2 / 2
-    by = H / 2 - 130
+    by = 180
     c.setFillColor(C_BOX_BG)
     c.roundRect(bx, by, bw2, bh2, 12, fill=1, stroke=0)
     c.setStrokeColor(C_BOX_BD)
@@ -845,18 +908,18 @@ def _cover(c, title, student_name):
         ("حقوق الملكية:", "محفوظة للبائع والمنصة"),
     ]
     for i, (lbl, val) in enumerate(rows):
-        row_y = by + bh2 - 45 - i * 42
+        row_y = by + bh2 - 35 - i * 38
         lbl_d, _ = _bidi(lbl)
         val_d, _ = _bidi(val)
-        c.setFont(FONT_BOLD, 10.5)
+        c.setFont(FONT_BOLD, 10)
         c.setFillColor(C_BLUE)
         c.drawRightString(bx + bw2 - 14, row_y, lbl_d)
-        c.setFont(FONT_REG, 10)
+        c.setFont(FONT_REG, 9.5)
         c.setFillColor(C_BODY)
-        c.drawRightString(bx + bw2 - 14, row_y - 17, val_d)
+        c.drawRightString(bx + bw2 - 14, row_y - 15, val_d)
 
     # Bottom note
-    note, _ = _bidi("صُنع بكل حب واحترافية بواسطة محرك لمّاح الذكي")
+    note, _ = _bidi("صُنع بكل حب واحترافية بواسطة محرك لمّاح الأكاديمي")
     c.setFillColor(C_MUTED)
     c.setFont(FONT_REG, 8.5)
     nw = c.stringWidth(note, FONT_REG, 8.5)
@@ -1219,12 +1282,15 @@ def generate_aesthetic_notebook_pdf(
     mcqs: list = None,
     comparisons: list = None,
     is_free_trial: bool = False,
+    study_strategy: str = None,
+    tldr: list = None,
+    stats: dict = None,
 ) -> str:
     os.makedirs(os.path.dirname(output_path), exist_ok=True)
     cv = canvas.Canvas(output_path, pagesize=A4)
 
     # 1. Cover Page
-    _cover(cv, lecture_title, student_name)
+    _cover(cv, lecture_title, student_name, stats=stats)
     if is_free_trial:
         cv.saveState()
         cv.setFont("HW-Reg", 18)
@@ -1238,8 +1304,8 @@ def generate_aesthetic_notebook_pdf(
     is_main_rtl = _has_ar(continuous_markdown[:2000]) if continuous_markdown else True
     st = _S(page_num=2, student_name=student_name, is_rtl=is_main_rtl, is_free_trial=is_free_trial)
 
-    # 2a. Visual Concept Mind Map (Page 2)
-    _draw_visual_mind_map(cv, st, lecture_title, continuous_markdown, cheat_sheet)
+    # 2a. Study Strategy & TL;DR page (Page 2)
+    _draw_study_strategy_and_tldr(cv, st, lecture_title, study_strategy=study_strategy, tldr=tldr)
     if is_free_trial:
         cv.saveState()
         cv.setFont("HW-Reg", 18)

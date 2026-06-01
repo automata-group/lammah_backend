@@ -471,6 +471,7 @@ async def process_notebook(
                 "   - 🧠 **الشرح والتفصيل (Deep Dive):** Comprehensive explanation covering all details and examples mentioned by the professor.\n"
                 "   - 🔑 **المصطلحات الأساسية (Key Terms):** A bulleted list of English terms and their concise Arabic definitions.\n"
                 "   - ⚠️ **نقاط امتحان (Exam Tips):** Highlight areas the professor emphasized or common pitfalls.\n"
+                "   - ⚠️ **فخ امتحاني (Exam Trap):** Identify confusing elements or typical mistakes students make on this topic (e.g. 'انتبه: يقع الطلاب في فخ خلط X مع Y...').\n"
                 "   - 💬 **اقتباسات المحاضر (Professor's Quotes):** Extract 1-2 exact, notable sentences, jokes, or literal advice the professor said, wrapped in quotes. This adds a personalized, human touch proving the guide is authentic.\n\n"
                 "4. Comprehensiveness:\n"
                 "   - Do not summarize by omitting facts. Include every rule, example, and detail. Your job is to structure and clarify, not to delete information.\n"
@@ -503,15 +504,22 @@ async def process_notebook(
 
             prompt_step2 = (
                 "You are 'Lammah Academic Engine' — an expert in extracting structured, high-yield study materials for university exam preparation.\n"
-                "Based ONLY on the provided Markdown Study Guide, generate a precise JSON output containing the following keys (cheat_sheet, mcqs, comparisons):\n\n"
-                "1. cheat_sheet: A list of the 10-20 most critical concepts or formulas. The 'term' must be in English. The 'brief_definition' must be in Arabic, written in a 'Capsule' style (highly concise, direct, one short line for quick revision).\n"
-                "2. comparisons: Extract at least one smart comparison table contrasting the most easily confused concepts in this lecture. Use clear keywords.\n"
-                "3. mcqs: Create 5 multiple-choice questions (A, B, C, D) at a medium-to-hard university level. The questions MUST test deep understanding and application, not just basic recall. Integrate English terms naturally within the Arabic question body.\n\n"
+                "Based ONLY on the provided Markdown Study Guide, generate a precise JSON output containing the following keys (study_strategy, tldr, cheat_sheet, mcqs, comparisons):\n\n"
+                "1. study_strategy: A 2-sentence Arabic advice directing the student how to study this lecture (e.g. is it concept-heavy, formula-heavy, or memorization-heavy? Recommend a strategy).\n"
+                "2. tldr: A list of 3-5 concise, high-yield Arabic bullet points summarizing the absolute most critical takeaways from the lecture (the '60-second summary' for exam day).\n"
+                "3. cheat_sheet: A list of the 10-20 most critical concepts or formulas. The 'term' must be in English. The 'brief_definition' must be in Arabic, written in a 'Capsule' style (highly concise, direct, one short line for quick revision).\n"
+                "4. comparisons: Extract at least one smart comparison table contrasting the most easily confused concepts in this lecture. Use clear keywords.\n"
+                "5. mcqs: Create 5 multiple-choice questions (A, B, C, D) at a medium-to-hard university level. The questions MUST test deep understanding and application, not just basic recall. Integrate English terms naturally within the Arabic question body.\n\n"
                 "══════════════════════════════════════\n"
                 "⚠️ STRICT JSON FORMAT RULE:\n"
                 "══════════════════════════════════════\n"
                 "Your output MUST be ONLY valid JSON. No markdown formatting outside the JSON, no intro, no outro.\n"
                 "{\n"
+                '  "study_strategy": "نصيحة لمّاح الأكاديمية للدراسة...",\n'
+                '  "tldr": [\n'
+                '    "التلخيص السريع الأول...",\n'
+                '    "التلخيص السريع الثاني..."\n'
+                '  ],\n'
                 '  "cheat_sheet": [\n'
                 '    {"term": "English Term", "brief_definition": "تعريف عربي موجز جداً"}\n'
                 '  ],\n'
@@ -536,6 +544,11 @@ async def process_notebook(
                 f"{markdown_content}\n"
             )
 
+            study_strategy = "هذه المحاضرة غنية بالمفاهيم الأساسية، ننصحك بالتركيز على مراجعة المصطلحات والأسئلة التطبيقية لترسيخ الفهم."
+            tldr = [
+                "المفاهيم الأساسية الواردة في هذه المحاضرة جوهرية للامتحان.",
+                "احرص على مراجعة جدول المقارنة والأسئلة التطبيقية لترسيخ الفهم."
+            ]
             cheat_sheet = []
             mcqs = []
             comparisons = []
@@ -564,16 +577,30 @@ async def process_notebook(
                         json_str = raw_json_content[brace_start:brace_end + 1]
 
                 parsed = json.loads(json_str)
+                study_strategy = parsed.get("study_strategy", study_strategy)
+                tldr = parsed.get("tldr", tldr)
                 cheat_sheet = parsed.get("cheat_sheet", [])
                 mcqs = parsed.get("mcqs", [])
                 comparisons = parsed.get("comparisons", [])
+                
                 if is_free_trial:
+                    tldr = tldr[:3]
                     cheat_sheet = cheat_sheet[:6]
                     mcqs = mcqs[:2]
                     comparisons = comparisons[:1]
                 logger.info(f"[NOTEBOOK] Call 2 Parsed: {len(cheat_sheet)} cheat items, {len(mcqs)} MCQs, {len(comparisons)} comparisons.")
             except Exception as parse_err:
                 logger.error(f"[NOTEBOOK] Call 2 JSON parse failed: {parse_err}. Raw JSON content: {raw_json_content}")
+
+            # Calculate stats for Cover page analytics grid
+            word_count = len(markdown_content.split())
+            est_study_time = min(60, 20 + math.ceil(word_count / 150))
+            stats = {
+                "num_key_terms": len(cheat_sheet),
+                "num_mcqs": len(mcqs),
+                "num_comparisons": len(comparisons),
+                "est_study_time": est_study_time
+            }
 
             # 6. Render Premium PDF
             yield f"data: {json.dumps({'type': 'progress', 'step': '5/5', 'message': '🎨 جاري رسم الدفتر الاحترافي بكل الميزات الجديدة...'}, ensure_ascii=False)}\n\n"
@@ -595,6 +622,9 @@ async def process_notebook(
                 mcqs=mcqs,
                 comparisons=comparisons,
                 is_free_trial=is_free_trial,
+                study_strategy=study_strategy,
+                tldr=tldr,
+                stats=stats,
             )
             
             await asyncio.to_thread(
