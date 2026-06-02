@@ -94,6 +94,7 @@ async def process_notebook(
     lecture_urls: Optional[str] = Form(None),
     lecture_title: Optional[str] = Form(None),
     student_name: Optional[str] = Form(None),
+    notebook_type: Optional[str] = Form("university"),
     profile=Depends(check_quota)
 ):
     """
@@ -450,37 +451,69 @@ async def process_notebook(
             # STEP 1: Generate comprehensive bilingual Markdown study notebook
             yield f"data: {json.dumps({'type': 'progress', 'step': '4/5', 'message': '🧠 محرك لمّاح الذكي يكتب محتوى الدفتر الدراسي ثنائي اللغة بالتفصيل...'}, ensure_ascii=False)}\n\n"
 
-            prompt_step1 = (
-                "You are 'Lammah Academic Engine' — an elite academic assistant and expert in synthesizing university lectures. "
-                "Your task is to transform the provided lecture transcript into a 'Premium Study Guide'. It must be highly organized, visually clean, devoid of fluff, and perfectly structured for students to rely on entirely for their exams.\n\n"
-                f"Context: The student's major is {student_major}. Tailor your explanations, tone, and analogies to perfectly suit a student in this specific field.\n\n"
-                f"{depth_note}\n"
-                f"{source_instruction}\n\n"
-                "══════════════════════════════════════\n"
-                "🎯 STRICT GUIDELINES (100% ENFORCED):\n"
-                "══════════════════════════════════════\n"
-                "1. Smart Bilingual Style:\n"
-                "   - Write the core explanations in clear, smooth, and academic Arabic.\n"
-                "   - MANDATORY: ALL technical, scientific, programming, or specific domain terms MUST be written in English. Provide the Arabic translation in parentheses ONLY upon the first mention. (e.g., 'تعتبر الـ Data Structures (هياكل البيانات) أساسية...').\n"
-                "   - NEVER generate separate Arabic and English sections. Integrate them naturally as university students actually study.\n\n"
-                "2. Minimalist & Clean Structure:\n"
-                "   - Use ## for main topics and ### for subtopics.\n"
-                "   - STRICTLY avoid walls of text. Use bullet points and numbered lists extensively for readability.\n\n"
-                "3. Section Components (For every ## main topic, use these exactly):\n"
-                "   - 💡 **الفكرة الجوهرية (Core Idea):** 2-3 lines summarizing the essence of the topic.\n"
-                "   - 🧠 **الشرح والتفصيل (Deep Dive):** Comprehensive explanation covering all details and examples mentioned by the professor.\n"
-                "   - 🔑 **المصطلحات الأساسية (Key Terms):** A bulleted list of English terms and their concise Arabic definitions.\n"
-                "   - ⚠️ **نقاط امتحان (Exam Tips):** Highlight areas the professor emphasized or common pitfalls.\n"
-                "   - ⚠️ **فخ امتحاني (Exam Trap):** Identify confusing elements or typical mistakes students make on this topic (e.g. 'انتبه: يقع الطلاب في فخ خلط X مع Y...').\n"
-                "   - 💬 **اقتباسات المحاضر (Professor's Quotes):** Extract 1-2 exact, notable sentences, jokes, or literal advice the professor said, wrapped in quotes. This adds a personalized, human touch proving the guide is authentic.\n\n"
-                "4. Comprehensiveness:\n"
-                "   - Do not summarize by omitting facts. Include every rule, example, and detail. Your job is to structure and clarify, not to delete information.\n"
-                f"   - {length_instruction}\n"
-                "══════════════════════════════════════\n"
-                "LECTURE TRANSCRIPT:\n"
-                "══════════════════════════════════════\n"
-                f"{transcript[:180000]}\n"
-            )
+            if notebook_type == "course_podcast":
+                prompt_step1 = (
+                    "You are 'Lammah Content Synthesizer' — an elite assistant and expert in creating premium, high-value summaries of courses, workshops, and podcasts. "
+                    "Your task is to transform the provided content transcript into a 'Premium Knowledge Guide'. It must be highly organized, structured, insightful, and designed for self-development and professional application. "
+                    "Avoid academic/university terminology (like 'students', 'professors', 'exams', 'lectures'). Refer to 'the content', 'the speaker', or 'the listeners' instead.\n\n"
+                    f"{depth_note}\n"
+                    f"{source_instruction}\n\n"
+                    "══════════════════════════════════════\n"
+                    "🎯 STRICT GUIDELINES (100% ENFORCED):\n"
+                    "══════════════════════════════════════\n"
+                    "1. Smart Bilingual Style:\n"
+                    "   - Write the core explanations in clear, smooth, and professional Arabic.\n"
+                    "   - MANDATORY: ALL technical, scientific, or specific domain terms MUST be written in English. Provide the Arabic translation in parentheses ONLY upon the first mention. (e.g., 'تعتبر الـ Strategy (الاستراتيجية) أساسية...').\n"
+                    "   - NEVER generate separate Arabic and English sections. Integrate them naturally.\n\n"
+                    "2. Minimalist & Clean Structure:\n"
+                    "   - Use ## for main topics and ### for subtopics.\n"
+                    "   - STRICTLY avoid walls of text. Use bullet points and numbered lists extensively for readability.\n\n"
+                    "3. Section Components (For every ## main topic, use these exactly):\n"
+                    "   - 💡 **الفكرة الجوهرية (Core Idea):** 2-3 lines summarizing the essence of the topic.\n"
+                    "   - 🧠 **الشرح والتفصيل (Deep Dive):** Comprehensive explanation covering all details and examples mentioned by the speaker.\n"
+                    "   - 🔑 **المصطلحات والأدوات (Key Concepts/Tools):** A bulleted list of English terms and their concise Arabic definitions.\n"
+                    "   - 💬 **اقتباسات مميزة (Speaker's Quotes):** Extract 1-2 exact, notable sentences or literal advice the speaker said, wrapped in quotes.\n\n"
+                    "4. Comprehensiveness:\n"
+                    "   - Do not summarize by omitting facts. Include every rule, example, and detail. Your job is to structure and clarify, not to delete information.\n"
+                    f"   - {length_instruction}\n"
+                    "══════════════════════════════════════\n"
+                    "CONTENT TRANSCRIPT:\n"
+                    "══════════════════════════════════════\n"
+                    f"{transcript[:180000]}\n"
+                )
+            else:
+                prompt_step1 = (
+                    "You are 'Lammah Academic Engine' — an elite academic assistant and expert in synthesizing university lectures. "
+                    "Your task is to transform the provided lecture transcript into a 'Premium Study Guide'. It must be highly organized, visually clean, devoid of fluff, and perfectly structured for students to rely on entirely for their exams.\n\n"
+                    f"Context: The student's major is {student_major}. Tailor your explanations, tone, and analogies to perfectly suit a student in this specific field.\n\n"
+                    f"{depth_note}\n"
+                    f"{source_instruction}\n\n"
+                    "══════════════════════════════════════\n"
+                    "🎯 STRICT GUIDELINES (100% ENFORCED):\n"
+                    "══════════════════════════════════════\n"
+                    "1. Smart Bilingual Style:\n"
+                    "   - Write the core explanations in clear, smooth, and academic Arabic.\n"
+                    "   - MANDATORY: ALL technical, scientific, programming, or specific domain terms MUST be written in English. Provide the Arabic translation in parentheses ONLY upon the first mention. (e.g., 'تعتبر الـ Data Structures (هياكل البيانات) أساسية...').\n"
+                    "   - NEVER generate separate Arabic and English sections. Integrate them naturally as university students actually study.\n\n"
+                    "2. Minimalist & Clean Structure:\n"
+                    "   - Use ## for main topics and ### for subtopics.\n"
+                    "   - STRICTLY avoid walls of text. Use bullet points and numbered lists extensively for readability.\n\n"
+                    "3. Section Components (For every ## main topic, use these exactly):\n"
+                    "   - 💡 **الفكرة الجوهرية (Core Idea):** 2-3 lines summarizing the essence of the topic.\n"
+                    "   - 🧠 **الشرح والتفصيل (Deep Dive):** Comprehensive explanation covering all details and examples mentioned by the professor.\n"
+                    "   - 🔑 **المصطلحات الأساسية (Key Terms):** A bulleted list of English terms and their concise Arabic definitions.\n"
+                    "   - ⚠️ **نقاط امتحان (Exam Tips):** Highlight areas the professor emphasized or common pitfalls.\n"
+                    "   - ⚠️ **فخ امتحاني (Exam Trap):** Identify confusing elements or typical mistakes students make on this topic (e.g. 'انتبه: يقع الطلاب في فخ خلط X مع Y...').\n"
+                    "   - 💬 **اقتباسات المحاضر (Professor's Quotes):** Extract 1-2 exact, notable sentences, jokes, or literal advice the professor said, wrapped in quotes. This adds a personalized, human touch proving the guide is authentic.\n\n"
+                    "4. Comprehensiveness:\n"
+                    "   - Do not summarize by omitting facts. Include every rule, example, and detail. Your job is to structure and clarify, not to delete information.\n"
+                    f"   - {length_instruction}\n"
+                    "══════════════════════════════════════\n"
+                    "LECTURE TRANSCRIPT:\n"
+                    "══════════════════════════════════════\n"
+                    f"{transcript[:180000]}\n"
+                )
+
             if pdf_context:
                 prompt_step1 += (
                     "\n══════════════════════════════════════\n"
@@ -500,49 +533,100 @@ async def process_notebook(
                 markdown_content = ai_response.content.strip()
 
             # STEP 2: Generate structured cheat_sheet, mcqs, and comparisons based on the generated markdown
-            yield f"data: {json.dumps({'type': 'progress', 'step': '4.5/5', 'message': '🧠 محرك لمّاح يستخلص خلاصة ليلة الامتحان وأسئلة المراجعة...'}, ensure_ascii=False)}\n\n"
-
-            prompt_step2 = (
-                "You are 'Lammah Academic Engine' — an expert in extracting structured, high-yield study materials for university exam preparation.\n"
-                "Based ONLY on the provided Markdown Study Guide, generate a precise JSON output containing the following keys (study_strategy, tldr, cheat_sheet, mcqs, comparisons):\n\n"
-                "1. study_strategy: A 2-sentence Arabic advice directing the student how to study this lecture (e.g. is it concept-heavy, formula-heavy, or memorization-heavy? Recommend a strategy).\n"
-                "2. tldr: A list of 3-5 concise, high-yield Arabic bullet points summarizing the absolute most critical takeaways from the lecture (the '60-second summary' for exam day).\n"
-                "3. cheat_sheet: A list of the 10-20 most critical concepts or formulas. The 'term' must be in English. The 'brief_definition' must be in Arabic, written in a 'Capsule' style (highly concise, direct, one short line for quick revision).\n"
-                "4. comparisons: Extract at least one smart comparison table contrasting the most easily confused concepts in this lecture. Use clear keywords.\n"
-                "5. mcqs: Create 5 multiple-choice questions (A, B, C, D) at a medium-to-hard university level. The questions MUST test deep understanding and application, not just basic recall. Integrate English terms naturally within the Arabic question body.\n\n"
-                "══════════════════════════════════════\n"
-                "⚠️ STRICT JSON FORMAT RULE:\n"
-                "══════════════════════════════════════\n"
-                "Your output MUST be ONLY valid JSON. No markdown formatting outside the JSON, no intro, no outro.\n"
-                "{\n"
-                '  "study_strategy": "نصيحة لمّاح الأكاديمية للدراسة...",\n'
-                '  "tldr": [\n'
-                '    "التلخيص السريع الأول...",\n'
-                '    "التلخيص السريع الثاني..."\n'
-                '  ],\n'
-                '  "cheat_sheet": [\n'
-                '    {"term": "English Term", "brief_definition": "تعريف عربي موجز جداً"}\n'
-                '  ],\n'
-                '  "mcqs": [\n'
-                '    {\n'
-                '      "question": "نص السؤال العربي المدمج بكلمات إنجليزية بمستوى جامعي",\n'
-                '      "choices": ["أ) خيار 1", "ب) خيار 2", "ج) خيار 3", "د) خيار 4"],\n'
-                '      "answer": "أ"\n'
-                '    }\n'
-                '  ],\n'
-                '  "comparisons": [\n'
-                '    {\n'
-                '      "title": "مقارنة ذكية بين ... و ...",\n'
-                '      "headers": ["المفهوم الأول", "المفهوم الثاني"],\n'
-                '      "rows": [["وجه المقارنة", "قيمة أ", "قيمة ب"]]\n'
-                '    }\n'
-                '  ]\n'
-                "}\n\n"
-                "══════════════════════════════════════\n"
-                "MARKDOWN STUDY GUIDE:\n"
-                "══════════════════════════════════════\n"
-                f"{markdown_content}\n"
-            )
+            if notebook_type == "course_podcast":
+                yield f"data: {json.dumps({'type': 'progress', 'step': '4.5/5', 'message': '🧠 محرك لمّاح يستخلص الخلاصة الجوهرية والخطوات العملية والأسئلة الذاتية...'}, ensure_ascii=False)}\n\n"
+                prompt_step2 = (
+                    "You are 'Lammah Content Synthesizer' — an expert in extracting structured, actionable insights from course and podcast summaries.\n"
+                    "Based ONLY on the provided Markdown Guide, generate a precise JSON output containing the following keys (big_picture, concept_breakdown, key_takeaways, actionable_blueprint, roadblocks_solutions, reflection_prompts, shareable_quotes, resources_tools):\n\n"
+                    "1. big_picture: A 2-3 sentence Arabic paragraph summarizing the core philosophy or main idea of the content (giving the reader immediate value).\n"
+                    "2. concept_breakdown: A list of the most important concepts, tools, or theories explained. The 'term' must be in English, and the 'definition' must be a simple, direct explanation in Arabic (1-2 sentences).\n"
+                    "3. key_takeaways: A list of 5-8 detailed Arabic bullet points representing the core takeaways and central arguments of the content.\n"
+                    "4. actionable_blueprint: A list of 4-6 practical, numbered Arabic steps (1, 2, 3...) that the user can immediately implement in their work or personal life.\n"
+                    "5. roadblocks_solutions: A list of 3-4 objects of potential roadblocks matching the advice, containing two keys: 'roadblock' (العقبة المتوقعة عند التطبيق) and 'solution' (الحل المقترح للتغلب عليها).\n"
+                    "6. reflection_prompts: A list of 3-5 deep self-reflection questions in Arabic, prompting the user to think about how this content applies to their specific situation (to turn it into a workbook).\n"
+                    "7. shareable_quotes: A list of 3-5 of the most powerful, inspiring quotes or literal sentences said by the speaker.\n"
+                    "8. resources_tools: A list of books, apps, sites, or references recommended or mentioned in the content.\n\n"
+                    "══════════════════════════════════════\n"
+                    "⚠️ STRICT JSON FORMAT RULE:\n"
+                    "══════════════════════════════════════\n"
+                    "Your output MUST be ONLY valid JSON. No markdown formatting outside the JSON, no intro, no outro.\n"
+                    "{\n"
+                    '  "big_picture": "الخلاصة الجوهرية هنا...",\n'
+                    '  "concept_breakdown": [\n'
+                    '    {"term": "Concept Name", "definition": "الشرح المبسط جداً..."}\n'
+                    '  ],\n'
+                    '  "key_takeaways": [\n'
+                    '    "الاستنتاج الأول التفصيلي...",\n'
+                    '    "الاستنتاج الثاني التفصيلي..."\n'
+                    '  ],\n'
+                    '  "actionable_blueprint": [\n'
+                    '    "الخطوة الأولى العملية...",\n'
+                    '    "الخطوة الثانية العملية..."\n'
+                    '  ],\n'
+                    '  "roadblocks_solutions": [\n'
+                    '    {"roadblock": "العقبة المحتملة...", "solution": "كيفية التغلب عليها..."}\n'
+                    '  ],\n'
+                    '  "reflection_prompts": [\n'
+                    '    "سؤال للتفكير 1...",\n'
+                    '    "سؤال للتفكير 2..."\n'
+                    '  ],\n'
+                    '  "shareable_quotes": [\n'
+                    '    "اقتباس ملهم 1...",\n'
+                    '    "اقتباس ملهم 2..."\n'
+                    '  ],\n'
+                    '  "resources_tools": [\n'
+                    '    "أداة أو كتاب أو موقع 1...",\n'
+                    '    "أداة أو كتاب أو موقع 2..."\n'
+                    '  ]\n'
+                    "}\n\n"
+                    "══════════════════════════════════════\n"
+                    "MARKDOWN GUIDE:\n"
+                    "══════════════════════════════════════\n"
+                    f"{markdown_content}\n"
+                )
+            else:
+                yield f"data: {json.dumps({'type': 'progress', 'step': '4.5/5', 'message': '🧠 محرك لمّاح يستخلص خلاصة ليلة الامتحان وأسئلة المراجعة...'}, ensure_ascii=False)}\n\n"
+                prompt_step2 = (
+                    "You are 'Lammah Academic Engine' — an expert in extracting structured, high-yield study materials for university exam preparation.\n"
+                    "Based ONLY on the provided Markdown Study Guide, generate a precise JSON output containing the following keys (study_strategy, tldr, cheat_sheet, mcqs, comparisons):\n\n"
+                    "1. study_strategy: A 2-sentence Arabic advice directing the student how to study this lecture (e.g. is it concept-heavy, formula-heavy, or memorization-heavy? Recommend a strategy).\n"
+                    "2. tldr: A list of 3-5 concise, high-yield Arabic bullet points summarizing the absolute most critical takeaways from the lecture (the '60-second summary' for exam day).\n"
+                    "3. cheat_sheet: A list of the 10-20 most critical concepts or formulas. The 'term' must be in English. The 'brief_definition' must be in Arabic, written in a 'Capsule' style (highly concise, direct, one short line for quick revision).\n"
+                    "4. comparisons: Extract at least one smart comparison table contrasting the most easily confused concepts in this lecture. Use clear keywords.\n"
+                    "5. mcqs: Create 5 multiple-choice questions (A, B, C, D) at a medium-to-hard university level. The questions MUST test deep understanding and application, not just basic recall. Integrate English terms naturally within the Arabic question body.\n\n"
+                    "══════════════════════════════════════\n"
+                    "⚠️ STRICT JSON FORMAT RULE:\n"
+                    "══════════════════════════════════════\n"
+                    "Your output MUST be ONLY valid JSON. No markdown formatting outside the JSON, no intro, no outro.\n"
+                    "{\n"
+                    '  "study_strategy": "نصيحة لمّاح الأكاديمية للدراسة...",\n'
+                    '  "tldr": [\n'
+                    '    "التلخيص السريع الأول...",\n'
+                    '    "التلخيص السريع الثاني..."\n'
+                    '  ],\n'
+                    '  "cheat_sheet": [\n'
+                    '    {"term": "English Term", "brief_definition": "تعريف عربي موجز جداً"}\n'
+                    '  ],\n'
+                    '  "mcqs": [\n'
+                    '    {\n'
+                    '      "question": "نص السؤال العربي المدمج بكلمات إنجليزية بمستوى جامعي",\n'
+                    '      "choices": ["أ) خيار 1", "ب) خيار 2", "ج) خيار 3", "د) خيار 4"],\n'
+                    '      "answer": "أ"\n'
+                    '    }\n'
+                    '  ],\n'
+                    '  "comparisons": [\n'
+                    '    {\n'
+                    '      "title": "مقارنة ذكية بين ... و ...",\n'
+                    '      "headers": ["المفهوم الأول", "المفهوم الثاني"],\n'
+                    '      "rows": [["وجه المقارنة", "قيمة أ", "قيمة ب"]]\n'
+                    '    }\n'
+                    '  ]\n'
+                    "}\n\n"
+                    "══════════════════════════════════════\n"
+                    "MARKDOWN STUDY GUIDE:\n"
+                    "══════════════════════════════════════\n"
+                    f"{markdown_content}\n"
+                )
 
             study_strategy = "هذه المحاضرة غنية بالمفاهيم الأساسية، ننصحك بالتركيز على مراجعة المصطلحات والأسئلة التطبيقية لترسيخ الفهم."
             tldr = [
@@ -552,6 +636,16 @@ async def process_notebook(
             cheat_sheet = []
             mcqs = []
             comparisons = []
+            
+            big_picture = "هذا الدفتر يقدم خلاصة وافية وخطوات عملية مفصلة مستخرجة من المحتوى لمساعدتك على التطبيق المباشر."
+            concept_breakdown = []
+            key_takeaways = []
+            actionable_blueprint = []
+            roadblocks_solutions = []
+            reflection_prompts = []
+            shareable_quotes = []
+            resources_tools = []
+            
             raw_json_content = ""
 
             try:
@@ -577,30 +671,58 @@ async def process_notebook(
                         json_str = raw_json_content[brace_start:brace_end + 1]
 
                 parsed = json.loads(json_str)
-                study_strategy = parsed.get("study_strategy", study_strategy)
-                tldr = parsed.get("tldr", tldr)
-                cheat_sheet = parsed.get("cheat_sheet", [])
-                mcqs = parsed.get("mcqs", [])
-                comparisons = parsed.get("comparisons", [])
-                
-                if is_free_trial:
-                    tldr = tldr[:3]
-                    cheat_sheet = cheat_sheet[:6]
-                    mcqs = mcqs[:2]
-                    comparisons = comparisons[:1]
-                logger.info(f"[NOTEBOOK] Call 2 Parsed: {len(cheat_sheet)} cheat items, {len(mcqs)} MCQs, {len(comparisons)} comparisons.")
+                if notebook_type == "course_podcast":
+                    big_picture = parsed.get("big_picture", big_picture)
+                    concept_breakdown = parsed.get("concept_breakdown", [])
+                    key_takeaways = parsed.get("key_takeaways", [])
+                    actionable_blueprint = parsed.get("actionable_blueprint", [])
+                    roadblocks_solutions = parsed.get("roadblocks_solutions", [])
+                    reflection_prompts = parsed.get("reflection_prompts", [])
+                    shareable_quotes = parsed.get("shareable_quotes", [])
+                    resources_tools = parsed.get("resources_tools", [])
+                    
+                    if is_free_trial:
+                        concept_breakdown = concept_breakdown[:4]
+                        key_takeaways = key_takeaways[:3]
+                        actionable_blueprint = actionable_blueprint[:3]
+                        roadblocks_solutions = roadblocks_solutions[:2]
+                        reflection_prompts = reflection_prompts[:2]
+                        shareable_quotes = shareable_quotes[:2]
+                        resources_tools = resources_tools[:2]
+                    logger.info(f"[NOTEBOOK] Call 2 Course/Podcast Parsed: {len(key_takeaways)} takeaways, {len(concept_breakdown)} concepts, {len(actionable_blueprint)} actions.")
+                else:
+                    study_strategy = parsed.get("study_strategy", study_strategy)
+                    tldr = parsed.get("tldr", tldr)
+                    cheat_sheet = parsed.get("cheat_sheet", [])
+                    mcqs = parsed.get("mcqs", [])
+                    comparisons = parsed.get("comparisons", [])
+                    
+                    if is_free_trial:
+                        tldr = tldr[:3]
+                        cheat_sheet = cheat_sheet[:6]
+                        mcqs = mcqs[:2]
+                        comparisons = comparisons[:1]
+                    logger.info(f"[NOTEBOOK] Call 2 University Parsed: {len(cheat_sheet)} cheat items, {len(mcqs)} MCQs, {len(comparisons)} comparisons.")
             except Exception as parse_err:
                 logger.error(f"[NOTEBOOK] Call 2 JSON parse failed: {parse_err}. Raw JSON content: {raw_json_content}")
 
             # Calculate stats for Cover page analytics grid
             word_count = len(markdown_content.split())
             est_study_time = min(60, 20 + math.ceil(word_count / 150))
-            stats = {
-                "num_key_terms": len(cheat_sheet),
-                "num_mcqs": len(mcqs),
-                "num_comparisons": len(comparisons),
-                "est_study_time": est_study_time
-            }
+            if notebook_type == "course_podcast":
+                stats = {
+                    "num_takeaways": len(key_takeaways),
+                    "num_concepts": len(concept_breakdown),
+                    "num_action_steps": len(actionable_blueprint),
+                    "est_read_time": est_study_time
+                }
+            else:
+                stats = {
+                    "num_key_terms": len(cheat_sheet),
+                    "num_mcqs": len(mcqs),
+                    "num_comparisons": len(comparisons),
+                    "est_study_time": est_study_time
+                }
 
             # 6. Render Premium PDF
             yield f"data: {json.dumps({'type': 'progress', 'step': '5/5', 'message': '🎨 جاري رسم الدفتر الاحترافي بكل الميزات الجديدة...'}, ensure_ascii=False)}\n\n"
@@ -610,22 +732,40 @@ async def process_notebook(
             output_pdf_path = os.path.join(base_dir, "outputs", output_filename)
             preview_pdf_path = os.path.join(base_dir, "outputs", preview_filename)
             
-            from app.services.aesthetic_notebook_service import generate_aesthetic_notebook_pdf, generate_preview_pdf
+            from app.services.aesthetic_notebook_service import generate_aesthetic_notebook_pdf, generate_course_podcast_notebook_pdf, generate_preview_pdf
             
-            await asyncio.to_thread(
-                generate_aesthetic_notebook_pdf,
-                output_path=output_pdf_path,
-                continuous_markdown=markdown_content,
-                student_name=student_name,
-                lecture_title=ai_title,
-                cheat_sheet=cheat_sheet,
-                mcqs=mcqs,
-                comparisons=comparisons,
-                is_free_trial=is_free_trial,
-                study_strategy=study_strategy,
-                tldr=tldr,
-                stats=stats,
-            )
+            if notebook_type == "course_podcast":
+                await asyncio.to_thread(
+                    generate_course_podcast_notebook_pdf,
+                    output_path=output_pdf_path,
+                    student_name=student_name,
+                    lecture_title=ai_title,
+                    is_free_trial=is_free_trial,
+                    big_picture=big_picture,
+                    concept_breakdown=concept_breakdown,
+                    key_takeaways=key_takeaways,
+                    actionable_blueprint=actionable_blueprint,
+                    roadblocks_solutions=roadblocks_solutions,
+                    reflection_prompts=reflection_prompts,
+                    shareable_quotes=shareable_quotes,
+                    resources_tools=resources_tools,
+                    stats=stats,
+                )
+            else:
+                await asyncio.to_thread(
+                    generate_aesthetic_notebook_pdf,
+                    output_path=output_pdf_path,
+                    continuous_markdown=markdown_content,
+                    student_name=student_name,
+                    lecture_title=ai_title,
+                    cheat_sheet=cheat_sheet,
+                    mcqs=mcqs,
+                    comparisons=comparisons,
+                    is_free_trial=is_free_trial,
+                    study_strategy=study_strategy,
+                    tldr=tldr,
+                    stats=stats,
+                )
             
             await asyncio.to_thread(
                 generate_preview_pdf,
@@ -645,10 +785,29 @@ async def process_notebook(
                 "has_pdf": bool(pdf_path),
                 "is_notebook": True,
                 "student_name": student_name,
-                "cheat_sheet": cheat_sheet,
-                "mcqs": mcqs,
-                "comparisons": comparisons
+                "notebook_type": notebook_type,
             }
+            if notebook_type == "course_podcast":
+                history_meta.update({
+                    "big_picture": big_picture,
+                    "concept_breakdown": concept_breakdown,
+                    "key_takeaways": key_takeaways,
+                    "actionable_blueprint": actionable_blueprint,
+                    "roadblocks_solutions": roadblocks_solutions,
+                    "reflection_prompts": reflection_prompts,
+                    "shareable_quotes": shareable_quotes,
+                    "resources_tools": resources_tools,
+                    "stats": stats
+                })
+            else:
+                history_meta.update({
+                    "cheat_sheet": cheat_sheet,
+                    "mcqs": mcqs,
+                    "comparisons": comparisons,
+                    "study_strategy": study_strategy,
+                    "tldr": tldr,
+                    "stats": stats
+                })
             log_id = use_lecture_quota(user_id, metadata=history_meta, cost=calculated_cost)
 
             download_url = f"/api/v1/notebook/download/{output_filename}"
@@ -723,26 +882,44 @@ def download_notebook(job_id: str):
                 markdown_content = annotations.get("markdown", "")
                 student_name = metadata.get("student_name", "طالب متميز")
                 ai_title = metadata.get("title", "ملزمة دراسية ممتازة")
-                cheat_sheet = metadata.get("cheat_sheet", None)
-                mcqs = metadata.get("mcqs", None)
-                comparisons = metadata.get("comparisons", None)
+                notebook_type = metadata.get("notebook_type", "university")
+                stats = metadata.get("stats", None)
                 
                 if markdown_content:
                     original_pdf_path = os.path.join(base_dir, "outputs", f"notebook_{unique_id}.pdf")
                     preview_pdf_path = os.path.join(base_dir, "outputs", f"preview_notebook_{unique_id}.pdf")
                     
-                    logger.info(f"[DOWNLOAD] Regenerating original PDF to {original_pdf_path}")
-                    from app.services.aesthetic_notebook_service import generate_aesthetic_notebook_pdf, generate_preview_pdf
+                    logger.info(f"[DOWNLOAD] Regenerating original PDF to {original_pdf_path} for type {notebook_type}")
+                    from app.services.aesthetic_notebook_service import generate_aesthetic_notebook_pdf, generate_course_podcast_notebook_pdf, generate_preview_pdf
                     
-                    generate_aesthetic_notebook_pdf(
-                        output_path=original_pdf_path,
-                        continuous_markdown=markdown_content,
-                        student_name=student_name,
-                        lecture_title=ai_title,
-                        cheat_sheet=cheat_sheet,
-                        mcqs=mcqs,
-                        comparisons=comparisons,
-                    )
+                    if notebook_type == "course_podcast":
+                        generate_course_podcast_notebook_pdf(
+                            output_path=original_pdf_path,
+                            student_name=student_name,
+                            lecture_title=ai_title,
+                            big_picture=metadata.get("big_picture"),
+                            concept_breakdown=metadata.get("concept_breakdown"),
+                            key_takeaways=metadata.get("key_takeaways"),
+                            actionable_blueprint=metadata.get("actionable_blueprint"),
+                            roadblocks_solutions=metadata.get("roadblocks_solutions"),
+                            reflection_prompts=metadata.get("reflection_prompts"),
+                            shareable_quotes=metadata.get("shareable_quotes"),
+                            resources_tools=metadata.get("resources_tools"),
+                            stats=stats,
+                        )
+                    else:
+                        generate_aesthetic_notebook_pdf(
+                            output_path=original_pdf_path,
+                            continuous_markdown=markdown_content,
+                            student_name=student_name,
+                            lecture_title=ai_title,
+                            cheat_sheet=metadata.get("cheat_sheet"),
+                            mcqs=metadata.get("mcqs"),
+                            comparisons=metadata.get("comparisons"),
+                            study_strategy=metadata.get("study_strategy"),
+                            tldr=metadata.get("tldr"),
+                            stats=stats,
+                        )
                     
                     logger.info(f"[DOWNLOAD] Regenerating preview PDF to {preview_pdf_path}")
                     generate_preview_pdf(
