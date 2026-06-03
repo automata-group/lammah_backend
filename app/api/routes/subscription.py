@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from app.core.auth_guard import verify_token, get_user_profile
 from app.core.logger import logger
 from pydantic import BaseModel
@@ -49,9 +49,54 @@ async def get_my_info(profile=Depends(get_user_profile)):
 
 
 @router.get("/quota")
-async def get_quota(profile=Depends(get_user_profile)):
+async def get_quota(request: Request, profile=Depends(get_user_profile)):
     from app.services.subscription_service import get_active_quota
-    return get_active_quota(profile["id"])
+    from app.db.supabase_client import get_supabase
+    from datetime import datetime, timezone
+    
+    quota_info = get_active_quota(profile["id"])
+    
+    fingerprint = profile.get("device_fingerprint")
+    if not fingerprint:
+        fingerprint = request.headers.get("X-Fingerprint")
+        
+    supabase = get_supabase()
+    
+    # Check if they have an active paid subscription
+    active_sub = None
+    try:
+        sub_result = supabase.table("user_subscriptions") \
+            .select("*, subscription_plans(*)") \
+            .eq("user_id", profile["id"]) \
+            .eq("status", "active") \
+            .gte("expires_at", datetime.now(timezone.utc).isoformat()) \
+            .order("created_at", desc=True) \
+            .limit(1) \
+            .execute()
+        active_sub = sub_result.data[0] if sub_result.data else None
+    except Exception as e:
+        logger.error(f"❌ Error checking subscription in quota route: {str(e)}")
+
+    device_abuse = False
+    device_abuse_message = None
+
+    if not active_sub and fingerprint:
+        try:
+            others = supabase.table("profiles") \
+                .select("id") \
+                .eq("device_fingerprint", fingerprint) \
+                .neq("id", profile["id"]) \
+                .execute()
+            if others.data:
+                logger.warning(f"🚫 Device abuse in quota endpoint: User {profile['id']} has fingerprint {fingerprint} already used by {others.data[0]['id']}")
+                device_abuse = True
+                device_abuse_message = "🚫 عذراً! تم استخدام التجربة المجانية بالفعل على هذا الجهاز بحساب آخر. يرجى الاشتراك للاستمرار. 🚀"
+        except Exception as e:
+            logger.error(f"Fingerprint check error in /quota route: {e}")
+
+    quota_info["device_abuse"] = device_abuse
+    quota_info["device_abuse_message"] = device_abuse_message
+    return quota_info
 
 
 @router.get("/chat-usage")
