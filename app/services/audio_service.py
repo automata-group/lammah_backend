@@ -59,13 +59,16 @@ def transcribe_audio(file_path: str, progress_callback=None) -> str:
             if progress_callback:
                 progress_callback("⚡ جاري الإرسال لمحرك لمّاح الصوتي الذكي...")
             
-            headers = {
-                "Authorization": f"Bearer {settings.GPT_AUDIO_KEY.strip()}",
-                "HTTP-Referer": "https://lammah.site",
-                "X-Title": "Lammah AI",
-                "Content-Type": "application/json"
-            }
+            # Get all available OpenRouter keys to try
+            keys_to_try = []
+            if settings.GPT_AUDIO_KEY:
+                keys_to_try.append(settings.GPT_AUDIO_KEY.strip())
+            if settings.OPENROUTER_API_KEY and settings.OPENROUTER_API_KEY.strip() not in keys_to_try:
+                keys_to_try.append(settings.OPENROUTER_API_KEY.strip())
             
+            if not keys_to_try:
+                raise RuntimeError("No OpenRouter keys configured.")
+                
             # Helper to encode file to base64 (raw string, no prefix)
             with open(file_path, "rb") as f:
                 encoded_audio = base64.b64encode(f.read()).decode('utf-8')
@@ -73,38 +76,54 @@ def transcribe_audio(file_path: str, progress_callback=None) -> str:
             ext = os.path.splitext(file_path)[1].replace(".", "").lower()
             if ext == "m4a": ext = "mp4" # OpenRouter mapping
             
-            # Strictly use Qwen ASR Flash as primary, with GPT Audio Mini as fallback
-            models_to_try = ["qwen/qwen3-asr-flash-2026-02-10", "openai/gpt-4o-mini-transcribe"]
+            # Strictly use Qwen ASR Flash as primary, with GPT Audio Mini and Whisper-1 as fallback
+            models_to_try = ["qwen/qwen3-asr-flash-2026-02-10", "openai/gpt-4o-mini-transcribe", "openai/whisper-1"]
             last_error = ""
+            success = False
+            transcription_text = ""
             
-            for m in models_to_try:
-                try:
-                    logger.info(f"🌐 [OR-FIX] Trying model: {m} with format: {ext}")
-                    payload = {
-                        "model": m,
-                        "input_audio": {
-                            "data": encoded_audio,
-                            "format": ext
+            for key_str in keys_to_try:
+                headers = {
+                    "Authorization": f"Bearer {key_str}",
+                    "HTTP-Referer": "https://lammah.site",
+                    "X-Title": "Lammah AI",
+                    "Content-Type": "application/json"
+                }
+                for m in models_to_try:
+                    try:
+                        logger.info(f"🌐 [OR-FIX] Trying model: {m} with format: {ext}")
+                        payload = {
+                            "model": m,
+                            "input_audio": {
+                                "data": encoded_audio,
+                                "format": ext
+                            }
                         }
-                    }
-                    
-                    response = requests.post(
-                        "https://openrouter.ai/api/v1/audio/transcriptions",
-                        headers=headers,
-                        json=payload,
-                        timeout=300
-                    )
-                    
-                    if response.status_code == 200:
-                        return response.json().get("text", "")
-                    else:
-                        last_error = f"Model {m} failed ({response.status_code}): {response.text}"
-                        logger.warning(last_error)
-                        continue 
-                except Exception as inner_e:
-                    last_error = str(inner_e)
-                    logger.error(f"❌ Error with model {m}: {last_error}")
-                    continue
+                        
+                        response = requests.post(
+                            "https://openrouter.ai/api/v1/audio/transcriptions",
+                            headers=headers,
+                            json=payload,
+                            timeout=300
+                        )
+                        
+                        if response.status_code == 200:
+                            transcription_text = response.json().get("text", "")
+                            success = True
+                            break
+                        else:
+                            last_error = f"Model {m} failed ({response.status_code}): {response.text}"
+                            logger.warning(last_error)
+                            continue 
+                    except Exception as inner_e:
+                        last_error = str(inner_e)
+                        logger.error(f"❌ Error with model {m}: {last_error}")
+                        continue
+                if success:
+                    break
+
+            if success:
+                return transcription_text
 
             # If both OR models fail, try Groq as last resort
             if settings.GROQ_API_KEY:
@@ -190,55 +209,68 @@ def _transcribe_large_audio(file_path: str, progress_callback=None) -> str:
                 
                 if active_is_openrouter:
                     import requests
-                    headers = {
-                        "Authorization": f"Bearer {settings.GPT_AUDIO_KEY.strip()}",
-                        "HTTP-Referer": "https://lammah.site",
-                        "X-Title": "Lammah AI",
-                        "Content-Type": "application/json"
-                    }
                     
+                    # Get all available OpenRouter keys to try
+                    keys_to_try = []
+                    if settings.GPT_AUDIO_KEY:
+                        keys_to_try.append(settings.GPT_AUDIO_KEY.strip())
+                    if settings.OPENROUTER_API_KEY and settings.OPENROUTER_API_KEY.strip() not in keys_to_try:
+                        keys_to_try.append(settings.OPENROUTER_API_KEY.strip())
+                    
+                    if not keys_to_try:
+                        raise RuntimeError("No OpenRouter keys configured.")
+                        
                     # Encode chunk to base64
                     with open(chunk_path, "rb") as f:
                         encoded_chunk = base64.b64encode(f.read()).decode('utf-8')
                     
-                    # Strictly use Qwen ASR Flash with GPT as fallback
-                    models_to_try = ["qwen/qwen3-asr-flash-2026-02-10", "openai/gpt-4o-mini-transcribe"]
+                    # Strictly use Qwen ASR Flash with GPT and Whisper-1 as fallback
+                    models_to_try = ["qwen/qwen3-asr-flash-2026-02-10", "openai/gpt-4o-mini-transcribe", "openai/whisper-1"]
                     
                     chunk_success = False
-                    for m in models_to_try:
-                        try:
-                            logger.info(f"🎙️ [LAMMAH] Transcribing chunk with model: {m}")
-                            payload = {
-                                "model": m,
-                                "input_audio": {
-                                    "data": encoded_chunk,
-                                    "format": "mp3"
+                    for key_str in keys_to_try:
+                        headers = {
+                            "Authorization": f"Bearer {key_str}",
+                            "HTTP-Referer": "https://lammah.site",
+                            "X-Title": "Lammah AI",
+                            "Content-Type": "application/json"
+                        }
+                        for m in models_to_try:
+                            try:
+                                logger.info(f"🎙️ [LAMMAH] Transcribing chunk with model: {m}")
+                                payload = {
+                                    "model": m,
+                                    "input_audio": {
+                                        "data": encoded_chunk,
+                                        "format": "mp3"
+                                    }
                                 }
-                            }
-                            
-                            response = requests.post(
-                                "https://openrouter.ai/api/v1/audio/transcriptions",
-                                headers=headers,
-                                json=payload,
-                                timeout=300
-                            )
-                            
-                            if response.status_code == 200:
-                                chunk_text = response.json().get("text", "").strip()
-                                m_start = idx * 5
-                                m_end = (idx + 1) * 5
-                                timestamp_label = f"\n\n⏱️ [{m_start:02d}:00 - {m_end:02d}:00]\n"
-                                full_transcript.append(timestamp_label + chunk_text)
-                                success = True
-                                chunk_success = True
-                                # If this model worked, stick with it for next chunks
-                                active_model = m
-                                break
-                            else:
-                                logger.warning(f"Chunk fail with {m} ({response.status_code}): {response.text}")
-                        except Exception as chunk_e:
-                            logger.error(f"Chunk error with {m}: {chunk_e}")
-                            continue
+                                
+                                response = requests.post(
+                                    "https://openrouter.ai/api/v1/audio/transcriptions",
+                                    headers=headers,
+                                    json=payload,
+                                    timeout=300
+                                )
+                                
+                                if response.status_code == 200:
+                                    chunk_text = response.json().get("text", "").strip()
+                                    m_start = idx * 5
+                                    m_end = (idx + 1) * 5
+                                    timestamp_label = f"\n\n⏱️ [{m_start:02d}:00 - {m_end:02d}:00]\n"
+                                    full_transcript.append(timestamp_label + chunk_text)
+                                    success = True
+                                    chunk_success = True
+                                    # If this model worked, stick with it for next chunks
+                                    active_model = m
+                                    break
+                                else:
+                                    logger.warning(f"Chunk fail with {m} ({response.status_code}): {response.text}")
+                            except Exception as chunk_e:
+                                logger.error(f"Chunk error with {m}: {chunk_e}")
+                                continue
+                        if chunk_success:
+                            break
                     
                     if chunk_success:
                         break
