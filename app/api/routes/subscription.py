@@ -101,7 +101,7 @@ async def get_quota(request: Request, profile=Depends(get_user_profile)):
                 if usage_check.data:
                     logger.warning(f"🚫 Device abuse in quota endpoint: User {profile['id']} has fingerprint {fingerprint} already used by {others.data[0]['id']} who processed lectures")
                     device_abuse = True
-                    device_abuse_message = "🚫 عذراً! تم استخدام التجربة المجانية بالفعل على هذا الجهاز بحساب آخر. يرجى الاشتراك للاستمرار. 🚀"
+                    device_abuse_message = "🚫 عذراً! التجربة المجانية غير متوفرة لأنها استُخدمت بالفعل على هذا الجهاز. يرجى الاشتراك للاستمرار. 🚀"
         except Exception as e:
             logger.error(f"Fingerprint check error in /quota route: {e}")
 

@@ -155,7 +155,7 @@ async def check_quota(request: Request, profile=Depends(get_user_profile)):
                     if usage_check.data:
                         logger.warning(f"🚫 Device abuse: User {profile['id']} using fingerprint {fingerprint} (already used by {others.data[0]['id']} who processed lectures)")
                         raise HTTPException(status_code=403, detail={
-                            "user_message": "🚫 عذراً! تم استخدام التجربة المجانية بالفعل على هذا الجهاز بحساب آخر. يرجى الاشتراك للاستمرار. 🚀",
+                            "user_message": "🚫 عذراً! التجربة المجانية غير متوفرة لأنها استُخدمت بالفعل على هذا الجهاز. يرجى الاشتراك للاستمرار. 🚀",
                             "type": "device_abuse"
                         })
             except HTTPException: raise
