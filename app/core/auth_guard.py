@@ -51,7 +51,7 @@ async def get_user_profile(request: Request, user=Depends(verify_token)):
             "id": user.id,
             "phone_number": getattr(user, 'phone', None),
             "phone_verified": bool(getattr(user, 'phone', None)),
-            "quota_remaining": 0,
+            "quota_remaining": 15,
         }
         
         try:
@@ -142,11 +142,22 @@ async def check_quota(request: Request, profile=Depends(get_user_profile)):
                     .execute()
                 
                 if others.data:
-                    logger.warning(f"🚫 Device abuse: User {profile['id']} using fingerprint {fingerprint} (already used by {others.data[0]['id']})")
-                    raise HTTPException(status_code=403, detail={
-                        "user_message": "🚫 عذراً! تم استخدام التجربة المجانية بالفعل على هذا الجهاز بحساب آخر. يرجى الاشتراك للاستمرار. 🚀",
-                        "type": "device_abuse"
-                    })
+                    other_ids = [u["id"] for u in others.data]
+                    # Smart check: only block if any of the other accounts sharing the fingerprint has successfully processed a lecture
+                    usage_check = supabase.table("usage_logs") \
+                        .select("id") \
+                        .in_("user_id", other_ids) \
+                        .eq("action_type", "lecture_process") \
+                        .eq("status", "success") \
+                        .limit(1) \
+                        .execute()
+                    
+                    if usage_check.data:
+                        logger.warning(f"🚫 Device abuse: User {profile['id']} using fingerprint {fingerprint} (already used by {others.data[0]['id']} who processed lectures)")
+                        raise HTTPException(status_code=403, detail={
+                            "user_message": "🚫 عذراً! تم استخدام التجربة المجانية بالفعل على هذا الجهاز بحساب آخر. يرجى الاشتراك للاستمرار. 🚀",
+                            "type": "device_abuse"
+                        })
             except HTTPException: raise
             except Exception as e: logger.error(f"Fingerprint check error: {e}")
 

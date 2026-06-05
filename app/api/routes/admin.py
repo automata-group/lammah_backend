@@ -68,11 +68,11 @@ async def get_admin_stats(admin=Depends(verify_admin)):
             })
 
         # 4b. Find users with manual quota (not covered by active subscriptions)
-        # We look for quota_remaining > 1 because 1 is the default free trial
+        # We look for quota_remaining > 15 because 15 is the default free trial
         subscriber_ids = [s.get("user_id") for s in subs_res.data if s.get("user_id")]
         manual_res = supabase.table("profiles") \
             .select("id, full_name, phone_number, device_fingerprint, quota_remaining, created_at") \
-            .gt("quota_remaining", 1) \
+            .gt("quota_remaining", 15) \
             .execute()
             
         for p in (manual_res.data or []):
@@ -122,10 +122,10 @@ async def cancel_user_plan(user_id: str, admin=Depends(verify_admin)):
             .eq("status", "active") \
             .execute()
             
-        # 2. Reset profile (Quota to 0, clear plan)
+        # 2. Reset profile (Quota to 15, clear plan)
         supabase.table("profiles") \
             .update({
-                "quota_remaining": 0,
+                "quota_remaining": 15,
                 "current_plan_id": None
             }) \
             .eq("id", user_id) \
@@ -255,7 +255,7 @@ async def bulk_cancel_user_plans(data: BulkCancelPlanModel, admin=Depends(verify
 
         # 2. Reset profile quota and plan for all specified users
         supabase.table("profiles") \
-            .update({"quota_remaining": 0, "current_plan_id": None}) \
+            .update({"quota_remaining": 15, "current_plan_id": None}) \
             .in_("id", data.user_ids) \
             .execute()
 

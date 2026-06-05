@@ -88,9 +88,20 @@ async def get_quota(request: Request, profile=Depends(get_user_profile)):
                 .neq("id", profile["id"]) \
                 .execute()
             if others.data:
-                logger.warning(f"🚫 Device abuse in quota endpoint: User {profile['id']} has fingerprint {fingerprint} already used by {others.data[0]['id']}")
-                device_abuse = True
-                device_abuse_message = "🚫 عذراً! تم استخدام التجربة المجانية بالفعل على هذا الجهاز بحساب آخر. يرجى الاشتراك للاستمرار. 🚀"
+                other_ids = [u["id"] for u in others.data]
+                # Smart check: only block if any of the other accounts sharing the fingerprint has successfully processed a lecture
+                usage_check = supabase.table("usage_logs") \
+                    .select("id") \
+                    .in_("user_id", other_ids) \
+                    .eq("action_type", "lecture_process") \
+                    .eq("status", "success") \
+                    .limit(1) \
+                    .execute()
+                
+                if usage_check.data:
+                    logger.warning(f"🚫 Device abuse in quota endpoint: User {profile['id']} has fingerprint {fingerprint} already used by {others.data[0]['id']} who processed lectures")
+                    device_abuse = True
+                    device_abuse_message = "🚫 عذراً! تم استخدام التجربة المجانية بالفعل على هذا الجهاز بحساب آخر. يرجى الاشتراك للاستمرار. 🚀"
         except Exception as e:
             logger.error(f"Fingerprint check error in /quota route: {e}")
 
