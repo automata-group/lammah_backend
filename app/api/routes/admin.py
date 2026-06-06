@@ -122,10 +122,10 @@ async def cancel_user_plan(user_id: str, admin=Depends(verify_admin)):
             .eq("status", "active") \
             .execute()
             
-        # 2. Reset profile (Quota to 15, clear plan)
+        # 2. Reset profile (Quota to 0, clear plan)
         supabase.table("profiles") \
             .update({
-                "quota_remaining": 15,
+                "quota_remaining": 0,
                 "current_plan_id": None
             }) \
             .eq("id", user_id) \
@@ -255,7 +255,7 @@ async def bulk_cancel_user_plans(data: BulkCancelPlanModel, admin=Depends(verify
 
         # 2. Reset profile quota and plan for all specified users
         supabase.table("profiles") \
-            .update({"quota_remaining": 15, "current_plan_id": None}) \
+            .update({"quota_remaining": 0, "current_plan_id": None}) \
             .in_("id", data.user_ids) \
             .execute()
 

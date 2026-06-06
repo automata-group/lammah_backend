@@ -32,7 +32,12 @@ async def chat_with_lecture(request: ChatRequest, user: dict = Depends(get_user_
     """
     try:
         supabase = get_supabase()
-        log_result = supabase.table("usage_logs").select("*").eq("id", request.history_id).eq("user_id", user["id"]).single().execute()
+        is_demo_lecture = request.history_id == "4198557f-5b1b-48ac-91a8-d8129de8ca0b"
+        
+        if is_demo_lecture:
+            log_result = supabase.table("usage_logs").select("*").eq("id", request.history_id).single().execute()
+        else:
+            log_result = supabase.table("usage_logs").select("*").eq("id", request.history_id).eq("user_id", user["id"]).single().execute()
         
         if not log_result.data:
             raise HTTPException(status_code=404, detail="Lecture not found or unauthorized")
@@ -40,43 +45,48 @@ async def chat_with_lecture(request: ChatRequest, user: dict = Depends(get_user_
         current_count = log_result.data.get("chat_count", 0) or 0
 
         # 1. Plan Verification & Limits
-        from datetime import datetime, timezone
-        sub_check = supabase.table("user_subscriptions") \
-            .select("*, subscription_plans(*)") \
-            .eq("user_id", user["id"]) \
-            .eq("status", "active") \
-            .gte("expires_at", datetime.now(timezone.utc).isoformat()) \
-            .limit(1) \
-            .execute()
-        
-        if not sub_check.data:
-            raise HTTPException(status_code=403, detail={
-                "user_message": "هذه الميزة متاحة للمشتركين فقط. قم بالترقية للاستمتاع بالمحادثة الذكية مع محاضراتك!",
-                "type": "upgrade_required"
-            })
-            
-        subscription = sub_check.data[0]
-        plan_name = subscription["subscription_plans"]["name"]
-        
-        # Determine plan tier and message limit
-        limit = 5  # Default/Free/Student
-        if any(term in plan_name for term in ["الذهبية", "الفصل الدراسي", "برو", "VIP", "Elite", "Pro", "النخبة"]):
+        if is_demo_lecture:
+            plan_name = "شهري - برو"
             limit = 100
-        elif any(term in plan_name for term in ["الميدتيرم", "التفوق", "متقدم", "Advanced", "Premium"]):
-            limit = 25
-        elif any(term in plan_name for term in ["الإنقاذ", "الأساسية", "الاساسية", "أساسي", "اساسي", "Basic", "Essential", "Emergency"]):
-            limit = 5
+            total_used = 0
+        else:
+            from datetime import datetime, timezone
+            sub_check = supabase.table("user_subscriptions") \
+                .select("*, subscription_plans(*)") \
+                .eq("user_id", user["id"]) \
+                .eq("status", "active") \
+                .gte("expires_at", datetime.now(timezone.utc).isoformat()) \
+                .limit(1) \
+                .execute()
             
-        # Calculate total chat count across all user's lectures
-        total_chats = supabase.table("usage_logs").select("chat_count").eq("user_id", user["id"]).execute()
-        total_used = sum(item.get("chat_count", 0) or 0 for item in total_chats.data) if total_chats.data else 0
-        
-        if total_used >= limit:
-            raise HTTPException(status_code=403, detail={
-                "user_message": f"لقد وصلت للحد الأقصى الإجمالي للمحادثات المتاح لحسابك ({limit} رسالة) حسب باقتك ({plan_name}). يمكنك الترقية للحصول على حدود أعلى!",
-                "type": "limit_reached",
-                "limit": limit
-            })
+            if not sub_check.data:
+                raise HTTPException(status_code=403, detail={
+                    "user_message": "هذه الميزة متاحة للمشتركين فقط. قم بالترقية للاستمتاع بالمحادثة الذكية مع محاضراتك!",
+                    "type": "upgrade_required"
+                })
+                
+            subscription = sub_check.data[0]
+            plan_name = subscription["subscription_plans"]["name"]
+            
+            # Determine plan tier and message limit
+            limit = 5  # Default/Free/Student
+            if any(term in plan_name for term in ["الذهبية", "الفصل الدراسي", "برو", "VIP", "Elite", "Pro", "النخبة"]):
+                limit = 100
+            elif any(term in plan_name for term in ["الميدتيرم", "التفوق", "متقدم", "Advanced", "Premium"]):
+                limit = 25
+            elif any(term in plan_name for term in ["الإنقاذ", "الأساسية", "الاساسية", "أساسي", "اساسي", "Basic", "Essential", "Emergency"]):
+                limit = 5
+                
+            # Calculate total chat count across all user's lectures
+            total_chats = supabase.table("usage_logs").select("chat_count").eq("user_id", user["id"]).execute()
+            total_used = sum(item.get("chat_count", 0) or 0 for item in total_chats.data) if total_chats.data else 0
+            
+            if total_used >= limit:
+                raise HTTPException(status_code=403, detail={
+                    "user_message": f"لقد وصلت للحد الأقصى الإجمالي للمحادثات المتاح لحسابك ({limit} رسالة) حسب باقتك ({plan_name}). يمكنك الترقية للحصول على حدود أعلى!",
+                    "type": "limit_reached",
+                    "limit": limit
+                })
 
         # 2. Context Retrieval (RAG)
         metadata = log_result.data.get("metadata", {})
@@ -128,8 +138,9 @@ async def chat_with_lecture(request: ChatRequest, user: dict = Depends(get_user_
 
         async def generate():
             try:
-                # Increment count in DB
-                supabase.table("usage_logs").update({"chat_count": current_count + 1}).eq("id", request.history_id).execute()
+                # Increment count in DB only for non-demo lectures
+                if request.history_id != "4198557f-5b1b-48ac-91a8-d8129de8ca0b":
+                    supabase.table("usage_logs").update({"chat_count": current_count + 1}).eq("id", request.history_id).execute()
                 
                 async for chunk in model.astream(messages):
                     if chunk.content:

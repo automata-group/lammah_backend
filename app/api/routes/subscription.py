@@ -130,6 +130,20 @@ async def get_history(profile=Depends(get_user_profile)):
     try:
         from app.services.subscription_service import get_usage_logs
         logs = get_usage_logs(profile["id"])
+        
+        # Inject demo lecture if not already in logs and user is on a free plan
+        is_free_trial = profile.get("current_plan_id") is None or profile.get("current_plan_id") == "free"
+        if is_free_trial:
+            has_demo = any(item.get("id") == "4198557f-5b1b-48ac-91a8-d8129de8ca0b" for item in logs)
+            if not has_demo:
+                from app.db.supabase_client import get_supabase
+                supabase = get_supabase()
+                demo_res = supabase.table("usage_logs").select("*").eq("id", "4198557f-5b1b-48ac-91a8-d8129de8ca0b").execute()
+                if demo_res.data:
+                    demo_item = demo_res.data[0]
+                    if "metadata" in demo_item and demo_item["metadata"]:
+                        demo_item["metadata"]["is_demo"] = True
+                    logs.insert(0, demo_item)
         return {"logs": logs}
     except Exception as e:
         logger.warning(f"⚠️ خطأ في جلب السجل: {str(e)}")
@@ -142,7 +156,13 @@ async def get_history_item(log_id: str, profile=Depends(get_user_profile)):
     try:
         from app.db.supabase_client import get_supabase
         supabase = get_supabase()
-        result = supabase.table("usage_logs").select("*").eq("id", log_id).eq("user_id", profile["id"]).single().execute()
+        
+        # Allow any user to retrieve the demo lecture
+        if log_id == "4198557f-5b1b-48ac-91a8-d8129de8ca0b":
+            result = supabase.table("usage_logs").select("*").eq("id", log_id).single().execute()
+        else:
+            result = supabase.table("usage_logs").select("*").eq("id", log_id).eq("user_id", profile["id"]).single().execute()
+            
         if not result.data:
             raise HTTPException(status_code=404, detail="السجل غير موجود")
         
@@ -168,6 +188,11 @@ async def update_lecture_title(log_id: str, body: UpdateTitleRequest, profile=De
     try:
         from app.db.supabase_client import get_supabase
         supabase = get_supabase()
+        
+        # Block title update for the demo lecture unless it's the owner
+        if log_id == "4198557f-5b1b-48ac-91a8-d8129de8ca0b" and profile["id"] != "8bcfddf9-088d-43af-a2ba-bd0ea33593bb":
+            return {"success": True, "title": body.title.strip()}
+            
         # Fetch existing record
         existing = supabase.table("usage_logs").select("metadata").eq("id", log_id).eq("user_id", profile["id"]).single().execute()
         if not existing.data:

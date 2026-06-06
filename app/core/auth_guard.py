@@ -51,7 +51,7 @@ async def get_user_profile(request: Request, user=Depends(verify_token)):
             "id": user.id,
             "phone_number": getattr(user, 'phone', None),
             "phone_verified": bool(getattr(user, 'phone', None)),
-            "quota_remaining": 15,
+            "quota_remaining": 0,
         }
         
         try:
