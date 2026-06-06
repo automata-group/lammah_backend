@@ -26,6 +26,7 @@ def _build_ydl_opts(
         "nocheckcertificate": True,
         "extract_flat": False,
         "force_keyframes_at_cuts": True,
+        "remote_components": ["ejs:github"],
         "postprocessors": [{
             "key": "FFmpegExtractAudio",
             "preferredcodec": "mp3",
@@ -179,6 +180,8 @@ def download_youtube_audio(youtube_url: str, upload_dir: str, unique_id: str) ->
         # Specific clients
         {"name": "proxy + ios client",                 "proxy": proxy, "cookies": None,         "clients": ["ios"]},
         {"name": "proxy + mweb client",                "proxy": proxy, "cookies": None,         "clients": ["mweb"]},
+        {"name": "direct + ios client",                "proxy": None,  "cookies": None,         "clients": ["ios"]},
+        {"name": "direct + mweb client",               "proxy": None,  "cookies": None,         "clients": ["mweb"]},
     ]
 
     last_error = ""

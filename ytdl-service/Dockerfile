@@ -1,5 +1,8 @@
 FROM python:3.11-slim
 
+# Copy Deno binary from official image for yt-dlp signature decryption solving
+COPY --from=denoland/deno:bin /deno /usr/local/bin/deno
+
 # Install system dependencies (ffmpeg and curl for health check)
 RUN apt-get update && apt-get install -y \
     ffmpeg \
