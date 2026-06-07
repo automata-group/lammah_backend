@@ -789,6 +789,11 @@ async def process_lecture(
             # Detect if this is a document-only mode (no audio, no URL)
             is_document_only = (audio_path is None) and (not lecture_url)
 
+            # Block URL processing for free trial users — send upgrade message instead
+            if lecture_url and is_free_trial:
+                yield f"data: {json.dumps({'type': 'error', 'message': '🔒 معالجة روابط يوتيوب متاحة للباقات المدفوعة فقط. قم بالترقية لتتمكن من رفع روابط يوتيوب وغيرها!'}, ensure_ascii=False)}\n\n"
+                return
+
             # 1. Finalize Audio Path (Download if URL)
             if lecture_url and not audio_path:
                 yield f"data: {json.dumps({'type': 'progress', 'step': '0/5', 'message': '🔗 جاري تحميل المحاضرة من الرابط...'}, ensure_ascii=False)}\n\n"
