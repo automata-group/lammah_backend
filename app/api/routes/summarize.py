@@ -1095,7 +1095,7 @@ async def download_annotated_pdf(
     title: Optional[str] = Query(None),
     mode: Optional[str] = Query(None),
     is_prep: Optional[bool] = Query(None),
-    download: bool = Query(True)
+    download: bool = Query(False)
 ):
     """Secure PDF download checking both backend and project root outputs.
     Includes Path Traversal protection and accurate Arabic filename metadata:
