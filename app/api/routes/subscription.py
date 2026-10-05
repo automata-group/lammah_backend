@@ -148,31 +148,6 @@ async def get_history(profile=Depends(get_user_profile)):
     try:
         from app.services.subscription_service import get_usage_logs
         logs = get_usage_logs(profile["id"])
-        
-        # Inject demo lecture if not already in logs and user is on a free plan
-        is_free_trial = profile.get("current_plan_id") is None or profile.get("current_plan_id") == "free"
-        if is_free_trial:
-            has_demo = any(item.get("id") == "4198557f-5b1b-48ac-91a8-d8129de8ca0b" for item in logs)
-            if not has_demo:
-                from app.db.supabase_client import get_supabase
-                supabase = get_supabase()
-                demo_res = supabase.table("usage_logs").select("*").eq("id", "4198557f-5b1b-48ac-91a8-d8129de8ca0b").execute()
-                demo_list = _as_dict_list(demo_res.data)
-                if demo_list:
-                    demo_item = demo_list[0]
-                    raw_meta = demo_item.get("metadata")
-                    if isinstance(raw_meta, dict):
-                        raw_meta["is_demo"] = True
-                    elif isinstance(raw_meta, str):
-                        try:
-                            parsed_meta = json.loads(raw_meta)
-                            parsed_meta["is_demo"] = True
-                            demo_item["metadata"] = parsed_meta
-                        except Exception:
-                            demo_item["metadata"] = {"is_demo": True}
-                    else:
-                        demo_item["metadata"] = {"is_demo": True}
-                    logs.insert(0, demo_item)
         return {"logs": logs}
     except Exception as e:
         logger.warning(f"⚠️ خطأ في جلب السجل: {str(e)}")
