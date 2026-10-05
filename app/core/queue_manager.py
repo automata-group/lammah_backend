@@ -311,7 +311,19 @@ class QueueManager:
         
         logger.info(f"[CANCEL] تم إلغاء المهمة: {job_id[:8]}...")
         return True
-    
+
+    def mark_job_completed(self, job_id: str, result: Optional[Dict[str, Any]] = None):
+        """Mark a job as completed externally."""
+        job = self._jobs.get(job_id)
+        if not job:
+            return
+        job.status = JobStatus.COMPLETED
+        job.completed_at = time.time()
+        job.progress = 100
+        if job.user_id in self._user_active_jobs and self._user_active_jobs[job.user_id] == job.job_id:
+            del self._user_active_jobs[job.user_id]
+        self._notify_job(job.job_id)
+
     async def _cleanup_worker(self):
         """Periodically clean up old completed/failed jobs."""
         while True:

@@ -3,6 +3,7 @@ from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from app.db.supabase_client import get_supabase, get_auth_client
 from app.core.logger import logger
 from datetime import datetime, timezone
+import json
 
 security = HTTPBearer()
 
@@ -77,8 +78,30 @@ async def get_user_profile(request: Request, user=Depends(verify_token)):
         profile_data["device_fingerprint"] = fingerprint
     
     if device_meta:
-        update_data["device_metadata"] = device_meta
-        profile_data["device_metadata"] = device_meta
+        existing = profile_data.get("device_metadata")
+        existing_dict = {}
+        if existing:
+            try:
+                existing_dict = json.loads(existing) if isinstance(existing, str) else (existing if isinstance(existing, dict) else {})
+            except Exception:
+                existing_dict = {}
+
+        new_dict = {}
+        try:
+            new_dict = json.loads(device_meta) if isinstance(device_meta, str) else (device_meta if isinstance(device_meta, dict) else {})
+        except Exception:
+            new_dict = {"raw": str(device_meta)}
+
+        merged = {**existing_dict, **new_dict}
+        # Safeguard important custom nested objects
+        if "academic_profile" in existing_dict and "academic_profile" not in new_dict:
+            merged["academic_profile"] = existing_dict["academic_profile"]
+        if "seller_username" in existing_dict and "seller_username" not in new_dict:
+            merged["seller_username"] = existing_dict["seller_username"]
+
+        merged_str = json.dumps(merged, ensure_ascii=False)
+        update_data["device_metadata"] = merged_str
+        profile_data["device_metadata"] = merged_str
         
     if update_data:
         try:

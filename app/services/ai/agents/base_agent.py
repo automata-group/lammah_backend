@@ -66,17 +66,20 @@ class BaseAgent:
         last_error = None
         for attempt in range(retries + 1):
             try:
-                # Enforce a strict 90-second timeout per LLM request (solves API hanging)
-                response = await asyncio.wait_for(chain.ainvoke({"input": input_data}), timeout=90.0)
+                # Enforce a 180-second timeout per LLM request (handles large batches safely)
+                response = await asyncio.wait_for(chain.ainvoke({"input": input_data}), timeout=180.0)
                 extracted = self._extract_json(response.content)
                 if extracted is not None:
                     logger.info(f"Successfully extracted JSON keys: {list(extracted.keys()) if isinstance(extracted, dict) else type(extracted)}")
                     return extracted
                 logger.warning(f"Attempt {attempt+1}: Failed to extract valid JSON.")
+            except asyncio.TimeoutError:
+                logger.error(f"Attempt {attempt+1}: LLM invocation timed out after 180s")
+                await asyncio.sleep(1 * (attempt + 1))
             except Exception as e:
                 last_error = e
-                logger.error(f"Attempt {attempt+1}: LLM invocation failed: {e}")
+                logger.error(f"Attempt {attempt+1}: LLM invocation failed: {type(e).__name__}: {e}")
                 await asyncio.sleep(1 * (attempt + 1))
         
-        logger.error(f"All {retries+1} attempts failed. Returning empty state.")
+        logger.error(f"All {retries+1} attempts failed. Last error: {type(last_error).__name__ if last_error else 'None'}: {last_error}. Returning empty state.")
         return {}

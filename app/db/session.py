@@ -1,17 +1,10 @@
-from sqlalchemy import create_engine
-from sqlalchemy.orm import declarative_base
-from sqlalchemy.orm import sessionmaker
+"""
+Database session module.
+Note: Lammah uses Supabase as its primary database client.
+This module is kept for backward-compatibility stubs.
+"""
+from typing import Generator, Any
 
-from app.core.config import settings
-
-engine = create_engine(settings.DATABASE_URL)
-SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
-
-Base = declarative_base()
-
-def get_db():
-    db = SessionLocal()
-    try:
-        yield db
-    finally:
-        db.close()
+def get_db() -> Generator[Any, None, None]:
+    """Stub for legacy dependency injection."""
+    yield None

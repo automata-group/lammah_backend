@@ -1,3 +1,4 @@
-from app.db.session import Base
-# Import all the models, so that Base has them before being imported by Alembic
-# from app.models.user import User
+"""
+Base models stub for legacy imports.
+"""
+Base = None

@@ -2,6 +2,7 @@ import os
 import re
 import time
 import random
+from typing import Any, Optional, Dict, List
 from urllib.parse import urlparse
 
 from app.core.logger import logger
@@ -15,7 +16,7 @@ def _build_ydl_opts(
 ) -> dict:
     """Build yt-dlp options dict consistent with ytdl-service."""
     output_template = os.path.join(upload_dir, f"{unique_id}_%(id)s.%(ext)s")
-    opts = {
+    opts: dict[str, Any] = {
         "format": "bestaudio/best",
         "outtmpl": output_template,
         "noplaylist": True,
@@ -170,7 +171,7 @@ def download_youtube_audio(youtube_url: str, upload_dir: str, unique_id: str) ->
     cookies_path = os.getenv("YOUTUBE_COOKIES_PATH", "/app/youtube_cookies.txt")
     cookies_file = cookies_path if os.path.exists(cookies_path) else None
 
-    strategies = [
+    strategies: list[dict[str, Any]] = [
         # Best: WARP proxy with auto client selection (proven to work)
         {"name": "proxy only (auto client)",          "proxy": proxy, "cookies": None,         "clients": None},
         {"name": "proxy + cookies (auto client)",      "proxy": proxy, "cookies": cookies_file, "clients": None},

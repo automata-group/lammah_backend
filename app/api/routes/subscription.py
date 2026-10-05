@@ -2,8 +2,23 @@ from fastapi import APIRouter, Depends, HTTPException, Request
 from app.core.auth_guard import verify_token, get_user_profile
 from app.core.logger import logger
 from pydantic import BaseModel
+from typing import Optional, List, Dict, Any
+from datetime import datetime, timezone
+import json
 
 router = APIRouter()
+
+
+def _as_dict_list(data: Any) -> List[Dict[str, Any]]:
+    if isinstance(data, list):
+        return [dict(item) for item in data if isinstance(item, dict)]
+    return []
+
+
+def _as_dict(data: Any) -> Dict[str, Any]:
+    if isinstance(data, dict):
+        return dict(data)
+    return {}
 
 
 class SubscribeRequest(BaseModel):
@@ -87,8 +102,9 @@ async def get_quota(request: Request, profile=Depends(get_user_profile)):
                 .eq("device_fingerprint", fingerprint) \
                 .neq("id", profile["id"]) \
                 .execute()
-            if others.data:
-                other_ids = [u["id"] for u in others.data]
+            others_list = _as_dict_list(others.data)
+            if others_list:
+                other_ids = [u.get("id") for u in others_list if u.get("id")]
                 # Smart check: only block if any of the other accounts sharing the fingerprint has successfully processed a lecture
                 usage_check = supabase.table("usage_logs") \
                     .select("id") \
@@ -99,7 +115,8 @@ async def get_quota(request: Request, profile=Depends(get_user_profile)):
                     .execute()
                 
                 if usage_check.data:
-                    logger.warning(f"🚫 Device abuse in quota endpoint: User {profile['id']} has fingerprint {fingerprint} already used by {others.data[0]['id']} who processed lectures")
+                    first_other_id = others_list[0].get("id", "unknown")
+                    logger.warning(f"🚫 Device abuse in quota endpoint: User {profile['id']} has fingerprint {fingerprint} already used by {first_other_id} who processed lectures")
                     device_abuse = True
                     device_abuse_message = "🚫 عذراً! التجربة المجانية غير متوفرة لأنها استُخدمت بالفعل على هذا الجهاز. يرجى الاشتراك للاستمرار. 🚀"
         except Exception as e:
@@ -117,7 +134,8 @@ async def get_chat_usage(profile=Depends(get_user_profile)):
         from app.db.supabase_client import get_supabase
         supabase = get_supabase()
         total_chats = supabase.table("usage_logs").select("chat_count").eq("user_id", profile["id"]).execute()
-        total_chat_count = sum(item.get("chat_count", 0) or 0 for item in total_chats.data) if total_chats.data else 0
+        total_chats_list = _as_dict_list(total_chats.data)
+        total_chat_count = sum(item.get("chat_count", 0) or 0 for item in total_chats_list)
         return {"total_chat_count": total_chat_count}
     except Exception as e:
         logger.warning(f"⚠️ Error fetching chat usage: {str(e)}")
@@ -139,10 +157,21 @@ async def get_history(profile=Depends(get_user_profile)):
                 from app.db.supabase_client import get_supabase
                 supabase = get_supabase()
                 demo_res = supabase.table("usage_logs").select("*").eq("id", "4198557f-5b1b-48ac-91a8-d8129de8ca0b").execute()
-                if demo_res.data:
-                    demo_item = demo_res.data[0]
-                    if "metadata" in demo_item and demo_item["metadata"]:
-                        demo_item["metadata"]["is_demo"] = True
+                demo_list = _as_dict_list(demo_res.data)
+                if demo_list:
+                    demo_item = demo_list[0]
+                    raw_meta = demo_item.get("metadata")
+                    if isinstance(raw_meta, dict):
+                        raw_meta["is_demo"] = True
+                    elif isinstance(raw_meta, str):
+                        try:
+                            parsed_meta = json.loads(raw_meta)
+                            parsed_meta["is_demo"] = True
+                            demo_item["metadata"] = parsed_meta
+                        except Exception:
+                            demo_item["metadata"] = {"is_demo": True}
+                    else:
+                        demo_item["metadata"] = {"is_demo": True}
                     logs.insert(0, demo_item)
         return {"logs": logs}
     except Exception as e:
@@ -163,16 +192,17 @@ async def get_history_item(log_id: str, profile=Depends(get_user_profile)):
         else:
             result = supabase.table("usage_logs").select("*").eq("id", log_id).eq("user_id", profile["id"]).single().execute()
             
-        if not result.data:
+        data_dict = _as_dict(result.data)
+        if not data_dict:
             raise HTTPException(status_code=404, detail="السجل غير موجود")
         
         # Calculate total chat count across all user's lectures
         total_chats = supabase.table("usage_logs").select("chat_count").eq("user_id", profile["id"]).execute()
-        total_chat_count = sum(item.get("chat_count", 0) or 0 for item in total_chats.data) if total_chats.data else 0
+        total_chats_list = _as_dict_list(total_chats.data)
+        total_chat_count = sum(item.get("chat_count", 0) or 0 for item in total_chats_list)
         
-        data = result.data
-        data["total_chat_count"] = total_chat_count
-        return data
+        data_dict["total_chat_count"] = total_chat_count
+        return data_dict
     except Exception as e:
         logger.warning(f"⚠️ خطأ في جلب تفاصيل السجل: {str(e)}")
         raise HTTPException(status_code=404, detail="السجل غير موجود أو يخص شخصاً آخر")
@@ -195,15 +225,135 @@ async def update_lecture_title(log_id: str, body: UpdateTitleRequest, profile=De
             
         # Fetch existing record
         existing = supabase.table("usage_logs").select("metadata").eq("id", log_id).eq("user_id", profile["id"]).single().execute()
-        if not existing.data:
+        existing_data = _as_dict(existing.data)
+        if not existing_data:
             raise HTTPException(status_code=404, detail="السجل غير موجود")
         # Merge title into existing metadata
-        meta = existing.data.get("metadata") or {}
-        meta["title"] = body.title.strip()
-        supabase.table("usage_logs").update({"metadata": meta}).eq("id", log_id).execute()
-        return {"success": True, "title": meta["title"]}
+        meta = existing_data.get("metadata")
+        meta_dict = dict(meta) if isinstance(meta, dict) else {}
+        meta_dict["title"] = body.title.strip()
+        supabase.table("usage_logs").update({"metadata": meta_dict}).eq("id", log_id).execute()
+        return {"success": True, "title": meta_dict["title"]}
     except HTTPException:
         raise
     except Exception as e:
         logger.error(f"⚠️ خطأ في تحديث العنوان: {str(e)}")
         raise HTTPException(status_code=500, detail="فشل تحديث العنوان")
+
+
+class StudentProfileRequest(BaseModel):
+    university: Optional[str] = None
+    major: Optional[str] = None
+    academic_year: Optional[str] = None
+    interests: Optional[List[str]] = None
+    study_preference: Optional[str] = None
+    phone: Optional[str] = None
+
+
+@router.get("/student-profile")
+async def get_student_profile(profile=Depends(get_user_profile)):
+    """Retrieve current student's academic profile from device_metadata."""
+    raw_meta = profile.get("device_metadata") or "{}"
+    try:
+        meta = json.loads(raw_meta) if isinstance(raw_meta, str) else (raw_meta if isinstance(raw_meta, dict) else {})
+    except Exception:
+        meta = {}
+    return {
+        "academic_profile": meta.get("academic_profile", {}),
+        "phone_number": profile.get("phone_number"),
+        "full_name": profile.get("full_name"),
+        "bonus_awarded": bool(meta.get("academic_profile_bonus_awarded", False))
+    }
+
+
+@router.post("/student-profile")
+async def update_student_profile(req: StudentProfileRequest, profile=Depends(get_user_profile)):
+    """Save or update student academic profile (university, major, year, interests, study preferences).
+    Automatically awards +20 minutes free quota bonus if this is their first time completing university and major.
+    """
+    try:
+        from app.db.supabase_client import get_supabase
+        supabase = get_supabase()
+
+        raw_meta = profile.get("device_metadata") or "{}"
+        try:
+            meta = json.loads(raw_meta) if isinstance(raw_meta, str) else (raw_meta if isinstance(raw_meta, dict) else {})
+        except Exception:
+            meta = {}
+
+        academic_profile = {
+            "university": (req.university or "").strip(),
+            "major": (req.major or "").strip(),
+            "academic_year": (req.academic_year or "").strip(),
+            "interests": req.interests or [],
+            "study_preference": (req.study_preference or "").strip(),
+            "updated_at": datetime.now(timezone.utc).isoformat()
+        }
+        meta["academic_profile"] = academic_profile
+
+        # Bonus 20 minutes eligibility check:
+        # User must provide at least university and major, and must not have received the bonus before.
+        bonus_awarded_already = bool(meta.get("academic_profile_bonus_awarded", False))
+        bonus_minutes_granted = 0
+        new_quota = None
+
+        update_fields: Dict[str, Any] = {}
+
+        if not bonus_awarded_already and academic_profile["university"] and academic_profile["major"]:
+            bonus_minutes_granted = 20
+            meta["academic_profile_bonus_awarded"] = True
+            meta["academic_profile_bonus_awarded_at"] = datetime.now(timezone.utc).isoformat()
+
+            # Retrieve fresh quota_remaining from database
+            curr_prof_res = supabase.table("profiles").select("quota_remaining").eq("id", profile["id"]).execute()
+            curr_prof_list = _as_dict_list(curr_prof_res.data)
+            current_quota = int(curr_prof_list[0].get("quota_remaining", 0) or 0) if curr_prof_list else int(profile.get("quota_remaining", 0) or 0)
+            
+            new_quota = current_quota + bonus_minutes_granted
+            update_fields["quota_remaining"] = new_quota
+
+            # If user has an active subscription, also adjust lectures_used if applicable
+            try:
+                active_sub_res = supabase.table("user_subscriptions") \
+                    .select("id, lectures_used") \
+                    .eq("user_id", profile["id"]) \
+                    .eq("status", "active") \
+                    .order("created_at", desc=True) \
+                    .limit(1) \
+                    .execute()
+                active_sub_list = _as_dict_list(active_sub_res.data)
+                if active_sub_list:
+                    sub_id = active_sub_list[0].get("id")
+                    used = int(active_sub_list[0].get("lectures_used", 0) or 0)
+                    if used > 0:
+                        reduced_used = max(0, used - bonus_minutes_granted)
+                        supabase.table("user_subscriptions").update({"lectures_used": reduced_used}).eq("id", sub_id).execute()
+            except Exception as sub_err:
+                logger.warning(f"Note on active subscription bonus adjustment: {sub_err}")
+
+            logger.info(f"🎁 Granted 20 bonus minutes to user {profile['id']} for completing academic profile (Previous: {current_quota}, New: {new_quota})")
+
+        update_fields["device_metadata"] = json.dumps(meta, ensure_ascii=False)
+        if req.phone and req.phone.strip():
+            clean_phone = req.phone.strip()
+            update_fields["phone_number"] = clean_phone
+
+        supabase.table("profiles").update(update_fields).eq("id", profile["id"]).execute()
+        logger.info(f"🎓 Updated student profile for user {profile['id']} ({academic_profile['university']} - {academic_profile['major']})")
+
+        if bonus_minutes_granted > 0:
+            msg = "تم حفظ ملفك بنجاح! 🎓 مبروك، تم شحن 20 دقيقة مجانية إلى رصيدك 🎁"
+        else:
+            msg = "تم حفظ ملفك الأكاديمي واهتماماتك بنجاح 🎓"
+
+        return {
+            "status": "success",
+            "message": msg,
+            "academic_profile": academic_profile,
+            "bonus_awarded": bonus_minutes_granted > 0,
+            "bonus_minutes": bonus_minutes_granted,
+            "new_quota": new_quota
+        }
+    except Exception as e:
+        logger.error(f"❌ خطأ في حفظ الملف الأكاديمي: {str(e)}")
+        raise HTTPException(status_code=500, detail="فشل حفظ البيانات الأكاديمية")

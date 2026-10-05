@@ -44,11 +44,10 @@ async def chat_with_lecture(request: ChatRequest, user: dict = Depends(get_user_
 
         current_count = log_result.data.get("chat_count", 0) or 0
 
-        # 1. Plan Verification & Limits
+        # 1. Plan Verification & Limits (Per-Lecture Limit)
         if is_demo_lecture:
-            plan_name = "شهري - برو"
-            limit = 100
-            total_used = 0
+            plan_name = "محاضرة تجريبية"
+            limit = 25
         else:
             from datetime import datetime, timezone
             sub_check = supabase.table("user_subscriptions") \
@@ -59,34 +58,36 @@ async def chat_with_lecture(request: ChatRequest, user: dict = Depends(get_user_
                 .limit(1) \
                 .execute()
             
-            if not sub_check.data:
-                raise HTTPException(status_code=403, detail={
-                    "user_message": "هذه الميزة متاحة للمشتركين فقط. قم بالترقية للاستمتاع بالمحادثة الذكية مع محاضراتك!",
-                    "type": "upgrade_required"
-                })
+            if sub_check.data:
+                subscription = sub_check.data[0]
+                plan_name = subscription["subscription_plans"]["name"]
                 
-            subscription = sub_check.data[0]
-            plan_name = subscription["subscription_plans"]["name"]
-            
-            # Determine plan tier and message limit
-            limit = 5  # Default/Free/Student
-            if any(term in plan_name for term in ["الذهبية", "الفصل الدراسي", "برو", "VIP", "Elite", "Pro", "النخبة"]):
-                limit = 100
-            elif any(term in plan_name for term in ["الميدتيرم", "التفوق", "متقدم", "Advanced", "Premium"]):
-                limit = 25
-            elif any(term in plan_name for term in ["الإنقاذ", "الأساسية", "الاساسية", "أساسي", "اساسي", "Basic", "Essential", "Emergency"]):
+                # Determine plan tier and message limit per lecture
+                if any(term in plan_name for term in ["الذهبية", "الفصل الدراسي", "برو", "VIP", "Elite", "Pro", "النخبة"]):
+                    limit = 100  # باقة النخبة / الفصل الكامل: 100 سؤال لكل محاضرة
+                elif any(term in plan_name for term in ["الميدتيرم", "التفوق", "متقدم", "Advanced", "Premium"]):
+                    limit = 35   # باقة التفوق / الشهري: 35 سؤال لكل محاضرة
+                else:
+                    limit = 15   # باقة إنقاذ الكويزات / الأساسية: 15 سؤال لكل محاضرة
+            else:
+                # Free tier user: 5 trial questions per lecture to experience AI Chat
+                plan_name = "الباقة المجانية"
                 limit = 5
                 
-            # Calculate total chat count across all user's lectures
-            total_chats = supabase.table("usage_logs").select("chat_count").eq("user_id", user["id"]).execute()
-            total_used = sum(item.get("chat_count", 0) or 0 for item in total_chats.data) if total_chats.data else 0
-            
-            if total_used >= limit:
-                raise HTTPException(status_code=403, detail={
-                    "user_message": f"لقد وصلت للحد الأقصى الإجمالي للمحادثات المتاح لحسابك ({limit} رسالة) حسب باقتك ({plan_name}). يمكنك الترقية للحصول على حدود أعلى!",
-                    "type": "limit_reached",
-                    "limit": limit
-                })
+            # Check current lecture's chat count against plan limit
+            if current_count >= limit:
+                if not sub_check.data:
+                    raise HTTPException(status_code=403, detail={
+                        "user_message": f"لقد استهلكت رصيد التجربة في هذه المحاضرة ({limit} أسئلة). اشترك في إحدى باقات لمّاح لفتح حتى 100 سؤال لكل محاضرة!",
+                        "type": "upgrade_required",
+                        "limit": limit
+                    })
+                else:
+                    raise HTTPException(status_code=403, detail={
+                        "user_message": f"لقد وصلت للحد الأقصى للأسئلة في هذه المحاضرة ({limit} سؤال) حسب باقتك ({plan_name}). يمكنك الترقية لباقة أعلى لزيادة الأسئلة، أو فتح محاضرة أخرى لمناقشتها!",
+                        "type": "limit_reached",
+                        "limit": limit
+                    })
 
         # 2. Context Retrieval (RAG)
         metadata = log_result.data.get("metadata", {})

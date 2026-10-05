@@ -1,0 +1,10 @@
+{
+  "include": [
+    "."
+  ],
+  "extraPaths": [
+    ".",
+    "C:\\Users\\HP\\AppData\\Roaming\\Python\\Python311\\site-packages",
+    "C:\\Program Files\\Python311\\Lib\\site-packages"
+  ]
+}

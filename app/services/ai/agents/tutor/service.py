@@ -18,6 +18,7 @@ class TutorService(BaseAgent):
             f"- For each slide in {[s['page_number'] for s in slides_batch]}, find transcript segments where the professor discusses concepts FROM THAT SLIDE's text.\n"
             f"- Match by keywords/concepts — do NOT assign content sequentially.\n"
             f"- If a slide's concepts are NOT in the transcript at all → write exactly: (الدكتور ما ذكر هالشريحة بالتفصيل.)\n"
+            f"- In ai_explanation: use friendly Palestinian student dialect (لهجة فلسطينية جامعية ودودة - ممنوع أي لهجة خليجية أو مفردات مثل هذي/وش/الدافور) and apply 'Enriched Bilingual Injection' — embed the exact English slide keywords inside the explanation (e.g. هاي الشريحة بتدخلنا في أول وأهم مرحلة وهي الـ Requirements (المتطلبات), Shared View, Textual format, User stories) so the student's eyes lock onto exam choices.\n"
             f"- Return JSON with slide_explanations for ALL slides in the batch."
         )
         return await self.run_with_retry(llm, input_data)

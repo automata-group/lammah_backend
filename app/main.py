@@ -64,7 +64,7 @@ async def early_security_middleware(request: Request, call_next):
     return await call_next(request)
 
 
-from app.api.routes import notebook, marketplace
+from app.api.routes import notebook, marketplace, tutoring, analytics
 
 # ====== Routes ======
 app.include_router(summarize.router, prefix="/api/v1/summarize", tags=["summarize"])
@@ -74,6 +74,8 @@ app.include_router(transactions.router, prefix="/api/v1/transactions", tags=["tr
 app.include_router(admin.router, prefix="/api/v1/admin", tags=["admin"])
 app.include_router(notebook.router, prefix="/api/v1/notebook", tags=["notebook"])
 app.include_router(marketplace.router, prefix="/api/v1/marketplace", tags=["marketplace"])
+app.include_router(tutoring.router, prefix="/api/v1/tutoring", tags=["tutoring"])
+app.include_router(analytics.router, prefix="/api/v1/analytics", tags=["analytics"])
 
 # ====== Global Error Handler ======
 @app.exception_handler(Exception)
@@ -104,6 +106,7 @@ if settings.BACKEND_CORS_ORIGINS:
     app.add_middleware(
         CORSMiddleware,
         allow_origins=[str(origin).strip("/") for origin in settings.BACKEND_CORS_ORIGINS],
+        allow_origin_regex=r"http://(localhost|127\.0\.0\.1)(:\d+)?",
         allow_credentials=True,
         allow_methods=["*"],
         allow_headers=["*"],

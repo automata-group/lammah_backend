@@ -4,7 +4,7 @@ import json
 import time
 import random
 from urllib.parse import urlparse
-from typing import Optional
+from typing import Optional, Any, Dict, List
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 import yt_dlp
@@ -58,7 +58,7 @@ def build_ydl_opts(
     """Build yt-dlp options dict with all anti-block measures."""
     output_template = os.path.join(upload_dir, f"{unique_id}_%(id)s.%(ext)s")
 
-    opts = {
+    opts: dict[str, Any] = {
         "format": "bestaudio/best",
         "outtmpl": output_template,
         "noplaylist": True,
@@ -92,7 +92,12 @@ def build_ydl_opts(
 
     if extractor_args:
         existing = opts.get("extractor_args", {})
-        existing["youtube"] = {**existing.get("youtube", {}), **extractor_args}
+        if not isinstance(existing, dict):
+            existing = {}
+        existing_yt = existing.get("youtube", {})
+        if not isinstance(existing_yt, dict):
+            existing_yt = {}
+        existing["youtube"] = {**existing_yt, **extractor_args}
         opts["extractor_args"] = existing
 
     po_token = os.getenv("YOUTUBE_PO_TOKEN")
@@ -183,7 +188,7 @@ def download_youtube_video(req: DownloadRequest):
     proxy = os.getenv("YOUTUBE_PROXY")
     cookies_file = COOKIES_PATH if os.path.exists(COOKIES_PATH) else None
 
-    strategies = [
+    strategies: list[dict[str, Any]] = [
         # ===== Best strategies first: WARP proxy without forcing a specific client =====
         # (default yt-dlp client selection works best with WARP)
         {

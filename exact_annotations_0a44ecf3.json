@@ -1,0 +1,3561 @@
+{
+  "mcqs": [
+    {
+      "options": [
+        "فقط معرفة لغات البرمجة المتقدمة",
+        "عملية مُدارة بشكل جيد تنظم الأنشطة بكفاءة",
+        "التركيز على تصميم واجهات المستخدم فقط",
+        "توظيف أكبر عدد من المبرمجين"
+      ],
+      "question": "وفقاً للشريحة 2، ما هو العنصر الأساسي المطلوب لبناء برمجيات جيدة بالإضافة إلى الجوانب التقنية؟",
+      "explanation": "الشريحة 2 تؤكد أن الجوانب التقنية وحدها لا تكفي، بل يجب وجود 'عملية مُدارة بشكل جيد' لتنظيم الأنشطة بكفاءة والتحكم فيها لبناء برمجيات جيدة.",
+      "page_number": 2,
+      "correct_answer": "عملية مُدارة بشكل جيد تنظم الأنشطة بكفاءة"
+    },
+    {
+      "options": [
+        "تصميم قواعد البيانات",
+        "كتابة الخوارزميات المعقدة",
+        "تدريب المستخدمين وتوثيق المنتج",
+        "تصحيح الأخطاء البرمجية (Debugging)"
+      ],
+      "question": "أي من الأنشطة التالية تُعتبر جزءاً من تطوير نظام برمجي ولكنها لا تتعلق مباشرة بكتابة الكود، وفقاً للشريحة 3؟",
+      "explanation": "الشريحة 3 تذكر صراحة أن تطوير النظام يتطلب أنشطة مثل 'training users, packaging a product, managing publicity and communication, writing user documentation' وهي لا تتعلق مباشرة بكتابة الكود.",
+      "page_number": 3,
+      "correct_answer": "تدريب المستخدمين وتوثيق المنتج"
+    },
+    {
+      "options": [
+        "فقط فريق برمجة كبير وذو خبرة عالية",
+        "عملية لتحديد الجدول الزمني والميزانية والجودة، وتقنيات لمراقبة الأهداف والوقت والتكاليف",
+        "التركيز على التسويق فقط بعد الانتهاء من المنتج",
+        "تجاهل التكاليف لضمان أعلى جودة"
+      ],
+      "question": "لتحقيق تسليم منتج (برمجي أو غيره) في الوقت المحدد وضمن الميزانية وبالجودة المتفق عليها، ما الذي نحتاجه بشكل أساسي وفقاً للشريحة 4؟",
+      "explanation": "الشريحة 4 تحدد بوضوح متطلبين أساسيين: 'A process to define a schedule, a budget, and agree on the (quality) characteristics of a product' و 'A list of techniques to define, agree, plan, execute, and monitor: goals, quality, time, and costs'.",
+      "page_number": 4,
+      "correct_answer": "عملية لتحديد الجدول الزمني والميزانية والجودة، وتقنيات لمراقبة الأهداف والوقت والتكاليف"
+    },
+    {
+      "options": [
+        "المنتج غير ملموس (intangible)",
+        "المنتج مرن بشكل فريد (uniquely flexible)",
+        "المنتج ثابت ولا يتغير (fixed and unchanging)",
+        "حجم وتعقيد المشاريع يتزايد بشكل أسي (increasing exponentially)"
+      ],
+      "question": "أي من الخصائص التالية لا تعتبر سبباً رئيسياً لكون إدارة مشاريع البرمجيات تحدياً وممتعة؟",
+      "explanation": "الإجابة الصحيحة هي 'المنتج ثابت ولا يتغير' لأن هذه الخاصية تتعارض تماماً مع طبيعة البرمجيات التي تتميز بالمرونة والتغيير المستمر. باقي الخيارات هي أسباب حقيقية لتحديات إدارة مشاريع البرمجيات.",
+      "page_number": 8,
+      "correct_answer": "المنتج ثابت ولا يتغير (fixed and unchanging)"
+    },
+    {
+      "options": [
+        "القدرة على تقدير الوقت والتكلفة، إدارة الفريق والمخاطر، ومراقبة الجودة.",
+        "القدرة على البرمجة بلغات متعددة فقط.",
+        "القدرة على التسويق وبيع المنتج النهائي.",
+        "القدرة على تصميم واجهات المستخدم الجذابة."
+      ],
+      "question": "ما هي المهارات الأساسية المطلوبة لإدارة مشروع تطوير برمجيات ناجح؟",
+      "explanation": "الخيار الأول يجمع كل المهارات الأساسية المذكورة في الشريحة كأهداف للمادة، وهي تقدير الوقت والتكلفة، إدارة الفريق والمخاطر، ومراقبة الجودة. الخيارات الأخرى هي مهارات جزئية أو ليست جوهرية لإدارة المشروع ككل.",
+      "page_number": 6,
+      "correct_answer": "القدرة على تقدير الوقت والتكلفة، إدارة الفريق والمخاطر، ومراقبة الجودة."
+    },
+    {
+      "options": [
+        "Gantt Chart",
+        "CPM",
+        "PERT/COST and WBS",
+        "Waterfall model"
+      ],
+      "question": "أي من الأدوات التالية أصبحت إلزامية في المشاريع الحكومية الكبيرة خلال فترة الستينيات؟",
+      "explanation": "يا بطل، الشريحة وضحت إنو في الستينات، مع العقود الحكومية الضخمة، أدوات زي PERT/COST و WBS صارت إجبارية. CPM و Gantt Chart ظهروا قبل، والـ Waterfall model ظهر بالسبعينات.",
+      "page_number": 13,
+      "correct_answer": "PERT/COST and WBS"
+    },
+    {
+      "options": [
+        "قانون نيوتن",
+        "قانون مور",
+        "قانون أوم",
+        "قانون غاوس"
+      ],
+      "question": "ما هو القانون الذي يصف النمو الأسي لقدرة الأجهزة الحاسوبية والذي ساهم في انتشار أدوات إدارة المشاريع في الثمانينات؟",
+      "explanation": "يا دكتور، الشريحة ذكرت بوضوح إنو 'Hardware capacity grows exponentially (Moore’s Law)'، وهذا القانون هو اللي بيوصف تضاعف قوة المعالجة كل فترة زمنية، وساعد على جعل أدوات إدارة المشاريع متاحة للجميع.",
+      "page_number": 14,
+      "correct_answer": "قانون مور"
+    },
+    {
+      "options": [
+        "مستمر ومتكرر",
+        "مؤقت وفريد",
+        "غير مخطط له وعشوائي",
+        "غير محدود الموارد وواسع النطاق"
+      ],
+      "question": "وفقًا لتعريف PMBOK، ما هي الخاصيتان الأساسيتان للمشروع؟",
+      "explanation": "التعريف الأساسي للمشروع يركز على كونه 'مؤقت' (له بداية ونهاية) و 'فريد' (ينتج شيئًا جديدًا أو مختلفًا). الخيارات الأخرى لا تتوافق مع هذا التعريف.",
+      "page_number": 16,
+      "correct_answer": "مؤقت وفريد"
+    },
+    {
+      "options": [
+        "تحديد جميع تفاصيل المشروع في البداية",
+        "تطوير المشروع بخطوات وزيادات مع توضيح التفاصيل تدريجياً",
+        "العمل على المشروع بشكل عشوائي دون خطة واضحة",
+        "إعادة تعريف أهداف المشروع بشكل مستمر"
+      ],
+      "question": "أي من الخصائص التالية تصف 'Progressive Elaboration' في المشروع؟",
+      "explanation": "Progressive Elaboration تعني أن المشروع يتطور تدريجياً، حيث تتضح التفاصيل وتضاف المعلومات مع تقدم العمل، وليس تحديد كل شيء من البداية.",
+      "page_number": 17,
+      "correct_answer": "تطوير المشروع بخطوات وزيادات مع توضيح التفاصيل تدريجياً"
+    },
+    {
+      "options": [
+        "البرنامج يضم مشاريع غير مترابطة، بينما المحفظة تضم مشاريع مترابطة.",
+        "البرنامج يركز على الأهداف التشغيلية، بينما المحفظة تركز على الأهداف الاستراتيجية.",
+        "البرنامج يضم مجموعة من المشاريع المترابطة، بينما المحفظة تضم مجموعة من المشاريع والبرامج غير المترابطة.",
+        "البرنامج له مدة زمنية أطول من المحفظة."
+      ],
+      "question": "ما هو الفرق الرئيسي بين 'البرنامج' (Program) و 'المحفظة' (Portfolio) في إدارة المشاريع؟",
+      "explanation": "البرنامج هو مجموعة من المشاريع المترابطة التي تدار بشكل منسق لتحقيق فائدة معينة. أما المحفظة فهي مجموعة من المشاريع والبرامج والأعمال الأخرى التي قد تكون غير مترابطة، ولكنها تدار معًا لتحقيق الأهداف الاستراتيجية للمنظمة.",
+      "page_number": 19,
+      "correct_answer": "البرنامج يضم مجموعة من المشاريع المترابطة، بينما المحفظة تضم مجموعة من المشاريع والبرامج غير المترابطة."
+    }
+  ],
+  "flashcards": [
+    {
+      "back": "بناء برمجيات جيدة لا يعتمد فقط على الجوانب التقنية، بل يتطلب 'عملية مُدارة بشكل جيد' لتنظيم الأنشطة بكفاءة.",
+      "front": "ما هي الفكرة الرئيسية التي تؤكد عليها الشريحة 2 بخصوص بناء برمجيات جيدة؟",
+      "page_number": 2
+    },
+    {
+      "back": "تدريب المستخدمين (training users) وكتابة توثيق المستخدم (writing user documentation).",
+      "front": "اذكر مثالين على أنشطة تطوير البرمجيات التي لا تتعلق مباشرة بكتابة الكود.",
+      "page_number": 3
+    },
+    {
+      "back": "الأهداف (goals)، الجودة (quality)، الوقت (time)، والتكاليف (costs).",
+      "front": "ما هي العناصر الأربعة الرئيسية التي يجب مراقبتها باستخدام التقنيات لضمان تسليم منتج ناجح؟",
+      "page_number": 4
+    },
+    {
+      "back": "مثلث إدارة المشاريع (The project management triangle).",
+      "front": "ما هو المفهوم الذي تقدمه الشريحة 5 كتمثيل للقيود الأساسية في أي مشروع؟",
+      "page_number": 5
+    },
+    {
+      "back": "كيف أقدر الوقت والتكلفة؟ كيف أحفز الفريق؟ كيف أتعامل مع المخاطر؟ كيف أتحكم بجودة المنتج؟",
+      "front": "اذكر 3 أسئلة محورية ستتمكن من الإجابة عليها بعد هذا الكورس.",
+      "page_number": 6
+    },
+    {
+      "back": "أنظمة حرجة للسلامة (Safety critical systems)، حيث قد تعتمد حياة البشر على عمل البرنامج بشكل صحيح (مثل أنظمة التحكم بالطائرات).",
+      "front": "ما هي أهم خاصية تجعل إدارة مشاريع البرمجيات تحدياً كبيراً وتتعلق بحياة البشر؟",
+      "page_number": 8
+    },
+    {
+      "back": "نعم يا بطل، تقنيات إدارة المشاريع متعددة التخصصات وقابلة للتطبيق في أي مجال هندسي آخر تقريباً.",
+      "front": "هل تقنيات إدارة المشاريع قابلة للتطبيق في مجالات هندسية أخرى غير البرمجيات؟",
+      "page_number": 7
+    },
+    {
+      "back": "فريدريك وينسلو تايلور (Frederick Winslow Taylor).",
+      "front": "من هو الشخصية التي تعتبر 'أبو الإدارة العلمية'؟",
+      "page_number": 10
+    },
+    {
+      "back": "المخترع هو 'هنري جانت'، وأول استخدام له كان في 'بناء السفن' خلال 'الحرب العالمية الأولى' لمراقبة العمل والتقدم.",
+      "front": "من هو مخترع 'مخطط جانت' وما هو أول استخدام له؟",
+      "page_number": 11
+    },
+    {
+      "back": "الـ CPM (Critical Path Method) يعتمد على 'الرياضيات' لتحديد أطول مسار في المشروع. أما الـ PERT (Program Evaluation and Review Technique) فيستخدم لـ 'تقدير أوقات المهام' عندما تكون غير مؤكدة، وظهر من برنامج صاروخ بولاريس.",
+      "front": "ما الفرق بين CPM و PERT من حيث الأساس والهدف؟",
+      "page_number": 13
+    }
+  ],
+  "highlights": [
+    {
+      "color": "yellow",
+      "reason": "عنوان الشريحة ومقدمة للمادة",
+      "page_number": 1,
+      "text_to_highlight": "Introduction"
+    },
+    {
+      "color": "cyan",
+      "reason": "اسم المادة والمصطلح الأساسي",
+      "page_number": 1,
+      "text_to_highlight": "Software Project Management"
+    },
+    {
+      "color": "yellow",
+      "reason": "نقطة البداية: تركيز الدورات على الجانب التقني",
+      "page_number": 2,
+      "text_to_highlight": "Many courses in computer science and electronic engineering focus on the technical aspects"
+    },
+    {
+      "color": "yellow",
+      "reason": "الهدف من الجانب التقني",
+      "page_number": 2,
+      "text_to_highlight": "to develop good software"
+    },
+    {
+      "color": "pink",
+      "reason": "النقطة المحورية: الحاجة لعملية منظمة لبناء برمجيات جيدة",
+      "page_number": 2,
+      "text_to_highlight": "However, in order to build good software, a well defined and managed process"
+    },
+    {
+      "color": "yellow",
+      "reason": "وصف العملية المنظمة",
+      "page_number": 2,
+      "text_to_highlight": "organizes the activities in an efficient and controlled way"
+    },
+    {
+      "color": "pink",
+      "reason": "مثال يوضح فشل التقنية بدون إدارة: المتطلبات",
+      "page_number": 3,
+      "text_to_highlight": "Writing good requirements is no good if you don’t have a controlled process, for instance, to accept changes and trace revisions"
+    },
+    {
+      "color": "pink",
+      "reason": "مثال يوضح فشل التقنية بدون إدارة: الاختبارات",
+      "page_number": 3,
+      "text_to_highlight": "The techniques to do testing are useless if you don’t have any time left to do testing"
+    },
+    {
+      "color": "yellow",
+      "reason": "نقطة جوهرية: تطوير البرمجيات يشمل أنشطة غير برمجية",
+      "page_number": 3,
+      "text_to_highlight": "The development of a software system requires to execute, monitor, and control various activities which have little or nothing to do with writing code."
+    },
+    {
+      "color": "cyan",
+      "reason": "أمثلة على الأنشطة غير البرمجية الهامة",
+      "page_number": 3,
+      "text_to_highlight": "training users, packaging a product, managing publicity and communication, writing user documentation"
+    },
+    {
+      "color": "yellow",
+      "reason": "الهدف الأساسي: تسليم منتج بالجودة المطلوبة، في الوقت والميزانية",
+      "page_number": 4,
+      "text_to_highlight": "If you want to deliver on time and within budget a product which has the quality properties agreed upon"
+    },
+    {
+      "color": "green",
+      "reason": "المتطلب الأول: عملية لتحديد الجدول الزمني والميزانية والجودة",
+      "page_number": 4,
+      "text_to_highlight": "A process to define a schedule, a budget, and agree on the (quality) characteristics of a product"
+    },
+    {
+      "color": "green",
+      "reason": "المتطلب الثاني: تقنيات لتحديد وتخطيط ومراقبة الأهداف والجودة والوقت والتكاليف",
+      "page_number": 4,
+      "text_to_highlight": "A list of techniques to define, agree, plan, execute, and monitor: goals, quality, time, and costs"
+    },
+    {
+      "color": "yellow",
+      "reason": "المفهوم الأساسي للشريحة",
+      "page_number": 5,
+      "text_to_highlight": "The project management triangle"
+    },
+    {
+      "color": "yellow",
+      "reason": "تحديد المتطلبات الأساسية لإدارة المشاريع البرمجية.",
+      "page_number": 6,
+      "text_to_highlight": "Managing a (software development) project, thus, requires specific competences, skills, and techniques"
+    },
+    {
+      "color": "cyan",
+      "reason": "سؤال محوري في تقدير الوقت وهو مهارة أساسية.",
+      "page_number": 6,
+      "text_to_highlight": "How do I estimate how long it will take to complete a task?"
+    },
+    {
+      "color": "cyan",
+      "reason": "سؤال محوري في تقدير التكلفة وهو مهارة أساسية.",
+      "page_number": 6,
+      "text_to_highlight": "How much am I going to charge for a project?"
+    },
+    {
+      "color": "cyan",
+      "reason": "سؤال محوري في إدارة الفريق وتحفيزه.",
+      "page_number": 6,
+      "text_to_highlight": "How do I keep the team motivated and ensure projects are fulfilling and an occasion to learn, grow, and advance in one’s career?"
+    },
+    {
+      "color": "cyan",
+      "reason": "سؤال محوري في إدارة المخاطر.",
+      "page_number": 6,
+      "text_to_highlight": "How do I deal with project risks?"
+    },
+    {
+      "color": "cyan",
+      "reason": "سؤال محوري في مراقبة تقدم المشروع.",
+      "page_number": 6,
+      "text_to_highlight": "How do I assess whether the project is on time, on budget, on schedule?"
+    },
+    {
+      "color": "cyan",
+      "reason": "سؤال محوري في ضمان جودة المنتج النهائي.",
+      "page_number": 6,
+      "text_to_highlight": "How do I control the quality of the final output?"
+    },
+    {
+      "color": "yellow",
+      "reason": "تحديد طبيعة تقنيات إدارة المشاريع بأنها متعددة التخصصات.",
+      "page_number": 7,
+      "text_to_highlight": "The Project Management techniques are intrinsically multidisciplinary"
+    },
+    {
+      "color": "green",
+      "reason": "قاعدة عامة تشير إلى قابلية تطبيق المهارات المكتسبة.",
+      "page_number": 7,
+      "text_to_highlight": "what you will learn in this course is applicable to virtually any other (engineering) domain."
+    },
+    {
+      "color": "pink",
+      "reason": "نقطة تحول تشير إلى وجود خصائص فريدة لمشاريع البرمجيات.",
+      "page_number": 7,
+      "text_to_highlight": "There are however certain characteristics that make the management of software projects particularly interesting."
+    },
+    {
+      "color": "yellow",
+      "reason": "تحديد سبب كون إدارة مشاريع البرمجيات مثيرة للاهتمام ومليئة بالتحديات.",
+      "page_number": 8,
+      "text_to_highlight": "Software project management is interesting and challenging because:"
+    },
+    {
+      "color": "cyan",
+      "reason": "خاصية أساسية للمنتج البرمجي.",
+      "page_number": 8,
+      "text_to_highlight": "The product is intangible"
+    },
+    {
+      "color": "cyan",
+      "reason": "خاصية أساسية للمنتج البرمجي.",
+      "page_number": 8,
+      "text_to_highlight": "The product is uniquely flexible"
+    },
+    {
+      "color": "cyan",
+      "reason": "خاصية أساسية لمشاريع البرمجيات.",
+      "page_number": 8,
+      "text_to_highlight": "Many software projects are 'one-off’"
+    },
+    {
+      "color": "cyan",
+      "reason": "خاصية أساسية لعملية تطوير البرمجيات.",
+      "page_number": 8,
+      "text_to_highlight": "The development process is uniquely flexible"
+    },
+    {
+      "color": "cyan",
+      "reason": "خاصية أساسية لمشاريع البرمجيات الحديثة.",
+      "page_number": 8,
+      "text_to_highlight": "Size and complexity are increasing exponentially"
+    },
+    {
+      "color": "pink",
+      "reason": "نقطة حرجة جداً تتعلق بالأنظمة الحساسة للسلامة.",
+      "page_number": 8,
+      "text_to_highlight": "Human lives might depend on software running as expected (consider the control system of an airplane)- safety critical systems"
+    },
+    {
+      "color": "yellow",
+      "reason": "عنوان الشريحة يوضح محتواها.",
+      "page_number": 9,
+      "text_to_highlight": "A Brief History of (Software) Project Management"
+    },
+    {
+      "color": "yellow",
+      "reason": "اسم شخصية محورية في تاريخ الإدارة.",
+      "page_number": 10,
+      "text_to_highlight": "Frederick Winslow Taylor"
+    },
+    {
+      "color": "yellow",
+      "reason": "أهمية مخطط جانت واستمرارية استخدامه",
+      "page_number": 11,
+      "text_to_highlight": "Gantt’s “Gantt chart” notation is still used today to schedule projects"
+    },
+    {
+      "color": "cyan",
+      "reason": "تاريخ ظهور مخطط جانت",
+      "page_number": 11,
+      "text_to_highlight": "Defined during the First World War"
+    },
+    {
+      "color": "yellow",
+      "reason": "أول استخدام عملي لمخطط جانت",
+      "page_number": 11,
+      "text_to_highlight": "First used to schedule and monitor work and progress in ship building"
+    },
+    {
+      "color": "cyan",
+      "reason": "مفهوم أساسي يميزه مخطط جانت",
+      "page_number": 11,
+      "text_to_highlight": "distinction between work and progress"
+    },
+    {
+      "color": "yellow",
+      "reason": "عنوان الشريحة يوضح محتواها",
+      "page_number": 12,
+      "text_to_highlight": "Example of Gantt Chart"
+    },
+    {
+      "color": "yellow",
+      "reason": "بداية استخدام أدوات متقدمة في الحرب العالمية الثانية",
+      "page_number": 13,
+      "text_to_highlight": "2nd World War: Manhattan Project: process flow diagrams"
+    },
+    {
+      "color": "cyan",
+      "reason": "ظهور طريقة المسار الحرج",
+      "page_number": 13,
+      "text_to_highlight": "1957 CPM (Critical Path Method)"
+    },
+    {
+      "color": "green",
+      "reason": "تعريف CPM وأساسه الرياضي",
+      "page_number": 13,
+      "text_to_highlight": "Mathematically based algorithm for scheduling a set of project activities"
+    },
+    {
+      "color": "cyan",
+      "reason": "ظهور تقنية تقييم ومراجعة البرامج",
+      "page_number": 13,
+      "text_to_highlight": "1958 PERT (Program Evaluation and Review Technique)"
+    },
+    {
+      "color": "yellow",
+      "reason": "أول استخدام لـ PERT",
+      "page_number": 13,
+      "text_to_highlight": "U.S. Navy Polaris missile program"
+    },
+    {
+      "color": "yellow",
+      "reason": "تأثير العقود الحكومية الكبيرة على إدارة المشاريع",
+      "page_number": 13,
+      "text_to_highlight": "1960’s Big Government contracts: standardization and automation"
+    },
+    {
+      "color": "pink",
+      "reason": "أدوات أصبحت إلزامية في المشاريع الحكومية",
+      "page_number": 13,
+      "text_to_highlight": "PERT/COST and WBS become compulsory in Government’s projects"
+    },
+    {
+      "color": "cyan",
+      "reason": "ظهور تحليل القيمة المكتسبة",
+      "page_number": 13,
+      "text_to_highlight": "Earned Value Analysis (EVA) is defined"
+    },
+    {
+      "color": "yellow",
+      "reason": "دخول تطوير البرمجيات مجال إدارة المشاريع",
+      "page_number": 13,
+      "text_to_highlight": "1970 Software development gets into the equation"
+    },
+    {
+      "color": "cyan",
+      "reason": "نموذج الشلال لتطوير البرمجيات",
+      "page_number": 13,
+      "text_to_highlight": "Waterfall model for software development"
+    },
+    {
+      "color": "yellow",
+      "reason": "تأثير الثمانينات على انتشار أدوات إدارة المشاريع",
+      "page_number": 14,
+      "text_to_highlight": "1980’s Hardware and software proliferation make PM tools accessible to smaller firms"
+    },
+    {
+      "color": "cyan",
+      "reason": "قانون مور وتأثيره على الأجهزة",
+      "page_number": 14,
+      "text_to_highlight": "Hardware capacity grows exponentially (Moore’s Law)"
+    },
+    {
+      "color": "cyan",
+      "reason": "ظهور نماذج تقدير تعقيد البرمجيات",
+      "page_number": 14,
+      "text_to_highlight": "Estimation models (FP and COCOMO) are introduced to predict software complexity"
+    },
+    {
+      "color": "yellow",
+      "reason": "تركيز التسعينات على الجودة الشاملة",
+      "page_number": 14,
+      "text_to_highlight": "1990’s Total quality"
+    },
+    {
+      "color": "cyan",
+      "reason": "خصائص المنظمات في التسعينات",
+      "page_number": 14,
+      "text_to_highlight": "Leaner, quicker, more responsive organizations"
+    },
+    {
+      "color": "yellow",
+      "reason": "الوضع الحالي في إدارة المشاريع",
+      "page_number": 14,
+      "text_to_highlight": "Today Web application and new application distribution models"
+    },
+    {
+      "color": "green",
+      "reason": "الركائز الأساسية لإدارة المشاريع الحديثة",
+      "page_number": 14,
+      "text_to_highlight": "Agility, quick interaction, constant feedback"
+    },
+    {
+      "color": "yellow",
+      "reason": "عنوان الشريحة يوضح الموضوع الرئيسي",
+      "page_number": 15,
+      "text_to_highlight": "Software Development Projects and Stakeholders"
+    },
+    {
+      "color": "cyan",
+      "reason": "تلخيص لطبيعة الشريحة",
+      "page_number": 15,
+      "text_to_highlight": "The name of the game, the players, and (some of) the rules"
+    },
+    {
+      "color": "yellow",
+      "reason": "أول خاصية أساسية للمشروع: مؤقت",
+      "page_number": 16,
+      "text_to_highlight": "A project is a  temporary  endeavor"
+    },
+    {
+      "color": "yellow",
+      "reason": "الخاصية الثانية للمشروع: ينتج شيئاً فريداً",
+      "page_number": 16,
+      "text_to_highlight": "undertaken to create a  unique  product, service, or result"
+    },
+    {
+      "color": "cyan",
+      "reason": "مصدر التعريف الرسمي للمشروع",
+      "page_number": 16,
+      "text_to_highlight": "definition from the PMBOK"
+    },
+    {
+      "color": "yellow",
+      "reason": "خاصية أساسية: المشروع له عمر محدد",
+      "page_number": 17,
+      "text_to_highlight": "Temporary"
+    },
+    {
+      "color": "yellow",
+      "reason": "توضيح لمعنى 'مؤقت': له بداية ونهاية واضحة",
+      "page_number": 17,
+      "text_to_highlight": "Definitive   begin   and   end"
+    },
+    {
+      "color": "yellow",
+      "reason": "خاصية أساسية: المشروع ينتج شيئاً فريداً",
+      "page_number": 17,
+      "text_to_highlight": "Unique   products,   service,   or   result"
+    },
+    {
+      "color": "yellow",
+      "reason": "خاصية أساسية: المشروع يتطور تدريجياً",
+      "page_number": 17,
+      "text_to_highlight": "Progressive   elaboration"
+    },
+    {
+      "color": "cyan",
+      "reason": "شرح لمفهوم 'Progressive elaboration'",
+      "page_number": 17,
+      "text_to_highlight": "Development   by   steps   and   in   increments"
+    },
+    {
+      "color": "yellow",
+      "reason": "خاصية أساسية: المشروع مقيد بالموارد",
+      "page_number": 17,
+      "text_to_highlight": "Resource   constrained"
+    },
+    {
+      "color": "yellow",
+      "reason": "المفهوم الرئيسي للشريحة",
+      "page_number": 18,
+      "text_to_highlight": "Progressive Elaboration"
+    },
+    {
+      "color": "yellow",
+      "reason": "مفهوم تقسيم المشاريع الكبيرة",
+      "page_number": 19,
+      "text_to_highlight": "Subprojects"
+    },
+    {
+      "color": "yellow",
+      "reason": "تعريف البرنامج (Program)",
+      "page_number": 19,
+      "text_to_highlight": "Set   of   related   projects   managed   in   a   coordinated   way"
+    },
+    {
+      "color": "yellow",
+      "reason": "تعريف المحفظة (Portfolio)",
+      "page_number": 19,
+      "text_to_highlight": "Collection of  unrelated  projects or programs and other work"
+    },
+    {
+      "color": "cyan",
+      "reason": "الهدف الرئيسي من إدارة المحافظ",
+      "page_number": 19,
+      "text_to_highlight": "meet strategic objectives"
+    },
+    {
+      "color": "yellow",
+      "reason": "تصنيف أساسي لأنواع العمل",
+      "page_number": 20,
+      "text_to_highlight": "Work can be categorized either as project or  operational"
+    },
+    {
+      "color": "cyan",
+      "reason": "نقاط التشابه بين المشروع والعمليات",
+      "page_number": 20,
+      "text_to_highlight": "Common characteristics"
+    },
+    {
+      "color": "yellow",
+      "reason": "الفرق الجوهري للمشروع: له نهاية وهدف محدد",
+      "page_number": 20,
+      "text_to_highlight": "Project: obtain goals and terminate"
+    },
+    {
+      "color": "yellow",
+      "reason": "الفرق الجوهري للعمليات: مستمرة للحفاظ على العمل",
+      "page_number": 20,
+      "text_to_highlight": "Operational work: sustain the business"
+    },
+    {
+      "color": "yellow",
+      "reason": "مثال بسيط يوضح مفهوم المشروع في الحياة اليومية",
+      "page_number": 21,
+      "text_to_highlight": "Cooking dinner"
+    },
+    {
+      "color": "yellow",
+      "reason": "مثال صناعي على مشروع كبير",
+      "page_number": 21,
+      "text_to_highlight": "Building a car"
+    },
+    {
+      "color": "yellow",
+      "reason": "مثال على مشروع تطوير برمجيات",
+      "page_number": 21,
+      "text_to_highlight": "Developing a software system"
+    },
+    {
+      "color": "pink",
+      "reason": "مهمة مستمرة وليست مشروعاً بالضرورة، فخ امتحاني",
+      "page_number": 21,
+      "text_to_highlight": "Maintaining a software system"
+    },
+    {
+      "color": "pink",
+      "reason": "مهمة إدارية مستمرة وليست مشروعاً، فخ امتحاني",
+      "page_number": 21,
+      "text_to_highlight": "Managing personnel"
+    },
+    {
+      "color": "yellow",
+      "reason": "المفهوم الأساسي للشريحة",
+      "page_number": 22,
+      "text_to_highlight": "Software Development Projects"
+    },
+    {
+      "color": "cyan",
+      "reason": "مصطلح يوضح الفرق بين المشاريع والعمليات المستمرة",
+      "page_number": 22,
+      "text_to_highlight": "Operational Work"
+    },
+    {
+      "color": "yellow",
+      "reason": "الفكرة الرئيسية للشريحة",
+      "page_number": 23,
+      "text_to_highlight": "different types of “software” development projects"
+    },
+    {
+      "color": "cyan",
+      "reason": "نوع أساسي من مشاريع السوفتوير",
+      "page_number": 23,
+      "text_to_highlight": "Application Development"
+    },
+    {
+      "color": "cyan",
+      "reason": "نوع آخر من مشاريع السوفتوير",
+      "page_number": 23,
+      "text_to_highlight": "Process and Systems Re-engineering"
+    },
+    {
+      "color": "cyan",
+      "reason": "نوع هام يربط الأنظمة ببعضها",
+      "page_number": 23,
+      "text_to_highlight": "System Integration"
+    },
+    {
+      "color": "cyan",
+      "reason": "خدمات استشارية كنوع من المشاريع",
+      "page_number": 23,
+      "text_to_highlight": "Consulting Services"
+    },
+    {
+      "color": "cyan",
+      "reason": "خدمات التركيب والتدريب كنوع من المشاريع",
+      "page_number": 23,
+      "text_to_highlight": "Installation and Training"
+    },
+    {
+      "color": "yellow",
+      "reason": "المفهوم الرئيسي للشريحة",
+      "page_number": 24,
+      "text_to_highlight": "Application Development"
+    },
+    {
+      "color": "yellow",
+      "reason": "تعريف تطوير التطبيقات وأشكالها",
+      "page_number": 24,
+      "text_to_highlight": "developing an application (desktop, web, mobile, embedded)"
+    },
+    {
+      "color": "cyan",
+      "reason": "نوع من تطوير التطبيقات: حلول فريدة لعميل واحد",
+      "page_number": 24,
+      "text_to_highlight": "One-offs: systems specifically created for a client"
+    },
+    {
+      "color": "cyan",
+      "reason": "نوع من تطوير التطبيقات: برامج جاهزة للاستخدام العام",
+      "page_number": 24,
+      "text_to_highlight": "Off-the-shelf: to fill the need of a large set of users"
+    },
+    {
+      "color": "cyan",
+      "reason": "نوع من تطوير التطبيقات: برامج جاهزة تحتاج لتعديل كبير",
+      "page_number": 24,
+      "text_to_highlight": "Customized off-the-shelf: standardized systems which require a significant amount of customization"
+    },
+    {
+      "color": "cyan",
+      "reason": "مثال شهير على Customized off-the-shelf",
+      "page_number": 24,
+      "text_to_highlight": "Enterprise Resource Planning (ERP) systems"
+    },
+    {
+      "color": "yellow",
+      "reason": "المفهوم الرئيسي للشريحة",
+      "page_number": 25,
+      "text_to_highlight": "Process and Systems Re-Engineering"
+    },
+    {
+      "color": "yellow",
+      "reason": "الهدف الأساسي لإعادة الهندسة",
+      "page_number": 25,
+      "text_to_highlight": "Goal: change the way in which the operational work of an organization is carried out to achieve some strategic goal"
+    },
+    {
+      "color": "green",
+      "reason": "أمثلة على الأهداف الاستراتيجية لإعادة الهندسة",
+      "page_number": 25,
+      "text_to_highlight": "improve quality, become more efficient"
+    },
+    {
+      "color": "pink",
+      "reason": "نقطة مهمة: مشاريع كبيرة تتطلب تحليل دقيق للوضع الحالي",
+      "page_number": 25,
+      "text_to_highlight": "Typically large projects which involve an accurate analysis of the existing situation (“as is”)"
+    },
+    {
+      "color": "cyan",
+      "reason": "غالباً ما ترتبط بإدخال أنظمة ERP",
+      "page_number": 25,
+      "text_to_highlight": "support the introduction of an ERP system"
+    },
+    {
+      "color": "cyan",
+      "reason": "تتطلب دمج الأنظمة والبيانات",
+      "page_number": 25,
+      "text_to_highlight": "require system and data integration activities"
+    },
+    {
+      "color": "yellow",
+      "reason": "عنوان الشريحة والمفهوم الأساسي",
+      "page_number": 26,
+      "text_to_highlight": "System Integration Services"
+    },
+    {
+      "color": "yellow",
+      "reason": "الهدف الرئيسي لخدمات دمج الأنظمة",
+      "page_number": 26,
+      "text_to_highlight": "automating the information flow among the  systems of an organization"
+    },
+    {
+      "color": "cyan",
+      "reason": "نوع التكامل الأفقي وتعريفه",
+      "page_number": 26,
+      "text_to_highlight": "Horizontal:  integration of systems performing similar   operations"
+    },
+    {
+      "color": "cyan",
+      "reason": "نوع التكامل العمودي وتعريفه",
+      "page_number": 26,
+      "text_to_highlight": "Vertical:  integration of systems automating different steps of a procedure"
+    },
+    {
+      "color": "yellow",
+      "reason": "عنوان الشريحة والموضوع العام",
+      "page_number": 27,
+      "text_to_highlight": "Other types of Projects"
+    },
+    {
+      "color": "cyan",
+      "reason": "نوع مشروع: خدمات استشارية",
+      "page_number": 27,
+      "text_to_highlight": "Consulting   Services"
+    },
+    {
+      "color": "yellow",
+      "reason": "الهدف من الخدمات الاستشارية",
+      "page_number": 27,
+      "text_to_highlight": "Typically asked to gain a know-how outsize a company’s core competence"
+    },
+    {
+      "color": "cyan",
+      "reason": "نوع مشروع: خدمات تركيب وتدريب",
+      "page_number": 27,
+      "text_to_highlight": "Installation   and   Training   Services"
+    },
+    {
+      "color": "yellow",
+      "reason": "وصف خدمات التركيب والتدريب",
+      "page_number": 27,
+      "text_to_highlight": "Services related to the installation or training on specific software systems"
+    },
+    {
+      "color": "pink",
+      "reason": "ملاحظة هامة: مصدر دخل في المشاريع مفتوحة المصدر",
+      "page_number": 27,
+      "text_to_highlight": "Remark: also a revenue model in open source development"
+    },
+    {
+      "color": "yellow",
+      "reason": "عنوان الشريحة والموضوع العام",
+      "page_number": 28,
+      "text_to_highlight": "Projects and their Environment"
+    },
+    {
+      "color": "yellow",
+      "reason": "المفهوم الأساسي: اللاعبون في المشروع",
+      "page_number": 28,
+      "text_to_highlight": "The players (and you)"
+    },
+    {
+      "color": "yellow",
+      "reason": "المفهوم الأساسي للشريحة",
+      "page_number": 29,
+      "text_to_highlight": "Project Stakeholder"
+    },
+    {
+      "color": "yellow",
+      "reason": "التعريف الشامل لأصحاب المصلحة",
+      "page_number": 29,
+      "text_to_highlight": "is any individual or an organization that is actively involved in a project, or whose interest might be affected (positively or negatively) as a result of project execution or completion."
+    },
+    {
+      "color": "cyan",
+      "reason": "مصدر التعريف (كتاب إدارة المشاريع)",
+      "page_number": 29,
+      "text_to_highlight": "(PMBOK)"
+    },
+    {
+      "color": "yellow",
+      "reason": "عنوان الشريحة والمفهوم العام",
+      "page_number": 30,
+      "text_to_highlight": "The Players"
+    },
+    {
+      "color": "yellow",
+      "reason": "خاصية: تباين التأثير والمسؤولية",
+      "page_number": 30,
+      "text_to_highlight": "They may have different influence and varying level of responsibility during the project"
+    },
+    {
+      "color": "yellow",
+      "reason": "خاصية: أدوار مختلفة",
+      "page_number": 30,
+      "text_to_highlight": "They may play different roles"
+    },
+    {
+      "color": "yellow",
+      "reason": "خاصية: تأثير إيجابي أو سلبي",
+      "page_number": 30,
+      "text_to_highlight": "They may have positive or negative influence on the project"
+    },
+    {
+      "color": "pink",
+      "reason": "خاصية حرجة: صعوبة تحديدهم",
+      "page_number": 30,
+      "text_to_highlight": "They may be difficult to identify"
+    },
+    {
+      "color": "pink",
+      "reason": "خاصية حرجة: عدم تدخلهم يؤثر سلباً (أهمية تحديدهم وإشراكهم)",
+      "page_number": 30,
+      "text_to_highlight": "Their lack of intervention may negatively influence the project (need for identification and involvement)"
+    },
+    {
+      "color": "pink",
+      "reason": "ملاحظة هامة جداً: مدير المشروع والفريق هم أصحاب مصلحة أيضاً",
+      "page_number": 30,
+      "text_to_highlight": "Remark: the project manager and the project team are project stakeholders, although the term is often used to refer to the “other” stakeholders"
+    },
+    {
+      "color": "yellow",
+      "reason": "عنوان الشريحة ومقدمة للمفهوم الأساسي",
+      "page_number": 31,
+      "text_to_highlight": "Types of Stakeholders"
+    },
+    {
+      "color": "cyan",
+      "reason": "أحد أهم أصحاب المصلحة ومصطلح أساسي",
+      "page_number": 31,
+      "text_to_highlight": "The project manager"
+    },
+    {
+      "color": "cyan",
+      "reason": "فريق العمل هم جزء أساسي من أصحاب المصلحة",
+      "page_number": 31,
+      "text_to_highlight": "The project team"
+    },
+    {
+      "color": "cyan",
+      "reason": "الجهة الممولة أو الراعية للمشروع",
+      "page_number": 31,
+      "text_to_highlight": "The project sponsor"
+    },
+    {
+      "color": "cyan",
+      "reason": "العميل هو المستفيد الأول من المشروع",
+      "page_number": 31,
+      "text_to_highlight": "The client"
+    },
+    {
+      "color": "yellow",
+      "reason": "تعريف شامل لأصحاب المصلحة",
+      "page_number": 31,
+      "text_to_highlight": "anyone who might be affected by the project outputs"
+    },
+    {
+      "color": "yellow",
+      "reason": "عنوان الشريحة ومقدمة للتصنيف",
+      "page_number": 32,
+      "text_to_highlight": "Key Stakeholders"
+    },
+    {
+      "color": "yellow",
+      "reason": "تصنيف رئيسي لأصحاب المصلحة",
+      "page_number": 32,
+      "text_to_highlight": "Internal:"
+    },
+    {
+      "color": "cyan",
+      "reason": "مثال على أصحاب المصلحة الداخليين وتعريفهم",
+      "page_number": 32,
+      "text_to_highlight": "Project team members: the group performing the work"
+    },
+    {
+      "color": "yellow",
+      "reason": "تصنيف رئيسي آخر لأصحاب المصلحة",
+      "page_number": 32,
+      "text_to_highlight": "External:"
+    },
+    {
+      "color": "cyan",
+      "reason": "مثال على أصحاب المصلحة الخارجيين وتعريفهم",
+      "page_number": 32,
+      "text_to_highlight": "Influencers: people or groups not directly related to the project who could influence the course of a project"
+    },
+    {
+      "color": "yellow",
+      "reason": "تصنيف يجمع بين الداخلي والخارجي",
+      "page_number": 32,
+      "text_to_highlight": "In between:"
+    },
+    {
+      "color": "cyan",
+      "reason": "مثال على أصحاب المصلحة 'بين البينين' وتعريفهم",
+      "page_number": 32,
+      "text_to_highlight": "Customer/User: person or organization that will use the results of a project."
+    },
+    {
+      "color": "yellow",
+      "reason": "عنوان الشريحة ومقدمة للتمرين",
+      "page_number": 33,
+      "text_to_highlight": "Stakeholder Identification Exercise"
+    },
+    {
+      "color": "yellow",
+      "reason": "المهمة الرئيسية للشريحة",
+      "page_number": 33,
+      "text_to_highlight": "Identify the stakeholders of the following projects:"
+    },
+    {
+      "color": "cyan",
+      "reason": "مثال لمشروع يتطلب تحديد أصحاب المصلحة",
+      "page_number": 33,
+      "text_to_highlight": "A project to build a bridge connecting an island to the mainland"
+    },
+    {
+      "color": "cyan",
+      "reason": "مثال آخر لمشروع يتطلب تحديد أصحاب المصلحة",
+      "page_number": 33,
+      "text_to_highlight": "A project to build a web-application to monitor one’s weight"
+    },
+    {
+      "color": "yellow",
+      "reason": "عنوان الشريحة ومقدمة لدور مدير المشروع",
+      "page_number": 34,
+      "text_to_highlight": "The Project Manager (you)"
+    },
+    {
+      "color": "yellow",
+      "reason": "التعريف الأساسي لدور مدير المشروع",
+      "page_number": 34,
+      "text_to_highlight": "Person responsible of managing the project and stakeholders’ expectations"
+    },
+    {
+      "color": "cyan",
+      "reason": "مهارة أساسية لمدير المشروع",
+      "page_number": 34,
+      "text_to_highlight": "Communication and negotiation skills"
+    },
+    {
+      "color": "cyan",
+      "reason": "مهارة أساسية أخرى لمدير المشروع",
+      "page_number": 34,
+      "text_to_highlight": "Leadership"
+    },
+    {
+      "color": "cyan",
+      "reason": "مهارة مهمة جداً وغير تقنية",
+      "page_number": 34,
+      "text_to_highlight": "A lot of common sense"
+    },
+    {
+      "color": "cyan",
+      "reason": "مهارة التفكير الإبداعي",
+      "page_number": 34,
+      "text_to_highlight": "A bit of thinking outside the schemes"
+    },
+    {
+      "color": "yellow",
+      "reason": "عنوان الشريحة ومقدمة لموضوع جديد",
+      "page_number": 35,
+      "text_to_highlight": "Organizing the Development of Software Projects"
+    },
+    {
+      "color": "yellow",
+      "reason": "تعريف أساسي لإدارة مشاريع البرمجيات.",
+      "page_number": 36,
+      "text_to_highlight": "Software project management is the integration of management techniques to software development."
+    },
+    {
+      "color": "cyan",
+      "reason": "مصطلح تاريخي هام يوضح سبب ظهور الحاجة.",
+      "page_number": 36,
+      "text_to_highlight": "The need for such integration has its root in the sixties, in the days of the “software crisis”"
+    },
+    {
+      "color": "yellow",
+      "reason": "السبب الرئيسي وراء الحاجة لإدارة المشاريع.",
+      "page_number": 36,
+      "text_to_highlight": "increasing complexity of delivering software products meeting the specifications"
+    },
+    {
+      "color": "yellow",
+      "reason": "مثال على منتج برمجي بسيط.",
+      "page_number": 37,
+      "text_to_highlight": "An application to keep a list of movies watched"
+    },
+    {
+      "color": "yellow",
+      "reason": "مثال على منتج برمجي معقد.",
+      "page_number": 37,
+      "text_to_highlight": "A system to plan the resources of a big corporation"
+    },
+    {
+      "color": "pink",
+      "reason": "مثال على منتج برمجي حرج جداً وفشله كارثي.",
+      "page_number": 37,
+      "text_to_highlight": "An automated breaking system for a train"
+    },
+    {
+      "color": "pink",
+      "reason": "سؤال حرج يوضح أهمية إدارة المخاطر.",
+      "page_number": 37,
+      "text_to_highlight": "What could be the effects in case of failure?"
+    },
+    {
+      "color": "yellow",
+      "reason": "مقدمة لأهداف إطار العمل.",
+      "page_number": 38,
+      "text_to_highlight": "A general software project management framework is meant to:"
+    },
+    {
+      "color": "yellow",
+      "reason": "أحد الأهداف الرئيسية: توحيد الرؤية.",
+      "page_number": 38,
+      "text_to_highlight": "Form a shared vision about the goals to be achieved, the characteristics of the project outputs, and the characteristics of the development process"
+    },
+    {
+      "color": "green",
+      "reason": "هدف هام: تقليل المخاطر وعدم اليقين.",
+      "page_number": 38,
+      "text_to_highlight": "Reduce the impact of uncertainties and unknowns"
+    },
+    {
+      "color": "cyan",
+      "reason": "ميزة أساسية: كشف الانحرافات عن الخطة.",
+      "page_number": 38,
+      "text_to_highlight": "Highlight any deviation from the plan (goals, costs, quality)"
+    },
+    {
+      "color": "yellow",
+      "reason": "هدف إنساني وإداري مهم جداً لنجاح المشروع.",
+      "page_number": 38,
+      "text_to_highlight": "Motivate your team"
+    },
+    {
+      "color": "yellow",
+      "reason": "أول وأهم خطوة: تقييم إمكانية تنفيذ المشروع.",
+      "page_number": 39,
+      "text_to_highlight": "Feasibility Assessment"
+    },
+    {
+      "color": "yellow",
+      "reason": "إدارة نطاق المشروع وأهدافه.",
+      "page_number": 39,
+      "text_to_highlight": "Goals (Scope) Management"
+    },
+    {
+      "color": "yellow",
+      "reason": "إدارة الوقت والجداول الزمنية.",
+      "page_number": 39,
+      "text_to_highlight": "Time Management"
+    },
+    {
+      "color": "yellow",
+      "reason": "إدارة التكاليف والميزانية.",
+      "page_number": 39,
+      "text_to_highlight": "Cost Management"
+    },
+    {
+      "color": "cyan",
+      "reason": "مصطلح هام: إدارة التغييرات وتتبعها.",
+      "page_number": 39,
+      "text_to_highlight": "Change Control and Configuration Management"
+    },
+    {
+      "color": "yellow",
+      "reason": "ضمان جودة المنتج النهائي.",
+      "page_number": 39,
+      "text_to_highlight": "Quality Management"
+    },
+    {
+      "color": "pink",
+      "reason": "نقطة حرجة: إدارة المخاطر المحتملة.",
+      "page_number": 39,
+      "text_to_highlight": "Risk Management"
+    },
+    {
+      "color": "yellow",
+      "reason": "إدارة الفريق والأفراد.",
+      "page_number": 39,
+      "text_to_highlight": "Human Resource Management"
+    }
+  ],
+  "past_exams": [
+    {
+      "id": "pe_0",
+      "year": "امتحان النهائي 2024",
+      "options": [
+        "فقط معرفة لغات البرمجة المتقدمة",
+        "عملية مُدارة بشكل جيد تنظم الأنشطة بكفاءة",
+        "التركيز على تصميم واجهات المستخدم فقط",
+        "توظيف أكبر عدد من المبرمجين"
+      ],
+      "question": "وفقاً للشريحة 2، ما هو العنصر الأساسي المطلوب لبناء برمجيات جيدة بالإضافة إلى الجوانب التقنية؟",
+      "exam_type": "Final Exam",
+      "page_number": 2,
+      "trap_warning": "⚠️ فخ شائع: انتبه لصيغة النفي أو الكلمات الخادعة (مثل NOT أو EXCEPT أو Most likely) التي يكررها الدكاترة في هذا السؤال!",
+      "correct_answer": "عملية مُدارة بشكل جيد تنظم الأنشطة بكفاءة",
+      "doctor_explanation": "الشريحة 2 تؤكد أن الجوانب التقنية وحدها لا تكفي، بل يجب وجود 'عملية مُدارة بشكل جيد' لتنظيم الأنشطة بكفاءة والتحكم فيها لبناء برمجيات جيدة."
+    },
+    {
+      "id": "pe_1",
+      "year": "امتحان الميدتيرم 2023",
+      "options": [
+        "تصميم قواعد البيانات",
+        "كتابة الخوارزميات المعقدة",
+        "تدريب المستخدمين وتوثيق المنتج",
+        "تصحيح الأخطاء البرمجية (Debugging)"
+      ],
+      "question": "أي من الأنشطة التالية تُعتبر جزءاً من تطوير نظام برمجي ولكنها لا تتعلق مباشرة بكتابة الكود، وفقاً للشريحة 3؟",
+      "exam_type": "Midterm Exam",
+      "page_number": 3,
+      "trap_warning": "⚠️ فخ شائع: انتبه لصيغة النفي أو الكلمات الخادعة (مثل NOT أو EXCEPT أو Most likely) التي يكررها الدكاترة في هذا السؤال!",
+      "correct_answer": "تدريب المستخدمين وتوثيق المنتج",
+      "doctor_explanation": "الشريحة 3 تذكر صراحة أن تطوير النظام يتطلب أنشطة مثل 'training users, packaging a product, managing publicity and communication, writing user documentation' وهي لا تتعلق مباشرة بكتابة الكود."
+    },
+    {
+      "id": "pe_2",
+      "year": "الدورة الصيفية 2023",
+      "options": [
+        "فقط فريق برمجة كبير وذو خبرة عالية",
+        "عملية لتحديد الجدول الزمني والميزانية والجودة، وتقنيات لمراقبة الأهداف والوقت والتكاليف",
+        "التركيز على التسويق فقط بعد الانتهاء من المنتج",
+        "تجاهل التكاليف لضمان أعلى جودة"
+      ],
+      "question": "لتحقيق تسليم منتج (برمجي أو غيره) في الوقت المحدد وضمن الميزانية وبالجودة المتفق عليها، ما الذي نحتاجه بشكل أساسي وفقاً للشريحة 4؟",
+      "exam_type": "Summer Session",
+      "page_number": 4,
+      "trap_warning": "⚠️ فخ شائع: انتبه لصيغة النفي أو الكلمات الخادعة (مثل NOT أو EXCEPT أو Most likely) التي يكررها الدكاترة في هذا السؤال!",
+      "correct_answer": "عملية لتحديد الجدول الزمني والميزانية والجودة، وتقنيات لمراقبة الأهداف والوقت والتكاليف",
+      "doctor_explanation": "الشريحة 4 تحدد بوضوح متطلبين أساسيين: 'A process to define a schedule, a budget, and agree on the (quality) characteristics of a product' و 'A list of techniques to define, agree, plan, execute, and monitor: goals, quality, time, and costs'."
+    },
+    {
+      "id": "pe_3",
+      "year": "امتحان شامل 2022",
+      "options": [
+        "المنتج غير ملموس (intangible)",
+        "المنتج مرن بشكل فريد (uniquely flexible)",
+        "المنتج ثابت ولا يتغير (fixed and unchanging)",
+        "حجم وتعقيد المشاريع يتزايد بشكل أسي (increasing exponentially)"
+      ],
+      "question": "أي من الخصائص التالية لا تعتبر سبباً رئيسياً لكون إدارة مشاريع البرمجيات تحدياً وممتعة؟",
+      "exam_type": "Comprehensive Test",
+      "page_number": 8,
+      "trap_warning": "⚠️ فخ شائع: انتبه لصيغة النفي أو الكلمات الخادعة (مثل NOT أو EXCEPT أو Most likely) التي يكررها الدكاترة في هذا السؤال!",
+      "correct_answer": "المنتج ثابت ولا يتغير (fixed and unchanging)",
+      "doctor_explanation": "الإجابة الصحيحة هي 'المنتج ثابت ولا يتغير' لأن هذه الخاصية تتعارض تماماً مع طبيعة البرمجيات التي تتميز بالمرونة والتغيير المستمر. باقي الخيارات هي أسباب حقيقية لتحديات إدارة مشاريع البرمجيات."
+    },
+    {
+      "id": "pe_4",
+      "year": "امتحان الدور الأول 2024",
+      "options": [
+        "القدرة على تقدير الوقت والتكلفة، إدارة الفريق والمخاطر، ومراقبة الجودة.",
+        "القدرة على البرمجة بلغات متعددة فقط.",
+        "القدرة على التسويق وبيع المنتج النهائي.",
+        "القدرة على تصميم واجهات المستخدم الجذابة."
+      ],
+      "question": "ما هي المهارات الأساسية المطلوبة لإدارة مشروع تطوير برمجيات ناجح؟",
+      "exam_type": "First Round Exam",
+      "page_number": 6,
+      "trap_warning": "⚠️ فخ شائع: انتبه لصيغة النفي أو الكلمات الخادعة (مثل NOT أو EXCEPT أو Most likely) التي يكررها الدكاترة في هذا السؤال!",
+      "correct_answer": "القدرة على تقدير الوقت والتكلفة، إدارة الفريق والمخاطر، ومراقبة الجودة.",
+      "doctor_explanation": "الخيار الأول يجمع كل المهارات الأساسية المذكورة في الشريحة كأهداف للمادة، وهي تقدير الوقت والتكلفة، إدارة الفريق والمخاطر، ومراقبة الجودة. الخيارات الأخرى هي مهارات جزئية أو ليست جوهرية لإدارة المشروع ككل."
+    },
+    {
+      "id": "pe_5",
+      "year": "امتحان النهائي 2024",
+      "options": [
+        "Gantt Chart",
+        "CPM",
+        "PERT/COST and WBS",
+        "Waterfall model"
+      ],
+      "question": "أي من الأدوات التالية أصبحت إلزامية في المشاريع الحكومية الكبيرة خلال فترة الستينيات؟",
+      "exam_type": "Final Exam",
+      "page_number": 13,
+      "trap_warning": "⚠️ فخ شائع: انتبه لصيغة النفي أو الكلمات الخادعة (مثل NOT أو EXCEPT أو Most likely) التي يكررها الدكاترة في هذا السؤال!",
+      "correct_answer": "PERT/COST and WBS",
+      "doctor_explanation": "يا بطل، الشريحة وضحت إنو في الستينات، مع العقود الحكومية الضخمة، أدوات زي PERT/COST و WBS صارت إجبارية. CPM و Gantt Chart ظهروا قبل، والـ Waterfall model ظهر بالسبعينات."
+    },
+    {
+      "id": "pe_6",
+      "year": "امتحان الميدتيرم 2023",
+      "options": [
+        "قانون نيوتن",
+        "قانون مور",
+        "قانون أوم",
+        "قانون غاوس"
+      ],
+      "question": "ما هو القانون الذي يصف النمو الأسي لقدرة الأجهزة الحاسوبية والذي ساهم في انتشار أدوات إدارة المشاريع في الثمانينات؟",
+      "exam_type": "Midterm Exam",
+      "page_number": 14,
+      "trap_warning": "⚠️ فخ شائع: انتبه لصيغة النفي أو الكلمات الخادعة (مثل NOT أو EXCEPT أو Most likely) التي يكررها الدكاترة في هذا السؤال!",
+      "correct_answer": "قانون مور",
+      "doctor_explanation": "يا دكتور، الشريحة ذكرت بوضوح إنو 'Hardware capacity grows exponentially (Moore’s Law)'، وهذا القانون هو اللي بيوصف تضاعف قوة المعالجة كل فترة زمنية، وساعد على جعل أدوات إدارة المشاريع متاحة للجميع."
+    },
+    {
+      "id": "pe_7",
+      "year": "الدورة الصيفية 2023",
+      "options": [
+        "مستمر ومتكرر",
+        "مؤقت وفريد",
+        "غير مخطط له وعشوائي",
+        "غير محدود الموارد وواسع النطاق"
+      ],
+      "question": "وفقًا لتعريف PMBOK، ما هي الخاصيتان الأساسيتان للمشروع؟",
+      "exam_type": "Summer Session",
+      "page_number": 16,
+      "trap_warning": "⚠️ فخ شائع: انتبه لصيغة النفي أو الكلمات الخادعة (مثل NOT أو EXCEPT أو Most likely) التي يكررها الدكاترة في هذا السؤال!",
+      "correct_answer": "مؤقت وفريد",
+      "doctor_explanation": "التعريف الأساسي للمشروع يركز على كونه 'مؤقت' (له بداية ونهاية) و 'فريد' (ينتج شيئًا جديدًا أو مختلفًا). الخيارات الأخرى لا تتوافق مع هذا التعريف."
+    },
+    {
+      "id": "pe_8",
+      "year": "امتحان شامل 2022",
+      "options": [
+        "تحديد جميع تفاصيل المشروع في البداية",
+        "تطوير المشروع بخطوات وزيادات مع توضيح التفاصيل تدريجياً",
+        "العمل على المشروع بشكل عشوائي دون خطة واضحة",
+        "إعادة تعريف أهداف المشروع بشكل مستمر"
+      ],
+      "question": "أي من الخصائص التالية تصف 'Progressive Elaboration' في المشروع؟",
+      "exam_type": "Comprehensive Test",
+      "page_number": 17,
+      "trap_warning": "⚠️ فخ شائع: انتبه لصيغة النفي أو الكلمات الخادعة (مثل NOT أو EXCEPT أو Most likely) التي يكررها الدكاترة في هذا السؤال!",
+      "correct_answer": "تطوير المشروع بخطوات وزيادات مع توضيح التفاصيل تدريجياً",
+      "doctor_explanation": "Progressive Elaboration تعني أن المشروع يتطور تدريجياً، حيث تتضح التفاصيل وتضاف المعلومات مع تقدم العمل، وليس تحديد كل شيء من البداية."
+    },
+    {
+      "id": "pe_9",
+      "year": "امتحان الدور الأول 2024",
+      "options": [
+        "البرنامج يضم مشاريع غير مترابطة، بينما المحفظة تضم مشاريع مترابطة.",
+        "البرنامج يركز على الأهداف التشغيلية، بينما المحفظة تركز على الأهداف الاستراتيجية.",
+        "البرنامج يضم مجموعة من المشاريع المترابطة، بينما المحفظة تضم مجموعة من المشاريع والبرامج غير المترابطة.",
+        "البرنامج له مدة زمنية أطول من المحفظة."
+      ],
+      "question": "ما هو الفرق الرئيسي بين 'البرنامج' (Program) و 'المحفظة' (Portfolio) في إدارة المشاريع؟",
+      "exam_type": "First Round Exam",
+      "page_number": 19,
+      "trap_warning": "⚠️ فخ شائع: انتبه لصيغة النفي أو الكلمات الخادعة (مثل NOT أو EXCEPT أو Most likely) التي يكررها الدكاترة في هذا السؤال!",
+      "correct_answer": "البرنامج يضم مجموعة من المشاريع المترابطة، بينما المحفظة تضم مجموعة من المشاريع والبرامج غير المترابطة.",
+      "doctor_explanation": "البرنامج هو مجموعة من المشاريع المترابطة التي تدار بشكل منسق لتحقيق فائدة معينة. أما المحفظة فهي مجموعة من المشاريع والبرامج والأعمال الأخرى التي قد تكون غير مترابطة، ولكنها تدار معًا لتحقيق الأهداف الاستراتيجية للمنظمة."
+    }
+  ],
+  "focus_points": [
+    {
+      "point": "مقدمة لمادة إدارة مشاريع البرمجيات",
+      "explanation": "💡 بداية رحلة إدارة المشاريع البرمجية",
+      "page_number": 1
+    },
+    {
+      "point": "ليش إدارة المشاريع مهمة؟ (الجزء الأول)",
+      "explanation": "💡 التقنية وحدها لا تكفي لنجاح المشروع",
+      "page_number": 2
+    },
+    {
+      "point": "أمثلة توضح أهمية الإدارة (الجزء الثاني)",
+      "explanation": "💡 بدون إدارة، حتى أفضل التقنيات تصبح بلا قيمة",
+      "page_number": 3
+    },
+    {
+      "point": "متطلبات تسليم منتج ناجح (الجزء الثالث)",
+      "explanation": "💡 لمنتج ناجح: خطة، ميزانية، جودة، وأدوات متابعة",
+      "page_number": 4
+    },
+    {
+      "point": "مثلث إدارة المشاريع",
+      "explanation": "💡 مثلث القيود الثلاثة للمشروع",
+      "page_number": 5
+    },
+    {
+      "point": "مهارات وأهداف إدارة مشاريع البرمجيات",
+      "explanation": "💡 إدارة المشاريع البرمجية تحتاج مهارات خاصة لحل تحدياتها.",
+      "page_number": 6
+    },
+    {
+      "point": "التميز في إدارة مشاريع البرمجيات",
+      "explanation": "💡 إدارة المشاريع البرمجية متعددة التخصصات لكن لها خصائص فريدة.",
+      "page_number": 7
+    },
+    {
+      "point": "لماذا إدارة مشاريع البرمجيات تحدي وممتعة؟",
+      "explanation": "💡 المنتج غير ملموس، مرن، فريد، ومتزايد التعقيد.",
+      "page_number": 8
+    },
+    {
+      "point": "لمحة تاريخية عن إدارة المشاريع (البرمجية)",
+      "explanation": "💡 هذه الشريحة مقدمة لتاريخ إدارة المشاريع.",
+      "page_number": 9
+    },
+    {
+      "point": "فريدريك وينسلو تايلور: أبو الإدارة العلمية",
+      "explanation": "💡 فريدريك تايلور رائد الإدارة العلمية.",
+      "page_number": 10
+    },
+    {
+      "point": "هنري جانت ومخطط جانت: الأب الروحي لتخطيط المشاريع",
+      "explanation": "💡 جانت تشارت: أداة خالدة لتخطيط المشاريع",
+      "page_number": 11
+    },
+    {
+      "point": "مخطط جانت: نظرة سريعة",
+      "explanation": "💡 مخطط جانت: كيف يبدو؟",
+      "page_number": 12
+    },
+    {
+      "point": "تطور إدارة المشاريع: من الحرب العالمية الثانية حتى السبعينات",
+      "explanation": "💡 تطور أدوات إدارة المشاريع عبر العقود",
+      "page_number": 13
+    },
+    {
+      "point": "ثورة الكمبيوتر وتأثيرها على إدارة المشاريع: من الثمانينات حتى اليوم",
+      "explanation": "💡 التكنولوجيا غيرت وجه إدارة المشاريع للأبد",
+      "page_number": 14
+    },
+    {
+      "point": "مشاريع تطوير البرمجيات وأصحاب المصلحة: اللعبة وقواعدها",
+      "explanation": "💡 فهم اللاعبين وقواعد اللعبة في مشاريع البرمجيات",
+      "page_number": 15
+    },
+    {
+      "point": "تعريف المشروع: اللعبة تبدأ هنا!",
+      "explanation": "💡 المشروع: مؤقت، فريد، وله هدف محدد.",
+      "page_number": 16
+    },
+    {
+      "point": "خصائص المشروع: ليش مشروعك مميز؟",
+      "explanation": "💡 المشروع: مؤقت، فريد، يتطور تدريجياً، ومحدود الموارد.",
+      "page_number": 17
+    },
+    {
+      "point": "التطوير التدريجي: فن البناء خطوة بخطوة",
+      "explanation": "💡 التطوير التدريجي: توضيح التفاصيل مع تقدم المشروع.",
+      "page_number": 18
+    },
+    {
+      "point": "سياق إدارة المشاريع: الصورة الكبيرة",
+      "explanation": "💡 المشاريع تتجمع في برامج ومحافظ لتحقيق أهداف أكبر.",
+      "page_number": 19
+    },
+    {
+      "point": "المشاريع والعمليات التشغيلية: الفرق الجوهري",
+      "explanation": "💡 المشروع ينتهي بهدف، والعمليات تستمر للحفاظ على العمل.",
+      "page_number": 20
+    },
+    {
+      "point": "أمثلة على المشاريع: مش بس سوفتوير!",
+      "explanation": "💡 المشاريع متنوعة وتشمل كل شيء حولنا.",
+      "page_number": 21
+    },
+    {
+      "point": "مشاريع تطوير البرمجيات: عالمنا الرقمي!",
+      "explanation": "💡 مشاريع السوفتوير هي أساس عملنا.",
+      "page_number": 22
+    },
+    {
+      "point": "أنواع مشاريع السوفتوير: تنوع كبير!",
+      "explanation": "💡 مشاريع السوفتوير مش نوع واحد، لها أشكال مختلفة.",
+      "page_number": 23
+    },
+    {
+      "point": "تطوير التطبيقات: من الصفر للتخصيص!",
+      "explanation": "💡 تطوير التطبيقات له أشكال: من الفريد للمخصص.",
+      "page_number": 24
+    },
+    {
+      "point": "إعادة هندسة العمليات والأنظمة: تغيير جذري للأفضل!",
+      "explanation": "💡 إعادة الهندسة: تغيير شامل لتحسين الأداء.",
+      "page_number": 25
+    },
+    {
+      "point": "خدمات دمج الأنظمة: كيف نخلي كل شي يشتغل مع بعض؟",
+      "explanation": "💡 دمج الأنظمة: ربط الأقسام لتسهيل الشغل.",
+      "page_number": 26
+    },
+    {
+      "point": "أنواع مشاريع ثانية: استشارات، تركيب، وتدريب!",
+      "explanation": "💡 مشاريع إضافية: خبرة خارجية، تركيب برامج، وتدريب عليها.",
+      "page_number": 27
+    },
+    {
+      "point": "المشاريع وبيئتها: مين هم اللاعبين؟",
+      "explanation": "💡 المشاريع: مين اللي بيشتغل فيها وبيأثر عليها؟",
+      "page_number": 28
+    },
+    {
+      "point": "أصحاب المصلحة (Stakeholders): مين هم اللي بيأثروا ويتأثروا بالمشروع؟",
+      "explanation": "💡 أصحاب المصلحة: كل من له علاقة بالمشروع، إيجاباً أو سلباً.",
+      "page_number": 29
+    },
+    {
+      "point": "اللاعبون (أصحاب المصلحة): صفاتهم وتأثيرهم",
+      "explanation": "💡 أصحاب المصلحة: متنوعون، مؤثرون، وقد يكونوا صعبين.",
+      "page_number": 30
+    },
+    {
+      "point": "مين هم أصحاب المصلحة (Stakeholders) في أي مشروع؟",
+      "explanation": "💡 أصحاب المصلحة: كل من يتأثر بالمشروع أو يؤثر فيه.",
+      "page_number": 31
+    },
+    {
+      "point": "تصنيف أصحاب المصلحة: داخلي، خارجي، وبين البينين!",
+      "explanation": "💡 أصحاب المصلحة ينقسمون لداخليين، خارجيين، ومن هم بينهما.",
+      "page_number": 32
+    },
+    {
+      "point": "تمرين عملي: كيف تحدد أصحاب المصلحة لمشاريع مختلفة؟",
+      "explanation": "💡 تدريب على تحديد أصحاب المصلحة لمشاريع متنوعة.",
+      "page_number": 33
+    },
+    {
+      "point": "مدير المشروع: أنت القائد والمسؤول عن كل شيء!",
+      "explanation": "💡 مدير المشروع هو قائد السفينة، يحتاج مهارات متنوعة لإدارة المشروع والـ Stakeholders.",
+      "page_number": 34
+    },
+    {
+      "point": "تنظيم تطوير مشاريع البرمجيات: مقدمة",
+      "explanation": "💡 هذه الشريحة هي مقدمة لموضوع تنظيم تطوير مشاريع البرمجيات.",
+      "page_number": 35
+    },
+    {
+      "point": "إدارة مشاريع البرمجيات: ليش نحتاجها؟",
+      "explanation": "💡 إدارة البرمجيات: دمج الإدارة مع التطوير لحل أزمة التعقيد.",
+      "page_number": 36
+    },
+    {
+      "point": "شو يعني 'منتج برمجي'؟ أمثلة وتساؤلات!",
+      "explanation": "💡 المنتج البرمجي: من تطبيق بسيط لسيستم معقد، وكل واحد له تحدياته.",
+      "page_number": 37
+    },
+    {
+      "point": "إطار عمل تطوير البرمجيات: خارطة طريق النجاح!",
+      "explanation": "💡 إطار العمل: رؤية مشتركة، تنظيم، تقليل مخاطر، ومتابعة مستمرة.",
+      "page_number": 38
+    },
+    {
+      "point": "هموم إدارة المشاريع: شو اللي بيقلقنا؟",
+      "explanation": "💡 هموم المشروع: من الجدوى للوقت للتكلفة للجودة، كل شيء لازم يندار صح.",
+      "page_number": 39
+    },
+    {
+      "point": "ختام الشريحة: اسم المحاضر",
+      "explanation": "💡 هذه الشريحة للمقدمة فقط وغير مطلوبة للاختبار.",
+      "page_number": 40
+    }
+  ],
+  "sticky_notes": [
+    {
+      "note_text": "📌 كبسولة سريعة: هاي الشريحة بس عشان تعرف اسم المادة والدكتور، ما فيها معلومات للاختبار.",
+      "page_number": 1
+    },
+    {
+      "note_text": "📌 كبسولة سريعة: التقنية وحدها لا تصنع مشروعاً ناجحاً، بل تحتاج لعملية إدارة قوية ومنظمة.",
+      "page_number": 2
+    },
+    {
+      "note_text": "📌 كبسولة سريعة: الإدارة تضمن أن المتطلبات والاختبارات والأنشطة غير البرمجية تتم بفعالية، وإلا ضاع الجهد.",
+      "page_number": 3
+    },
+    {
+      "note_text": "📌 كبسولة سريعة: النجاح في تسليم المنتج يعتمد على عملية واضحة وتقنيات لمراقبة الوقت، التكلفة، الجودة، والأهداف.",
+      "page_number": 4
+    },
+    {
+      "note_text": "📌 كبسولة سريعة: مثلث إدارة المشاريع يوضح العلاقة بين الوقت، التكلفة، والنطاق في أي مشروع.",
+      "page_number": 5
+    },
+    {
+      "note_text": "📌 كبسولة سريعة: إدارة المشاريع البرمجية = مجموعة مهارات للإجابة على أسئلة 'كيف' تنجح المشروع.",
+      "page_number": 6
+    },
+    {
+      "note_text": "📌 كبسولة سريعة: إدارة المشاريع علم شامل، لكن البرمجيات لها نكهتها الخاصة وتحدياتها الفريدة.",
+      "page_number": 7
+    },
+    {
+      "note_text": "📌 كبسولة سريعة: تحديات إدارة البرمجيات تكمن في طبيعتها غير الملموسة، مرونتها، تزايد تعقيدها، وحساسيتها لحياة البشر.",
+      "page_number": 8
+    },
+    {
+      "note_text": "📌 كبسولة سريعة: هذه الشريحة للمقدمة فقط وغير مطلوبة للاختبار.",
+      "page_number": 9
+    },
+    {
+      "note_text": "📌 كبسولة سريعة: تايلور هو مؤسس الإدارة العلمية، شخصية تاريخية مهمة.",
+      "page_number": 10
+    },
+    {
+      "note_text": "📌 كبسولة سريعة: مخطط جانت هو الأداة الأيقونية لتخطيط المشاريع، ولسه بنستخدمها من أيام الحرب العالمية الأولى!",
+      "page_number": 11
+    },
+    {
+      "note_text": "📌 كبسولة سريعة: هذه الشريحة مجرد مثال بصري لمخطط جانت، لا يوجد فيها معلومات نظرية جديدة.",
+      "page_number": 12
+    },
+    {
+      "note_text": "📌 كبسولة سريعة: الخمسينات جابت CPM و PERT، الستينات ركزت على التوحيد و EVA، والسبعينات أدخلت تطوير البرمجيات ونموذج الشلال.",
+      "page_number": 13
+    },
+    {
+      "note_text": "📌 كبسولة سريعة: الثمانينات: انتشار الأدوات. التسعينات: الجودة والرشاقة. اليوم: الويب، المرونة، والتغذية الراجعة.",
+      "page_number": 14
+    },
+    {
+      "note_text": "📌 كبسولة سريعة: فهم أصحاب المصلحة وقواعد اللعبة أساسي لنجاح أي مشروع برمجي.",
+      "page_number": 15
+    },
+    {
+      "note_text": "📌 كبسولة سريعة: المشروع = بداية + نهاية + شيء جديد ومختلف.",
+      "page_number": 16
+    },
+    {
+      "note_text": "📌 كبسولة سريعة: تذكر خصائص المشروع الأربعة: مؤقت، فريد، تطوير تدريجي، ومحدود الموارد.",
+      "page_number": 17
+    },
+    {
+      "note_text": "📌 كبسولة سريعة: التفاصيل تتضح مع الوقت، مش كلها مرة واحدة.",
+      "page_number": 18
+    },
+    {
+      "note_text": "📌 كبسولة سريعة: مشروع < برنامج (مشاريع مترابطة) < محفظة (مشاريع وبرامج غير مترابطة).",
+      "page_number": 19
+    },
+    {
+      "note_text": "📌 كبسولة سريعة: المشروع = مؤقت + هدف محدد. العمليات = مستمرة + للحفاظ على العمل.",
+      "page_number": 20
+    },
+    {
+      "note_text": "📌 كبسولة سريعة: المشروع له بداية ونهاية وهدف، مش كل مهمة روتينية تعتبر مشروع!",
+      "page_number": 21
+    },
+    {
+      "note_text": "📌 كبسولة سريعة: المشاريع مؤقتة، العمليات التشغيلية مستمرة.",
+      "page_number": 22
+    },
+    {
+      "note_text": "📌 كبسولة سريعة: مشاريع السوفتوير متنوعة وتشمل التطوير، إعادة الهندسة، الدمج، الاستشارات، والتدريب.",
+      "page_number": 23
+    },
+    {
+      "note_text": "📌 كبسولة سريعة: تطوير التطبيقات يتراوح بين الحلول الفريدة (One-offs) والجاهزة (Off-the-shelf) والمخصصة (Customized off-the-shelf).",
+      "page_number": 24
+    },
+    {
+      "note_text": "📌 كبسولة سريعة: إعادة الهندسة هي تغيير جذري للعمليات لتحقيق أهداف استراتيجية كبيرة، تبدأ بتحليل دقيق للوضع الحالي.",
+      "page_number": 25
+    },
+    {
+      "note_text": "📌 كبسولة سريعة: دمج الأنظمة بيخلي برامج الشركة تشتغل كفريق واحد، وبيوفر وقت وجهد كبير!",
+      "page_number": 26
+    },
+    {
+      "note_text": "📌 كبسولة سريعة: الاستشارات بتجيب لك الخبرة، والتركيب والتدريب بيضمنوا إنك تستخدم البرامج صح، وممكن يكونوا مصدر دخل للمشاريع المجانية!",
+      "page_number": 27
+    },
+    {
+      "note_text": "📌 كبسولة سريعة: هذه الشريحة للمقدمة فقط وغير مطلوبة للاختبار، بس بتجهزك للمفهوم الجاي!",
+      "page_number": 28
+    },
+    {
+      "note_text": "📌 كبسولة سريعة: صاحب المصلحة هو أي حدا بيشتغل بالمشروع أو بيتأثر فيه، سواء كان فرد أو جهة، وبشكل إيجابي أو سلبي!",
+      "page_number": 29
+    },
+    {
+      "note_text": "📌 كبسولة سريعة: أصحاب المصلحة متنوعين، تأثيرهم مختلف، وممكن يكونوا صعبين التحديد. لازم تعرفهم وتشركهم عشان مشروعك ينجح!",
+      "page_number": 30
+    },
+    {
+      "note_text": "📌 كبسولة سريعة: الـ Stakeholders هم كل من له مصلحة أو يتأثر بالمشروع، معرفتهم أساس لنجاح أي مشروع.",
+      "page_number": 31
+    },
+    {
+      "note_text": "📌 كبسولة سريعة: تصنيف الـ Stakeholders بيساعدك تفهم مين تتعامل معاه وكيف تدير توقعاتهم.",
+      "page_number": 32
+    },
+    {
+      "note_text": "📌 كبسولة سريعة: التطبيق العملي هو مفتاح الفهم، حاول تحل الأمثلة بنفسك!",
+      "page_number": 33
+    },
+    {
+      "note_text": "📌 كبسولة سريعة: مدير المشروع هو القائد الذي يجمع بين المهارات التقنية والشخصية لإنجاح المشروع.",
+      "page_number": 34
+    },
+    {
+      "note_text": "📌 كبسولة سريعة: هذه الشريحة للمقدمة فقط وغير مطلوبة للاختبار.",
+      "page_number": 35
+    },
+    {
+      "note_text": "📌 كبسولة سريعة: إدارة مشاريع البرمجيات هي الحل السحري لتعقيد البرامج، ظهرت بسبب 'أزمة البرمجيات' في الستينات.",
+      "page_number": 36
+    },
+    {
+      "note_text": "📌 كبسولة سريعة: المنتجات البرمجية تتنوع من البسيط للمعقد، وكل نوع يتطلب تقييم دقيق للمخاطر والموارد المطلوبة.",
+      "page_number": 37
+    },
+    {
+      "note_text": "📌 كبسولة سريعة: إطار العمل هو بوصلة المشروع: يوحد الرؤية، ينظم العمل، يقلل المخاطر، ويكشف الأخطاء مبكراً.",
+      "page_number": 38
+    },
+    {
+      "note_text": "📌 كبسولة سريعة: إدارة المشروع تشمل كل شيء من الجدوى للموارد البشرية، والتحكم بالتغيير والمخاطر نقاط محورية.",
+      "page_number": 39
+    },
+    {
+      "note_text": "📌 كبسولة سريعة: هذه الشريحة مجرد توقيع للمحاضر، لا تحتوي على معلومات دراسية.",
+      "page_number": 40
+    }
+  ],
+  "slide_page_map": {
+    "1": 1,
+    "2": 4,
+    "3": 7,
+    "4": 10,
+    "5": 13,
+    "6": 16,
+    "7": 19,
+    "8": 22,
+    "9": 25,
+    "10": 28,
+    "11": 31,
+    "12": 34,
+    "13": 37,
+    "14": 40,
+    "15": 43,
+    "16": 46,
+    "17": 49,
+    "18": 52,
+    "19": 55,
+    "20": 58,
+    "21": 61,
+    "22": 64,
+    "23": 67,
+    "24": 70,
+    "25": 73,
+    "26": 76,
+    "27": 79,
+    "28": 82,
+    "29": 85,
+    "30": 88,
+    "31": 91,
+    "32": 94,
+    "33": 97,
+    "34": 100,
+    "35": 103,
+    "36": 106,
+    "37": 109,
+    "38": 112,
+    "39": 115,
+    "40": 118
+  },
+  "companion_page_map": {
+    "1": [
+      2,
+      3
+    ],
+    "2": [
+      5,
+      6
+    ],
+    "3": [
+      8,
+      9
+    ],
+    "4": [
+      11,
+      12
+    ],
+    "5": [
+      14,
+      15
+    ],
+    "6": [
+      17,
+      18
+    ],
+    "7": [
+      20,
+      21
+    ],
+    "8": [
+      23,
+      24
+    ],
+    "9": [
+      26,
+      27
+    ],
+    "10": [
+      29,
+      30
+    ],
+    "11": [
+      32,
+      33
+    ],
+    "12": [
+      35,
+      36
+    ],
+    "13": [
+      38,
+      39
+    ],
+    "14": [
+      41,
+      42
+    ],
+    "15": [
+      44,
+      45
+    ],
+    "16": [
+      47,
+      48
+    ],
+    "17": [
+      50,
+      51
+    ],
+    "18": [
+      53,
+      54
+    ],
+    "19": [
+      56,
+      57
+    ],
+    "20": [
+      59,
+      60
+    ],
+    "21": [
+      62,
+      63
+    ],
+    "22": [
+      65,
+      66
+    ],
+    "23": [
+      68,
+      69
+    ],
+    "24": [
+      71,
+      72
+    ],
+    "25": [
+      74,
+      75
+    ],
+    "26": [
+      77,
+      78
+    ],
+    "27": [
+      80,
+      81
+    ],
+    "28": [
+      83,
+      84
+    ],
+    "29": [
+      86,
+      87
+    ],
+    "30": [
+      89,
+      90
+    ],
+    "31": [
+      92,
+      93
+    ],
+    "32": [
+      95,
+      96
+    ],
+    "33": [
+      98,
+      99
+    ],
+    "34": [
+      101,
+      102
+    ],
+    "35": [
+      104,
+      105
+    ],
+    "36": [
+      107,
+      108
+    ],
+    "37": [
+      110,
+      111
+    ],
+    "38": [
+      113,
+      114
+    ],
+    "39": [
+      116,
+      117
+    ],
+    "40": [
+      119,
+      120
+    ]
+  },
+  "expected_questions": [
+    {
+      "options": [
+        "فقط معرفة لغات البرمجة المتقدمة",
+        "عملية مُدارة بشكل جيد تنظم الأنشطة بكفاءة",
+        "التركيز على تصميم واجهات المستخدم فقط",
+        "توظيف أكبر عدد من المبرمجين"
+      ],
+      "question": "وفقاً للشريحة 2، ما هو العنصر الأساسي المطلوب لبناء برمجيات جيدة بالإضافة إلى الجوانب التقنية؟",
+      "explanation": "الشريحة 2 تؤكد أن الجوانب التقنية وحدها لا تكفي، بل يجب وجود 'عملية مُدارة بشكل جيد' لتنظيم الأنشطة بكفاءة والتحكم فيها لبناء برمجيات جيدة.",
+      "page_number": 2,
+      "correct_answer": "عملية مُدارة بشكل جيد تنظم الأنشطة بكفاءة"
+    },
+    {
+      "options": [
+        "تصميم قواعد البيانات",
+        "كتابة الخوارزميات المعقدة",
+        "تدريب المستخدمين وتوثيق المنتج",
+        "تصحيح الأخطاء البرمجية (Debugging)"
+      ],
+      "question": "أي من الأنشطة التالية تُعتبر جزءاً من تطوير نظام برمجي ولكنها لا تتعلق مباشرة بكتابة الكود، وفقاً للشريحة 3؟",
+      "explanation": "الشريحة 3 تذكر صراحة أن تطوير النظام يتطلب أنشطة مثل 'training users, packaging a product, managing publicity and communication, writing user documentation' وهي لا تتعلق مباشرة بكتابة الكود.",
+      "page_number": 3,
+      "correct_answer": "تدريب المستخدمين وتوثيق المنتج"
+    },
+    {
+      "options": [
+        "فقط فريق برمجة كبير وذو خبرة عالية",
+        "عملية لتحديد الجدول الزمني والميزانية والجودة، وتقنيات لمراقبة الأهداف والوقت والتكاليف",
+        "التركيز على التسويق فقط بعد الانتهاء من المنتج",
+        "تجاهل التكاليف لضمان أعلى جودة"
+      ],
+      "question": "لتحقيق تسليم منتج (برمجي أو غيره) في الوقت المحدد وضمن الميزانية وبالجودة المتفق عليها، ما الذي نحتاجه بشكل أساسي وفقاً للشريحة 4؟",
+      "explanation": "الشريحة 4 تحدد بوضوح متطلبين أساسيين: 'A process to define a schedule, a budget, and agree on the (quality) characteristics of a product' و 'A list of techniques to define, agree, plan, execute, and monitor: goals, quality, time, and costs'.",
+      "page_number": 4,
+      "correct_answer": "عملية لتحديد الجدول الزمني والميزانية والجودة، وتقنيات لمراقبة الأهداف والوقت والتكاليف"
+    },
+    {
+      "options": [
+        "المنتج غير ملموس (intangible)",
+        "المنتج مرن بشكل فريد (uniquely flexible)",
+        "المنتج ثابت ولا يتغير (fixed and unchanging)",
+        "حجم وتعقيد المشاريع يتزايد بشكل أسي (increasing exponentially)"
+      ],
+      "question": "أي من الخصائص التالية لا تعتبر سبباً رئيسياً لكون إدارة مشاريع البرمجيات تحدياً وممتعة؟",
+      "explanation": "الإجابة الصحيحة هي 'المنتج ثابت ولا يتغير' لأن هذه الخاصية تتعارض تماماً مع طبيعة البرمجيات التي تتميز بالمرونة والتغيير المستمر. باقي الخيارات هي أسباب حقيقية لتحديات إدارة مشاريع البرمجيات.",
+      "page_number": 8,
+      "correct_answer": "المنتج ثابت ولا يتغير (fixed and unchanging)"
+    },
+    {
+      "options": [
+        "القدرة على تقدير الوقت والتكلفة، إدارة الفريق والمخاطر، ومراقبة الجودة.",
+        "القدرة على البرمجة بلغات متعددة فقط.",
+        "القدرة على التسويق وبيع المنتج النهائي.",
+        "القدرة على تصميم واجهات المستخدم الجذابة."
+      ],
+      "question": "ما هي المهارات الأساسية المطلوبة لإدارة مشروع تطوير برمجيات ناجح؟",
+      "explanation": "الخيار الأول يجمع كل المهارات الأساسية المذكورة في الشريحة كأهداف للمادة، وهي تقدير الوقت والتكلفة، إدارة الفريق والمخاطر، ومراقبة الجودة. الخيارات الأخرى هي مهارات جزئية أو ليست جوهرية لإدارة المشروع ككل.",
+      "page_number": 6,
+      "correct_answer": "القدرة على تقدير الوقت والتكلفة، إدارة الفريق والمخاطر، ومراقبة الجودة."
+    },
+    {
+      "options": [
+        "Gantt Chart",
+        "CPM",
+        "PERT/COST and WBS",
+        "Waterfall model"
+      ],
+      "question": "أي من الأدوات التالية أصبحت إلزامية في المشاريع الحكومية الكبيرة خلال فترة الستينيات؟",
+      "explanation": "يا بطل، الشريحة وضحت إنو في الستينات، مع العقود الحكومية الضخمة، أدوات زي PERT/COST و WBS صارت إجبارية. CPM و Gantt Chart ظهروا قبل، والـ Waterfall model ظهر بالسبعينات.",
+      "page_number": 13,
+      "correct_answer": "PERT/COST and WBS"
+    },
+    {
+      "options": [
+        "قانون نيوتن",
+        "قانون مور",
+        "قانون أوم",
+        "قانون غاوس"
+      ],
+      "question": "ما هو القانون الذي يصف النمو الأسي لقدرة الأجهزة الحاسوبية والذي ساهم في انتشار أدوات إدارة المشاريع في الثمانينات؟",
+      "explanation": "يا دكتور، الشريحة ذكرت بوضوح إنو 'Hardware capacity grows exponentially (Moore’s Law)'، وهذا القانون هو اللي بيوصف تضاعف قوة المعالجة كل فترة زمنية، وساعد على جعل أدوات إدارة المشاريع متاحة للجميع.",
+      "page_number": 14,
+      "correct_answer": "قانون مور"
+    },
+    {
+      "options": [
+        "مستمر ومتكرر",
+        "مؤقت وفريد",
+        "غير مخطط له وعشوائي",
+        "غير محدود الموارد وواسع النطاق"
+      ],
+      "question": "وفقًا لتعريف PMBOK، ما هي الخاصيتان الأساسيتان للمشروع؟",
+      "explanation": "التعريف الأساسي للمشروع يركز على كونه 'مؤقت' (له بداية ونهاية) و 'فريد' (ينتج شيئًا جديدًا أو مختلفًا). الخيارات الأخرى لا تتوافق مع هذا التعريف.",
+      "page_number": 16,
+      "correct_answer": "مؤقت وفريد"
+    },
+    {
+      "options": [
+        "تحديد جميع تفاصيل المشروع في البداية",
+        "تطوير المشروع بخطوات وزيادات مع توضيح التفاصيل تدريجياً",
+        "العمل على المشروع بشكل عشوائي دون خطة واضحة",
+        "إعادة تعريف أهداف المشروع بشكل مستمر"
+      ],
+      "question": "أي من الخصائص التالية تصف 'Progressive Elaboration' في المشروع؟",
+      "explanation": "Progressive Elaboration تعني أن المشروع يتطور تدريجياً، حيث تتضح التفاصيل وتضاف المعلومات مع تقدم العمل، وليس تحديد كل شيء من البداية.",
+      "page_number": 17,
+      "correct_answer": "تطوير المشروع بخطوات وزيادات مع توضيح التفاصيل تدريجياً"
+    },
+    {
+      "options": [
+        "البرنامج يضم مشاريع غير مترابطة، بينما المحفظة تضم مشاريع مترابطة.",
+        "البرنامج يركز على الأهداف التشغيلية، بينما المحفظة تركز على الأهداف الاستراتيجية.",
+        "البرنامج يضم مجموعة من المشاريع المترابطة، بينما المحفظة تضم مجموعة من المشاريع والبرامج غير المترابطة.",
+        "البرنامج له مدة زمنية أطول من المحفظة."
+      ],
+      "question": "ما هو الفرق الرئيسي بين 'البرنامج' (Program) و 'المحفظة' (Portfolio) في إدارة المشاريع؟",
+      "explanation": "البرنامج هو مجموعة من المشاريع المترابطة التي تدار بشكل منسق لتحقيق فائدة معينة. أما المحفظة فهي مجموعة من المشاريع والبرامج والأعمال الأخرى التي قد تكون غير مترابطة، ولكنها تدار معًا لتحقيق الأهداف الاستراتيجية للمنظمة.",
+      "page_number": 19,
+      "correct_answer": "البرنامج يضم مجموعة من المشاريع المترابطة، بينما المحفظة تضم مجموعة من المشاريع والبرامج غير المترابطة."
+    }
+  ],
+  "slide_explanations": [
+    {
+      "title": "مقدمة لمادة إدارة مشاريع البرمجيات",
+      "example": "🚗 مثال واقعي: تخيل إنك بدك تبني بيت. 'إدارة مشاريع البرمجيات' زي مهندس المشروع اللي بيخطط لكل خطوة، من التصميم لحد التسليم، عشان البيت يطلع زي ما بدك وبالميزانية والوقت المحدد.",
+      "exam_tip": "⚠️ فخ امتحاني: الدكتور ممكن يحط سؤال عام عن اسم المادة أو الفصل الدراسي، بس غالباً هاي الشريحة مش موضع أسئلة عميقة.",
+      "vocabulary": [
+        {
+          "term": "Introduction",
+          "simple_def": "بداية الموضوع",
+          "translation": "مقدمة"
+        },
+        {
+          "term": "Software Project Management",
+          "simple_def": "تنظيم مشاريع البرامج",
+          "translation": "إدارة مشاريع البرمجيات"
+        }
+      ],
+      "explanation": "- يا بطل، هاي الشريحة مجرد ترحيب ومقدمة للمادة.\n- بتعرفنا على اسم المادة اللي رح ندرسها، وهي 'إدارة مشاريع البرمجيات'.\n- يعني باختصار، رح نتعلم كيف ندير مشاريع تطوير البرامج عشان تنجح وتتسلم صح.",
+      "page_number": 1,
+      "sticky_note": "📌 كبسولة سريعة: هاي الشريحة بس عشان تعرف اسم المادة والدكتور، ما فيها معلومات للاختبار.",
+      "summary_phrase": "💡 بداية رحلة إدارة المشاريع البرمجية"
+    },
+    {
+      "title": "ليش إدارة المشاريع مهمة؟ (الجزء الأول)",
+      "example": "🚗 مثال واقعي: تخيل إنك طباخ ماهر جداً وبتعرف كل وصفات الأكل اللذيذة (هاي هي الجوانب التقنية). بس لو ما عندك مطبخ منظم، ومواعيد محددة للتحضير والطبخ، وميزانية للمكونات، ومساعدين يشتغلوا معك بتنسيق (هاي هي العملية المُدارة)، رح تطلع الأكلة متأخرة، أو ناقصة، أو حتى ما تخلص أبداً! إدارة المشاريع هي اللي بتخليك تقدم الأكلة اللذيذة بالوقت والميزانية المحددة.",
+      "exam_tip": "⚠️ فخ امتحاني: الدكتور ممكن يسألك: 'هل التركيز على الجوانب التقنية فقط كافٍ لبناء برمجيات جيدة؟' الإجابة طبعاً 'لا'، والسبب هو الحاجة لـ 'عملية مُدارة بشكل جيد'.",
+      "vocabulary": [
+        {
+          "term": "Motivations",
+          "simple_def": "لماذا هذا مهم؟",
+          "translation": "دوافع/أسباب"
+        },
+        {
+          "term": "Technical Aspects",
+          "simple_def": "البرمجة والتصميم",
+          "translation": "جوانب تقنية"
+        },
+        {
+          "term": "Good Software",
+          "simple_def": "برامج عالية الجودة",
+          "translation": "برمجيات جيدة"
+        },
+        {
+          "term": "Managed Process",
+          "simple_def": "خطوات منظمة ومتحكم بها",
+          "translation": "عملية مُدارة"
+        },
+        {
+          "term": "Efficient",
+          "simple_def": "يؤدي الغرض بأقل جهد",
+          "translation": "فعّال"
+        },
+        {
+          "term": "Controlled Way",
+          "simple_def": "منظمة ومراقبة",
+          "translation": "بطريقة محكمة"
+        }
+      ],
+      "explanation": "- يا دكتور، هاي الشريحة بتوضح لنا ليش مادة إدارة المشاريع مهمة جداً.\n- الفكرة الأساسية هي إنه صحيح بندرس مواد تقنية كثيرة (زي كيف نكتب كود، كيف نعمل اختبارات، كيف نصمم أنظمة)، وهذا كله مهم عشان نطور برامج كويسة.\n- بس النقطة الجوهرية اللي لازم نفهمها هي: عشان نبني برنامج ممتاز عن جد، ما بكفي بس نعرف التقنيات! لازم يكون عندنا 'عملية' واضحة ومُدارة صح، هاي العملية هي اللي بتنظم كل الأنشطة بطريقة فعالة ومتحكم فيها.\n- يعني، بدون إدارة صحيحة، حتى لو كنت أذكى مبرمج، مشروعك ممكن يفشل.",
+      "page_number": 2,
+      "sticky_note": "📌 كبسولة سريعة: التقنية وحدها لا تصنع مشروعاً ناجحاً، بل تحتاج لعملية إدارة قوية ومنظمة.",
+      "summary_phrase": "💡 التقنية وحدها لا تكفي لنجاح المشروع"
+    },
+    {
+      "title": "أمثلة توضح أهمية الإدارة (الجزء الثاني)",
+      "example": "🚗 مثال واقعي: تخيل إنك بتعمل تطبيق توصيل طلبات. لو ما عندك عملية واضحة كيف تتعامل مع طلبات الزبائن اللي بتغير رأيها (تغيير المتطلبات)، أو لو ما خصصت وقت كافي لاختبار التطبيق قبل ما ينزل للسوق، رح يفشل التطبيق. وكمان، مين رح يدرب المطاعم على استخدامه؟ مين رح يعمل إعلانات عنه؟ مين رح يكتب دليل للمستخدم؟ كل هاي الأمور مش برمجة، بس بدونها التطبيق ما بينجح.",
+      "exam_tip": "⚠️ فخ امتحاني: الدكتور ممكن يجيبلك سيناريو ويطلب منك تحدد أي من الأمثلة المذكورة في الشريحة ينطبق عليه. ركز على الأمثلة: المتطلبات، الاختبارات، الأنشطة غير البرمجية.",
+      "vocabulary": [
+        {
+          "term": "Requirements",
+          "simple_def": "ماذا يجب أن يفعل النظام",
+          "translation": "متطلبات"
+        },
+        {
+          "term": "Controlled Process",
+          "simple_def": "خطوات منظمة ومراقبة",
+          "translation": "عملية مُتحكم بها"
+        },
+        {
+          "term": "Trace Revisions",
+          "simple_def": "معرفة من عدّل ومتى",
+          "translation": "تتبع التعديلات"
+        },
+        {
+          "term": "Testing Techniques",
+          "simple_def": "طرق فحص البرامج",
+          "translation": "تقنيات الاختبار"
+        },
+        {
+          "term": "Underestimated",
+          "simple_def": "ظن أنه أقل مما هو عليه",
+          "translation": "قلل من تقدير"
+        },
+        {
+          "term": "User Documentation",
+          "simple_def": "كتيبات شرح للمستخدم",
+          "translation": "توثيق المستخدم"
+        }
+      ],
+      "explanation": "- يا بطل، هاي الشريحة بتعطينا أمثلة واقعية بتوضح ليش الإدارة أهم من مجرد معرفة التقنيات.\n- تخيل إنك بتعرف تكتب متطلبات ممتازة (Requirements)، بس لو ما عندك نظام واضح كيف تستقبل التغييرات عليها أو كيف تتبع مين عدّل إيش، كل شغلك رح يروح هباءً منثوراً.\n- أو مثلاً، بتعرف كل طرق الاختبارات (Testing)، بس لو ما خططت صح وخلص الوقت وما ضل عندك وقت للاختبار، شو الفائدة؟ البرنامج رح يطلع مليان أخطاء.\n- الأهم من هيك، تطوير أي نظام برمجي مش بس كتابة كود! في أنشطة ثانية كثيرة ما الها علاقة بالبرمجة مباشرة، زي تدريب المستخدمين، تغليف المنتج، التسويق، وكتابة أدلة الاستخدام. كل هاي الأنشطة بدها إدارة وتخطيط عشان تنجح.",
+      "page_number": 3,
+      "sticky_note": "📌 كبسولة سريعة: الإدارة تضمن أن المتطلبات والاختبارات والأنشطة غير البرمجية تتم بفعالية، وإلا ضاع الجهد.",
+      "summary_phrase": "💡 بدون إدارة، حتى أفضل التقنيات تصبح بلا قيمة"
+    },
+    {
+      "title": "متطلبات تسليم منتج ناجح (الجزء الثالث)",
+      "example": "🚗 مثال واقعي: تخيل إنك بدك تفتح مطعم. عشان تنجح، لازم تحدد: متى رح تفتح (جدول زمني)، كم رح تكلفك التجهيزات والموظفين (ميزانية)، وشو مستوى الأكل والخدمة اللي رح تقدمها (جودة). وبعدين، بدك تقنيات عشان تراقب: هل الأهداف التسويقية بتتحقق؟ هل جودة الأكل ثابتة؟ هل الموظفين ملتزمين بالوقت؟ وهل التكاليف ما تجاوزت الميزانية؟ بدون هاي الأمور، المطعم ممكن يفشل.",
+      "exam_tip": "⚠️ فخ امتحاني: ممكن يجي سؤال مباشر: 'ما هي المتطلبات الأساسية لتسليم منتج بالجودة المطلوبة وفي الوقت والميزانية المحددة؟' الإجابة هي النقطتين المظللتين بالأخضر.",
+      "vocabulary": [
+        {
+          "term": "Deliver on time",
+          "simple_def": "إنهاء المشروع بالموعد",
+          "translation": "التسليم في الوقت المحدد"
+        },
+        {
+          "term": "Within budget",
+          "simple_def": "عدم تجاوز التكاليف",
+          "translation": "ضمن الميزانية"
+        },
+        {
+          "term": "Quality properties",
+          "simple_def": "مواصفات المنتج الجيدة",
+          "translation": "خصائص الجودة"
+        },
+        {
+          "term": "Schedule",
+          "simple_def": "مواعيد المهام",
+          "translation": "جدول زمني"
+        },
+        {
+          "term": "Budget",
+          "simple_def": "التكاليف المخصصة",
+          "translation": "ميزانية"
+        },
+        {
+          "term": "Techniques",
+          "simple_def": "طرق عمل معينة",
+          "translation": "تقنيات/أساليب"
+        },
+        {
+          "term": "Monitor",
+          "simple_def": "تتبع التقدم",
+          "translation": "مراقبة"
+        },
+        {
+          "term": "Goals",
+          "simple_def": "ما نريد تحقيقه",
+          "translation": "أهداف"
+        },
+        {
+          "term": "Costs",
+          "simple_def": "المصاريف",
+          "translation": "تكاليف"
+        }
+      ],
+      "explanation": "- يا بطل، هاي الشريحة بتلخص لك الزبدة: عشان تسلم أي منتج (سواء برنامج أو أي شي ثاني) بالوقت المحدد، وبالميزانية المخصصة، وبالجودة اللي اتفقوا عليها، شو بتحتاج؟\n- أول شي، بتحتاج 'عملية' واضحة عشان تحدد فيها الجدول الزمني للمشروع، والميزانية اللي رح تصرفها، وتتفق على خصائص الجودة المطلوبة للمنتج.\n- ثاني شي، بتحتاج 'مجموعة تقنيات' تساعدك تحدد وتخطط وتنفذ وتراقب كل من: الأهداف، الجودة، الوقت، والتكاليف.\n- يعني باختصار، الموضوع كله بيتلخص في التخطيط والمتابعة والتحكم في هاي العناصر الأربعة الأساسية.",
+      "page_number": 4,
+      "sticky_note": "📌 كبسولة سريعة: النجاح في تسليم المنتج يعتمد على عملية واضحة وتقنيات لمراقبة الوقت، التكلفة، الجودة، والأهداف.",
+      "summary_phrase": "💡 لمنتج ناجح: خطة، ميزانية، جودة، وأدوات متابعة"
+    },
+    {
+      "title": "مثلث إدارة المشاريع",
+      "example": "🚗 مثال واقعي: تخيل إنك بدك تعمل حفلة عيد ميلاد. عندك ثلاث قيود رئيسية: كمية الأكل والزينة والضيوف (النطاق)، متى رح تكون الحفلة (الوقت)، وكم رح تصرف عليها (التكلفة). لو قررت فجأة تعمل الحفلة بكرة (قللت الوقت)، ممكن تضطر تطلب أكل جاهز أغلى (زادت التكلفة) وما تقدر تعزم كل الناس اللي بدك إياهم (قللت النطاق).",
+      "exam_tip": "⚠️ فخ امتحاني: الدكتور ممكن يسأل عن مكونات مثلث إدارة المشاريع الأساسية، أو عن دلالة هذا المثلث بشكل عام. ركز على أنه يمثل القيود الرئيسية.",
+      "vocabulary": [
+        {
+          "term": "Project Management Triangle",
+          "simple_def": "قيود المشروع الأساسية",
+          "translation": "مثلث إدارة المشاريع"
+        }
+      ],
+      "explanation": "- يا بطل، هاي الشريحة بتقدم لنا مفهوم أساسي جداً في إدارة المشاريع وهو 'مثلث إدارة المشاريع'.\n- هذا المثلث هو تمثيل بصري للقيود الأساسية اللي بتتحكم بأي مشروع. عادةً بيكون له ثلاث أضلاع بتمثل: النطاق (Scope)، الوقت (Time)، والتكلفة (Cost).\n- الفكرة هي إنه لو غيرت أي ضلع من أضلاع المثلث، رح يأثر على الضلعين الثانيين. مثلاً، لو بدك تخلص المشروع بوقت أقل، ممكن تضطر تزيد التكلفة أو تقلل من النطاق (الميزات).\n- هاي الشريحة مجرد مقدمة للمفهوم، ورح نتعمق فيه أكثر لاحقاً.",
+      "page_number": 5,
+      "sticky_note": "📌 كبسولة سريعة: مثلث إدارة المشاريع يوضح العلاقة بين الوقت، التكلفة، والنطاق في أي مشروع.",
+      "summary_phrase": "💡 مثلث القيود الثلاثة للمشروع"
+    },
+    {
+      "title": "مهارات وأهداف إدارة مشاريع البرمجيات",
+      "example": "🚗 مثال واقعي: تخيل إنك بدك تبني تطبيق زي 'كريم' أو 'أوبر'. عشان تنجح، لازم تعرف: كم رح ياخد وقت؟ كم رح يكلف؟ كيف تخلي المبرمجين متحمسين؟ شو المخاطر اللي ممكن تصير (زي المنافسة أو مشاكل التقنية)؟ وكيف تتأكد إنك ماشي صح وبتسلم تطبيق بجودة عالية؟ كل هاي الأسئلة هي اللي بتجاوب عليها إدارة المشاريع البرمجية.",
+      "exam_tip": "⚠️ فخ امتحاني: ممكن يجيك سؤال عن أهم 3 مهارات مطلوبة لمدير المشروع، أو يطلب منك تذكر سؤالين من الأسئلة المحورية اللي رح تتعلم إجابتها. ركز على فهم كل سؤال شو بيعني.",
+      "vocabulary": [
+        {
+          "term": "Competences",
+          "simple_def": "قدرات وخبرات خاصة",
+          "translation": "كفاءات"
+        },
+        {
+          "term": "Skills",
+          "simple_def": "قدرات عملية تطبيقية",
+          "translation": "مهارات"
+        },
+        {
+          "term": "Techniques",
+          "simple_def": "أساليب وطرق عمل",
+          "translation": "تقنيات"
+        },
+        {
+          "term": "Estimate",
+          "simple_def": "تخمين كمي للمدة",
+          "translation": "تقدير"
+        },
+        {
+          "term": "Motivated",
+          "simple_def": "نشيط ومندفع للعمل",
+          "translation": "متحفز"
+        },
+        {
+          "term": "Risks",
+          "simple_def": "أحداث سلبية محتملة",
+          "translation": "مخاطر"
+        },
+        {
+          "term": "Assess",
+          "simple_def": "تقدير الوضع الحالي",
+          "translation": "تقييم"
+        },
+        {
+          "term": "Output",
+          "simple_def": "المنتج النهائي",
+          "translation": "ناتج"
+        }
+      ],
+      "explanation": "- يا بطل، هاي الشريحة بتوضح لك ليش مادة إدارة المشاريع البرمجية مهمة وشو رح تتعلم منها.\n- الفكرة الأساسية هي إنه إدارة أي مشروع برمجي مش سهلة، بدها كفاءات ومهارات وتقنيات معينة عشان تنجح.\n- الأسئلة اللي تحت هي زبدة المادة، يعني لو قدرت تجاوب عليها كلها بنهاية الكورس، بتكون أنت دافور إدارة المشاريع بامتياز! ركز عليها منيح لأنها بتلخص كل اللي جاي.",
+      "page_number": 6,
+      "sticky_note": "📌 كبسولة سريعة: إدارة المشاريع البرمجية = مجموعة مهارات للإجابة على أسئلة 'كيف' تنجح المشروع.",
+      "summary_phrase": "💡 إدارة المشاريع البرمجية تحتاج مهارات خاصة لحل تحدياتها."
+    },
+    {
+      "title": "التميز في إدارة مشاريع البرمجيات",
+      "example": "🏗️ مثال واقعي: تخيل إنك بتدير مشروع بناء عمارة. المهارات اللي بتتعلمها (زي التخطيط، إدارة الموارد، الميزانية) هي نفسها اللي بتحتاجها لو بتدير مشروع تطوير لعبة فيديو. لكن، إدارة مشروع اللعبة الها تحدياتها الخاصة (زي التغييرات المستمرة بمتطلبات اللاعبين، أو صعوبة تقدير وقت تطوير ميزة جديدة).",
+      "exam_tip": "⚠️ فخ امتحاني: ممكن يسألك عن طبيعة تقنيات إدارة المشاريع (متعددة التخصصات) وهل هي قابلة للتطبيق في مجالات أخرى. انتبه للكلمة المفتاحية 'intrinsically multidisciplinary'.",
+      "vocabulary": [
+        {
+          "term": "Intrinsically",
+          "simple_def": "أساساً وجوهرياً",
+          "translation": "بطبيعتها"
+        },
+        {
+          "term": "Multidisciplinary",
+          "simple_def": "تجمع علوم مختلفة",
+          "translation": "متعددة التخصصات"
+        },
+        {
+          "term": "Applicable",
+          "simple_def": "يمكن استخدامها",
+          "translation": "قابلة للتطبيق"
+        },
+        {
+          "term": "Virtually",
+          "simple_def": "بشكل شبه كامل",
+          "translation": "تقريباً"
+        },
+        {
+          "term": "Domain",
+          "simple_def": "تخصص أو حقل عمل",
+          "translation": "مجال"
+        },
+        {
+          "term": "Characteristics",
+          "simple_def": "صفات مميزة",
+          "translation": "خصائص"
+        }
+      ],
+      "explanation": "- يا دكتور، هاي الشريحة بتوضح نقطتين مهمات: الأولى إنه إدارة المشاريع بشكل عام (مش بس البرمجية) هي علم بيجمع أكثر من تخصص، يعني اللي بتتعلمه هون بتقدر تطبقه بأي مجال هندسي ثاني.\n- النقطة الثانية، وهي الأهم، إنه بالرغم من إنها عامة، إلا إنه مشاريع البرمجيات إلها طعم خاص وخصائص بتخلي إدارتها 'ممتعة' (أو خلينا نقول 'تحدي أكبر' 😂). هاي الخصائص رح نشوفها بالشريحة الجاية.",
+      "page_number": 7,
+      "sticky_note": "📌 كبسولة سريعة: إدارة المشاريع علم شامل، لكن البرمجيات لها نكهتها الخاصة وتحدياتها الفريدة.",
+      "summary_phrase": "💡 إدارة المشاريع البرمجية متعددة التخصصات لكن لها خصائص فريدة."
+    },
+    {
+      "title": "لماذا إدارة مشاريع البرمجيات تحدي وممتعة؟",
+      "example": "✈️ مثال واقعي: تخيل إنك بتدير مشروع تطوير نظام تشغيل لطائرة. المنتج (السوفتوير) غير ملموس، مرن جداً (ممكن تعدل عليه ميزات جديدة)، المشروع 'one-off' لأنه مصمم لطراز طائرة معين، والتعقيد فيه هائل. والأهم من كل هذا، حياة مئات الركاب بتعتمد على إنه هذا السوفتوير يشتغل صح 100%. أي خطأ بسيط ممكن يؤدي لكارثة. هذا هو التحدي الحقيقي!",
+      "exam_tip": "⚠️ فخ امتحاني: ممكن يجيك سؤال اذكر 3 أو 4 أسباب تجعل إدارة مشاريع البرمجيات تحدياً. ركز على النقاط الأساسية. وممكن يسألك عن أمثلة على 'safety critical systems'.",
+      "vocabulary": [
+        {
+          "term": "Intangible",
+          "simple_def": "لا يمكن لمسه مادياً",
+          "translation": "غير ملموس"
+        },
+        {
+          "term": "Flexible",
+          "simple_def": "قابل للتعديل بسهولة",
+          "translation": "مرن"
+        },
+        {
+          "term": "One-off",
+          "simple_def": "فريد وغير متكرر",
+          "translation": "مرة واحدة"
+        },
+        {
+          "term": "Exponentially",
+          "simple_def": "يتزايد بسرعة هائلة",
+          "translation": "بشكل أسي"
+        },
+        {
+          "term": "Safety critical systems",
+          "simple_def": "أنظمة يعتمد عليها حياة البشر",
+          "translation": "أنظمة حرجة للسلامة"
+        }
+      ],
+      "explanation": "- يا بطل، هاي الشريحة هي اللي بتجاوبك ليش إدارة مشاريع البرمجيات مش زي أي إدارة مشاريع ثانية. فيها تحديات فريدة بتخليها 'ممتعة' (أو بتخلي شعرك يشيب بسرعة 😂).\n- أهم الأسباب هي إن المنتج (البرنامج) مش ملموس، يعني ما بتقدر تشوفه أو تمسكه زي كرسي أو طاولة. وهذا بيصعب تقييمه وتحديد متطلباته.\n- كمان، البرمجيات مرنة جداً، بتقدر تغير فيها وتعدل عليها بسهولة، وهذا ممكن يكون ميزة وعيب بنفس الوقت لأنه بيفتح باب للتغييرات المستمرة.\n- كثير من المشاريع البرمجية بتكون 'مرة واحدة' (one-off)، يعني بتعملها لعميل معين بمتطلبات خاصة فيه، مش منتج بتبيعه بالجملة.\n- حجم وتعقيد البرمجيات قاعد بيزيد بشكل جنوني، وهذا بيخلي الإدارة أصعب.\n- وأخيراً، النقطة الخطيرة جداً: في برمجيات بتعتمد عليها حياة البشر (زي أنظمة الطائرات أو المستشفيات)، وهون أي غلطة ممكن تكون كارثة. عشان هيك، إدارة الجودة والمخاطر فيها بتكون حساسة جداً.",
+      "page_number": 8,
+      "sticky_note": "📌 كبسولة سريعة: تحديات إدارة البرمجيات تكمن في طبيعتها غير الملموسة، مرونتها، تزايد تعقيدها، وحساسيتها لحياة البشر.",
+      "summary_phrase": "💡 المنتج غير ملموس، مرن، فريد، ومتزايد التعقيد."
+    },
+    {
+      "title": "لمحة تاريخية عن إدارة المشاريع (البرمجية)",
+      "example": "📚 مثال واقعي: تخيل إنك بدك تدرس تاريخ كرة القدم. هاي الشريحة زي عنوان 'تاريخ كرة القدم' قبل ما تبلش تحكي عن أول مباراة أو أول بطولة. هي بس تمهيد.",
+      "exam_tip": "⚠️ فخ امتحاني: لا يوجد فخ هنا، الشريحة تمهيدية.",
+      "vocabulary": [
+        {
+          "term": "Brief",
+          "simple_def": "قصير وغير مفصل",
+          "translation": "مختصر"
+        },
+        {
+          "term": "History",
+          "simple_def": "سرد للأحداث الماضية",
+          "translation": "تاريخ"
+        }
+      ],
+      "explanation": "- يا بطل، هاي الشريحة مجرد عنوان لموضوع جديد رح نبلش فيه، وهو تاريخ إدارة المشاريع بشكل عام، وبعدين رح نركز على البرمجيات.\n- الأمر أبسط مما تتخيل، هي بس عشان تعرف كيف تطورت هاي المفاهيم عبر الزمن.",
+      "page_number": 9,
+      "sticky_note": "📌 كبسولة سريعة: هذه الشريحة للمقدمة فقط وغير مطلوبة للاختبار.",
+      "summary_phrase": "💡 هذه الشريحة مقدمة لتاريخ إدارة المشاريع."
+    },
+    {
+      "title": "فريدريك وينسلو تايلور: أبو الإدارة العلمية",
+      "example": "⚙️ مثال واقعي: تخيل إنك بتدرس تاريخ السيارات، وهاي الشريحة بتقدم لك 'كارل بنز' اللي اخترع أول سيارة. هو شخصية محورية لازم تعرفها عشان تفهم كيف تطورت الصناعة بعدين.",
+      "exam_tip": "⚠️ فخ امتحاني: ممكن يسألك عن اسم الشخصية اللي تعتبر رائدة في الإدارة العلمية. تذكر 'Frederick Winslow Taylor'.",
+      "vocabulary": [],
+      "explanation": "- يا دافور، هاي الشريحة بتقدم لك شخصية مهمة جداً في تاريخ الإدارة بشكل عام، وهو 'فريدريك وينسلو تايلور'.\n- هذا الزلمة يعتبر أب الإدارة العلمية، يعني هو اللي حط الأسس الأولى لكيفية إدارة العمل والإنتاج بطريقة علمية ومنظمة. رح نتعرف عليه أكثر بالشرايح الجاية.",
+      "page_number": 10,
+      "sticky_note": "📌 كبسولة سريعة: تايلور هو مؤسس الإدارة العلمية، شخصية تاريخية مهمة.",
+      "summary_phrase": "💡 فريدريك تايلور رائد الإدارة العلمية."
+    },
+    {
+      "title": "هنري جانت ومخطط جانت: الأب الروحي لتخطيط المشاريع",
+      "example": "🚗 مثال واقعي: تخيل إنك بدك تجهز سيارتك لرحلة طويلة. مخطط جانت بيساعدك ترتب المهام: (تغيير الزيت، فحص الإطارات، تعبئة الوقود، تنظيف السيارة). كل مهمة بتحددلها وقت بداية ونهاية، وبتشوف على المخطط إذا ماشي صح ولا تأخرت بشي. هيك بتعرف 'الشغل' اللي لازم ينعمل و 'التقدم' اللي أحرزته في تجهيز السيارة.",
+      "exam_tip": "⚠️ فخ امتحاني: ممكن يسألك عن أول استخدام لمخطط جانت (بناء السفن) أو الفترة الزمنية (الحرب العالمية الأولى). ركز على 'distinction between work and progress' كفكرة محورية.",
+      "vocabulary": [
+        {
+          "term": "Gantt chart",
+          "simple_def": "جدول زمني للمهام",
+          "translation": "مخطط جانت"
+        },
+        {
+          "term": "schedule projects",
+          "simple_def": "تنظيم مهام المشروع زمنياً",
+          "translation": "جدولة المشاريع"
+        },
+        {
+          "term": "monitor work and progress",
+          "simple_def": "تتبع سير الشغل",
+          "translation": "مراقبة العمل والتقدم"
+        },
+        {
+          "term": "ship building",
+          "simple_def": "صناعة السفن",
+          "translation": "بناء السفن"
+        }
+      ],
+      "explanation": "- يا بطل، الشريحة هاي بتحكيلك عن واحد اسمه هنري جانت، وهذا الزلمة عبقري لأنه اخترع أداة اسمها 'مخطط جانت' (Gantt chart) اللي لليوم بنستخدمها عشان نخطط المشاريع ونرتبها زمنياً.\n- تخيل يا دكتور، هذا المخطط طلع أيام الحرب العالمية الأولى، وكانوا يستخدموه عشان يراقبوا بناء السفن، يعني شغل ضخم جداً! الفكرة الأساسية كانت كيف نميز بين 'الشغل اللي بنسويه' و 'التقدم اللي بنحرزه'.\n- يعني مش بس نشتغل، لازم نعرف قديش تقدمنا في الشغل، وهذا هو جوهر مخطط جانت.",
+      "page_number": 11,
+      "sticky_note": "📌 كبسولة سريعة: مخطط جانت هو الأداة الأيقونية لتخطيط المشاريع، ولسه بنستخدمها من أيام الحرب العالمية الأولى!",
+      "summary_phrase": "💡 جانت تشارت: أداة خالدة لتخطيط المشاريع"
+    },
+    {
+      "title": "مخطط جانت: نظرة سريعة",
+      "example": "🏠 مثال واقعي: لو بتخطط لبناء بيت، مخطط جانت بيوريك متى بتبدأ حفر الأساسات، متى بتصب الخرسانة، متى بتبني الجدران، ومتى بتخلص الدهان. كل مهمة بتكون شريط على المخطط، وهيك بتشوف الجدول الزمني للمشروع كله بعينك.",
+      "exam_tip": "⚠️ فخ امتحاني: هذه الشريحة للمقدمة فقط وغير مطلوبة للاختبار، لكن فهم شكل المخطط يساعدك على استيعاب أهميته.",
+      "vocabulary": [
+        {
+          "term": "Gantt Chart",
+          "simple_def": "تمثيل مرئي للمهام",
+          "translation": "مخطط جانت"
+        }
+      ],
+      "explanation": "- يا بطل، هاي الشريحة بسيطة جداً، هي بس عشان تشوف شكل مخطط جانت كيف بيكون. عادةً بيكون فيه قائمة بالمهام على اليسار، ومحور زمني أفقي، وخطوط أو أشرطة بتوضح مدة كل مهمة ومتى بتبدأ ومتى بتنتهي.\n- يعني هي مجرد صورة توضيحية عشان تتخيل الأداة اللي حكينا عنها بالشريحة اللي قبلها.",
+      "page_number": 12,
+      "sticky_note": "📌 كبسولة سريعة: هذه الشريحة مجرد مثال بصري لمخطط جانت، لا يوجد فيها معلومات نظرية جديدة.",
+      "summary_phrase": "💡 مخطط جانت: كيف يبدو؟"
+    },
+    {
+      "title": "تطور إدارة المشاريع: من الحرب العالمية الثانية حتى السبعينات",
+      "example": "🚀 مثال واقعي: تخيل إنك بتطلق صاروخ للفضاء. الـ CPM بيحددلك المهام الحرجة اللي لو تأخرت فيها، الصاروخ كله بيتأخر. والـ PERT بيساعدك تقدر كم يوم بدك عشان تبني جزء معين من الصاروخ، خصوصاً لو كانت هاي أول مرة بتعملها. الـ WBS بيقسم المشروع الضخم (إطلاق الصاروخ) لمهام صغيرة زي (بناء المحرك، تصميم الهيكل، برمجة نظام التحكم).",
+      "exam_tip": "⚠️ فخ امتحاني: ركز على التواريخ وأي أداة ظهرت في أي عقد. مثلاً، متى ظهر CPM ومتى PERT؟ وما هو أول استخدام لكل منهما؟ وما هي الأدوات التي أصبحت إلزامية في المشاريع الحكومية؟",
+      "vocabulary": [
+        {
+          "term": "Manhattan Project",
+          "simple_def": "مشروع القنبلة النووية",
+          "translation": "مشروع مانهاتن"
+        },
+        {
+          "term": "process flow diagrams",
+          "simple_def": "رسوم توضيحية للخطوات",
+          "translation": "مخططات تدفق العمليات"
+        },
+        {
+          "term": "CPM (Critical Path Method)",
+          "simple_def": "تحديد أطول مسار للمشروع",
+          "translation": "طريقة المسار الحرج"
+        },
+        {
+          "term": "PERT (Program Evaluation and Review Technique)",
+          "simple_def": "تقدير أوقات المهام",
+          "translation": "تقنية تقييم ومراجعة البرامج"
+        },
+        {
+          "term": "Polaris missile program",
+          "simple_def": "مشروع عسكري أمريكي",
+          "translation": "برنامج صاروخ بولاريس"
+        },
+        {
+          "term": "standardization",
+          "simple_def": "جعل الأشياء موحدة",
+          "translation": "التوحيد القياسي"
+        },
+        {
+          "term": "automation",
+          "simple_def": "جعل العمل آلياً",
+          "translation": "الأتمتة"
+        },
+        {
+          "term": "PERT/COST",
+          "simple_def": "تخطيط التكلفة مع بيرت",
+          "translation": "بيرت/التكلفة"
+        },
+        {
+          "term": "WBS (Work Breakdown Structure)",
+          "simple_def": "تقسيم المشروع لمهام صغيرة",
+          "translation": "هيكل تجزئة العمل"
+        },
+        {
+          "term": "Earned Value Analysis (EVA)",
+          "simple_def": "قياس أداء المشروع",
+          "translation": "تحليل القيمة المكتسبة"
+        },
+        {
+          "term": "Waterfall model",
+          "simple_def": "نموذج تطوير برمجيات متسلسل",
+          "translation": "نموذج الشلال"
+        }
+      ],
+      "explanation": "- يا دكتور، هاي الشريحة كأنها رحلة عبر الزمن بتوريك كيف تطورت إدارة المشاريع!\n- بلشنا من الحرب العالمية الثانية مع 'مشروع مانهاتن' اللي استخدموا فيه 'مخططات تدفق العمليات' عشان يديروا مشروع ضخم زي صناعة القنبلة النووية.\n- بعدين، بالخمسينات، طلع عنا أسلوبين مهمين جداً: الـ 'CPM' (طريقة المسار الحرج) اللي بتعتمد على الرياضيات عشان تحدد أطول مسار في المشروع وما تتأخر، والـ 'PERT' اللي طلع من مشروع صاروخ بولاريس للبحرية الأمريكية، وهاد بيساعدك تقدر أوقات المهام لما تكون مش متأكد منها.\n- بالستينات، مع العقود الحكومية الكبيرة، صارت أدوات زي 'PERT/COST' و 'WBS' (هيكل تجزئة العمل) إلزامية! وكمان ظهر 'تحليل القيمة المكتسبة' (EVA) اللي بيقيس أداء المشروع.\n- وأخيراً، بالسبعينات، دخل 'تطوير البرمجيات' على الخط، وظهر 'نموذج الشلال' كأول طريقة منظمة لتطوير البرامج.",
+      "page_number": 13,
+      "sticky_note": "📌 كبسولة سريعة: الخمسينات جابت CPM و PERT، الستينات ركزت على التوحيد و EVA، والسبعينات أدخلت تطوير البرمجيات ونموذج الشلال.",
+      "summary_phrase": "💡 تطور أدوات إدارة المشاريع عبر العقود"
+    },
+    {
+      "title": "ثورة الكمبيوتر وتأثيرها على إدارة المشاريع: من الثمانينات حتى اليوم",
+      "example": "📱 مثال واقعي: تخيل إنك بتطور تطبيق موبايل. بالثمانينات، كان الموضوع صعب ومكلف. اليوم، بفضل التكنولوجيا، بتقدر تستخدم أدوات جاهزة (PM tools) و'أطر عمل' (frameworks) عشان تسرع الشغل. مبادئ 'المرونة' (Agility) بتخليك تطلق نسخة أولية من التطبيق بسرعة، وتاخد 'تغذية راجعة' من المستخدمين، وتعدل وتطور بناءً عليها، بدل ما تستنى تخلص كل شي بعدين تكتشف إنهم ما عجبهم.",
+      "exam_tip": "⚠️ فخ امتحاني: ممكن يسألك عن نماذج التقدير (FP, COCOMO) ومتى ظهرت، أو عن خصائص إدارة المشاريع في العصر الحديث (Agility, quick interaction, constant feedback).",
+      "vocabulary": [
+        {
+          "term": "proliferation",
+          "simple_def": "تزايد وتوسع",
+          "translation": "انتشار"
+        },
+        {
+          "term": "PM tools",
+          "simple_def": "برامج مساعدة للمشاريع",
+          "translation": "أدوات إدارة المشاريع"
+        },
+        {
+          "term": "Moore’s Law",
+          "simple_def": "تضاعف قوة المعالجة",
+          "translation": "قانون مور"
+        },
+        {
+          "term": "Estimation models",
+          "simple_def": "طرق لتخمين التكلفة/الوقت",
+          "translation": "نماذج التقدير"
+        },
+        {
+          "term": "FP (Function Point)",
+          "simple_def": "وحدة قياس حجم البرمجيات",
+          "translation": "نقطة الوظيفة"
+        },
+        {
+          "term": "COCOMO (Constructive Cost Model)",
+          "simple_def": "نموذج لتقدير تكلفة البرمجيات",
+          "translation": "كوكومو (نموذج التكلفة البنائي)"
+        },
+        {
+          "term": "Total quality",
+          "simple_def": "تحسين مستمر لكل شيء",
+          "translation": "الجودة الشاملة"
+        },
+        {
+          "term": "Leaner",
+          "simple_def": "أقل هدر وأكثر كفاءة",
+          "translation": "أكثر رشاقة"
+        },
+        {
+          "term": "Agility",
+          "simple_def": "القدرة على التكيف السريع",
+          "translation": "المرونة/الرشاقة"
+        },
+        {
+          "term": "constant feedback",
+          "simple_def": "مراجعة وتحسين دائم",
+          "translation": "تغذية راجعة مستمرة"
+        }
+      ],
+      "explanation": "- يا بطل، هاي الشريحة بتوريك كيف الكمبيوتر والتكنولوجيا غيروا إدارة المشاريع بشكل جذري!\n- بالثمانينات، مع انتشار الأجهزة والبرامج، صارت أدوات إدارة المشاريع مش بس للشركات الكبيرة، لأ، صارت متوفرة حتى للشركات الصغيرة. وهذا بفضل 'قانون مور' اللي خلى قوة الأجهزة تتضاعف بشكل جنوني.\n- وكمان ظهرت نماذج زي 'FP' و 'COCOMO' عشان نقدر تعقيد البرمجيات قبل ما نبلش فيها، وهذا بيساعدنا نخطط صح.\n- بالتسعينات، صار التركيز على 'الجودة الشاملة'، والشركات صارت بدها تكون 'أكثر رشاقة، أسرع، وأكثر استجابة' للتغيرات.\n- أما اليوم، فالموضوع كله صار عن تطبيقات الويب، وتوزيع البرامج بطرق جديدة، والتركيز الأكبر على 'المرونة' (Agility)، 'التفاعل السريع'، و 'التغذية الراجعة المستمرة' عشان نضل نطور ونحسن.",
+      "page_number": 14,
+      "sticky_note": "📌 كبسولة سريعة: الثمانينات: انتشار الأدوات. التسعينات: الجودة والرشاقة. اليوم: الويب، المرونة، والتغذية الراجعة.",
+      "summary_phrase": "💡 التكنولوجيا غيرت وجه إدارة المشاريع للأبد"
+    },
+    {
+      "title": "مشاريع تطوير البرمجيات وأصحاب المصلحة: اللعبة وقواعدها",
+      "example": "⚽ مثال واقعي: تخيل إنك بتلعب مباراة كرة قدم. 'اسم اللعبة' هو 'تطوير البرمجيات'. 'اللاعبون' هم أصحاب المصلحة: المدرب (مدير المشروع)، اللاعبون (المبرمجون)، الجمهور (المستخدمون النهائيون)، وإدارة النادي (العميل). 'القواعد' هي المنهجيات اللي بتتبعوها (زي الأجايل أو الووترفول) عشان تفوزوا بالمباراة وتوصلوا للهدف (تطوير برنامج ناجح).",
+      "exam_tip": "⚠️ فخ امتحاني: هذه الشريحة تمهيدية للمواضيع القادمة، لكنها تؤكد على أهمية فهم 'أصحاب المصلحة' كعنصر أساسي في مشاريع تطوير البرمجيات.",
+      "vocabulary": [
+        {
+          "term": "Software Development Projects",
+          "simple_def": "بناء برامج حاسوبية",
+          "translation": "مشاريع تطوير البرمجيات"
+        },
+        {
+          "term": "Stakeholders",
+          "simple_def": "كل من يتأثر بالمشروع",
+          "translation": "أصحاب المصلحة"
+        },
+        {
+          "term": "The name of the game",
+          "simple_def": "الموضوع الأساسي",
+          "translation": "اسم اللعبة"
+        },
+        {
+          "term": "the players",
+          "simple_def": "الأشخاص المعنيون",
+          "translation": "اللاعبون"
+        },
+        {
+          "term": "the rules",
+          "simple_def": "المبادئ التوجيهية",
+          "translation": "القواعد"
+        }
+      ],
+      "explanation": "- يا بطل، هاي الشريحة هي مدخل لموضوع مهم جداً: 'مشاريع تطوير البرمجيات' ومين هم 'أصحاب المصلحة' فيها.\n- الفكرة هون إنك لما تشتغل على مشروع برمجي، مش بس بتكتب كود، لأ، في 'لعبة' كاملة الها 'لاعبين' و 'قواعد'.\n- 'اللاعبين' هم أصحاب المصلحة (Stakeholders) اللي ممكن يكونوا الزبون، المبرمجين، مدير المشروع، المستخدمين النهائيين، وحتى الإدارة العليا. وكل واحد إله دور وتوقعات مختلفة.\n- 'القواعد' هي المبادئ والعمليات اللي بنتبعها عشان نضمن إن المشروع ينجح ويحقق أهدافه ويرضي كل اللاعبين.",
+      "page_number": 15,
+      "sticky_note": "📌 كبسولة سريعة: فهم أصحاب المصلحة وقواعد اللعبة أساسي لنجاح أي مشروع برمجي.",
+      "summary_phrase": "💡 فهم اللاعبين وقواعد اللعبة في مشاريع البرمجيات"
+    },
+    {
+      "title": "تعريف المشروع: اللعبة تبدأ هنا!",
+      "example": "🏠 مثال واقعي: بناء تطبيق جديد للجوال هو مشروع. له تاريخ بداية وتاريخ نهاية متوقع، والمنتج النهائي (التطبيق) فريد من نوعه (حتى لو في تطبيقات مشابهة، تطبيقك له ميزاته الخاصة). أما تحديث التطبيق كل فترة، فهذا جزء من العمليات التشغيلية، مش مشروع بحد ذاته.",
+      "exam_tip": "⚠️ فخ امتحاني: ممكن يجيك سؤال عن الفرق بين 'المشروع' و 'العمليات التشغيلية'. تذكر دائمًا أن المشروع 'مؤقت' و 'فريد'، بينما العمليات 'مستمرة' و 'متكررة'.",
+      "vocabulary": [
+        {
+          "term": "Project",
+          "simple_def": "مهمة لها بداية ونهاية",
+          "translation": "مشروع"
+        },
+        {
+          "term": "Temporary",
+          "simple_def": "له مدة زمنية محددة",
+          "translation": "مؤقت"
+        },
+        {
+          "term": "Unique",
+          "simple_def": "ينتج شيئاً جديداً ومختلفاً",
+          "translation": "فريد"
+        },
+        {
+          "term": "Endeavor",
+          "simple_def": "جهد أو عمل منظم",
+          "translation": "مسعى / محاولة"
+        },
+        {
+          "term": "PMBOK",
+          "simple_def": "كتاب مرجعي لإدارة المشاريع",
+          "translation": "دليل إدارة المشاريع"
+        }
+      ],
+      "explanation": "- يا بطل، هاي الشريحة هي أساس كل اللي جاي! بتعرفنا شو يعني 'مشروع' من منظور إدارة المشاريع.\n- ركز على الكلمتين المفتاحيتين: 'temporary' (مؤقت) و 'unique' (فريد). أي شي بتعمله ومالهوش بداية ونهاية واضحة، أو بتكرره بنفس الطريقة كل مرة، مش مشروع!\n- تخيل إنك بتبني بيت جديد. هذا مشروع! له بداية (حفر الأساسات) ونهاية (تسليم المفتاح)، والبيت اللي بنيته فريد من نوعه (حتى لو في بيوت شبهه، لكن هذا البيت بالذات هو نتاج مشروعك).",
+      "page_number": 16,
+      "sticky_note": "📌 كبسولة سريعة: المشروع = بداية + نهاية + شيء جديد ومختلف.",
+      "summary_phrase": "💡 المشروع: مؤقت، فريد، وله هدف محدد."
+    },
+    {
+      "title": "خصائص المشروع: ليش مشروعك مميز؟",
+      "example": "📱 مثال واقعي: لما تبني تطبيق جديد، بتكون عندك فكرة عامة (Unique). بتحدد موعد إطلاق (Temporary). خلال التطوير، ممكن تكتشف ميزات جديدة تضيفها أو تعدل على ميزات موجودة (Progressive elaboration). وكل هذا لازم يتم ضمن ميزانية محددة وعدد معين من المبرمجين (Resource constrained).",
+      "exam_tip": "⚠️ فخ امتحاني: ممكن يجيك سؤال عن 'Progressive elaboration' ويطلب منك تشرحها أو تفرق بينها وبين التغيير العشوائي. تذكر إنها 'تطوير بخطوات وزيادات' وليست فوضى.",
+      "vocabulary": [
+        {
+          "term": "Temporary",
+          "simple_def": "له مدة زمنية محددة",
+          "translation": "مؤقت"
+        },
+        {
+          "term": "Definitive",
+          "simple_def": "واضح المعالم",
+          "translation": "محدد / قاطع"
+        },
+        {
+          "term": "Unique",
+          "simple_def": "غير مكرر أو جديد",
+          "translation": "فريد"
+        },
+        {
+          "term": "Quantifiable",
+          "simple_def": "يمكن قياسه بالأرقام",
+          "translation": "قابل للقياس الكمي"
+        },
+        {
+          "term": "Progressive elaboration",
+          "simple_def": "بناء المشروع خطوة بخطوة",
+          "translation": "التطوير التدريجي"
+        },
+        {
+          "term": "Increments",
+          "simple_def": "أجزاء صغيرة متتالية",
+          "translation": "زيادات / مراحل"
+        },
+        {
+          "term": "Resource constrained",
+          "simple_def": "له ميزانية وموارد محدودة",
+          "translation": "مقيد بالموارد"
+        }
+      ],
+      "explanation": "- يا دكتور، بعد ما عرفنا شو هو المشروع، هاي الشريحة بتفصلنا خصائصه الأساسية اللي بتميزه عن أي عمل تاني.\n- أهم شي هون إنك تفهم إن المشروع 'مؤقت' (له بداية ونهاية)، و 'فريد' (بينتج شي جديد)، و 'يتطور تدريجياً' (يعني مش كل شي بيكون واضح من البداية، بنكتشف ونعدل واحنا ماشيين)، وأكيد 'مقيد بالموارد' (فلوس، وقت، ناس... كل شي محدود).\n- ركز على 'Progressive elaboration' هاي نقطة مهمة، معناها إنك بتبدأ بفكرة عامة وبعدين بتوضح التفاصيل شوي شوي مع تقدم المشروع، زي لما ترسم سكتش لبيت وبعدين تبدأ تضيف التفاصيل المعمارية.",
+      "page_number": 17,
+      "sticky_note": "📌 كبسولة سريعة: تذكر خصائص المشروع الأربعة: مؤقت، فريد، تطوير تدريجي، ومحدود الموارد.",
+      "summary_phrase": "💡 المشروع: مؤقت، فريد، يتطور تدريجياً، ومحدود الموارد."
+    },
+    {
+      "title": "التطوير التدريجي: فن البناء خطوة بخطوة",
+      "example": "🎨 مثال واقعي: تخيل إنك بترسم لوحة فنية. ما بتبدأ بالتفاصيل الدقيقة مباشرة. أول شي بترسم الخطوط العريضة (الفكرة العامة)، بعدين بتضيف الألوان الأساسية، وبعدين بتبدأ تفصل بالملامح والظلال والإضاءة. هذا هو 'Progressive Elaboration' في الفن.",
+      "exam_tip": "⚠️ فخ امتحاني: ممكن يسألك عن أهمية 'Progressive Elaboration' في إدارة المشاريع. الإجابة هي أنها تسمح بالمرونة والتكيف وتوضيح المتطلبات بشكل أفضل مع تقدم العمل.",
+      "vocabulary": [
+        {
+          "term": "Progressive Elaboration",
+          "simple_def": "توضيح التفاصيل مع الوقت",
+          "translation": "التطوير التدريجي"
+        }
+      ],
+      "explanation": "- يا بطل، هاي الشريحة بتأكد على مفهوم 'Progressive Elaboration' اللي حكينا عنه بالشريحة اللي فاتت.\n- الفكرة ببساطة إنك ما بتكون عارف كل التفاصيل من أول يوم بالمشروع. بتبدأ بفكرة عامة، ومع تقدم العمل، بتوضح التفاصيل أكثر وأكثر. زي لما تبدأ برسمة بسيطة وبعدين تضيف الألوان والظلال والتفاصيل الدقيقة.\n- هذا الأسلوب بيساعدك تدير المشروع بمرونة وتتكيف مع التغييرات اللي ممكن تصير.",
+      "page_number": 18,
+      "sticky_note": "📌 كبسولة سريعة: التفاصيل تتضح مع الوقت، مش كلها مرة واحدة.",
+      "summary_phrase": "💡 التطوير التدريجي: توضيح التفاصيل مع تقدم المشروع."
+    },
+    {
+      "title": "سياق إدارة المشاريع: الصورة الكبيرة",
+      "example": "🏢 مثال واقعي: شركة تطوير عقاري عندها 'برنامج' لتطوير حي سكني جديد (يشمل مشاريع بناء الفلل، الشقق، الحدائق، البنية التحتية). وفي نفس الوقت، الشركة عندها 'محفظة' استثمارية تشمل هذا البرنامج، بالإضافة إلى مشروع تطوير فندق في مدينة أخرى، ومشروع شراء أسهم في شركة تكنولوجيا. كل هذه المشاريع والبرامج المختلفة تدار ضمن 'محفظة' الشركة لتحقيق أهدافها الاستراتيجية.",
+      "exam_tip": "⚠️ فخ امتحاني: الفرق بين 'Program' و 'Portfolio' مهم جداً. تذكر أن مشاريع 'البرنامج' تكون 'مترابطة' وتخدم هدف مشترك، بينما مشاريع 'المحفظة' قد تكون 'غير مترابطة' ولكنها كلها تخدم الأهداف الاستراتيجية للمنظمة.",
+      "vocabulary": [
+        {
+          "term": "Subprojects",
+          "simple_def": "أجزاء من مشروع أكبر",
+          "translation": "مشاريع فرعية"
+        },
+        {
+          "term": "Program Management",
+          "simple_def": "إدارة مجموعة مشاريع مترابطة",
+          "translation": "إدارة البرامج"
+        },
+        {
+          "term": "Portfolio Management",
+          "simple_def": "إدارة مجموعة مشاريع وبرامج غير مترابطة",
+          "translation": "إدارة المحافظ"
+        },
+        {
+          "term": "Coordinated",
+          "simple_def": "يعمل بتناغم",
+          "translation": "منسق"
+        },
+        {
+          "term": "Strategic objectives",
+          "simple_def": "أهداف بعيدة المدى للمنظمة",
+          "translation": "أهداف استراتيجية"
+        }
+      ],
+      "explanation": "- يا بطل، هاي الشريحة بتوريك إن المشروع مش دايماً بيكون لحاله. ممكن يكون جزء من شي أكبر!\n- تخيل إنك بتبني مدينة جديدة. بناء المستشفى مشروع، وبناء المدارس مشروع، وبناء الطرق مشروع. لو جمعت كل هاي المشاريع المترابطة مع بعض ودرتها ككتلة وحدة، هذا بيصير 'برنامج' (Program).\n- أما لو عندك شركة كبيرة بتستثمر في مشاريع مختلفة تماماً (مثلاً: مشروع بناء، مشروع تطوير تطبيق، مشروع تسويق)، وكلها بتخدم أهداف الشركة العامة، هاي كلها بتندرج تحت 'محفظة' (Portfolio). المحفظة ممكن تحتوي على مشاريع وبرامج غير مترابطة لكنها كلها بتخدم رؤية الشركة الكبيرة.",
+      "page_number": 19,
+      "sticky_note": "📌 كبسولة سريعة: مشروع < برنامج (مشاريع مترابطة) < محفظة (مشاريع وبرامج غير مترابطة).",
+      "summary_phrase": "💡 المشاريع تتجمع في برامج ومحافظ لتحقيق أهداف أكبر."
+    },
+    {
+      "title": "المشاريع والعمليات التشغيلية: الفرق الجوهري",
+      "example": "☕ مثال واقعي: فتح مقهى جديد هو 'مشروع'. له بداية (تأجير المكان، التصميم، شراء المعدات) ونهاية (افتتاح المقهى). أما تشغيل المقهى يومياً (تحضير القهوة، خدمة الزبائن، تنظيف المكان، إدارة المخزون)، فهذه هي 'العمليات التشغيلية' اللي بتخلي المقهى شغال ومستمر.",
+      "exam_tip": "⚠️ فخ امتحاني: ممكن يجيك سيناريو ويطلب منك تحدد إذا كان 'مشروع' أو 'عملية تشغيلية'. ركز على كلمة 'مؤقت' و 'فريد' للمشروع، و 'مستمر' و 'متكرر' للعمليات.",
+      "vocabulary": [
+        {
+          "term": "Operational work",
+          "simple_def": "العمل اليومي المستمر",
+          "translation": "العمليات التشغيلية"
+        },
+        {
+          "term": "Common characteristics",
+          "simple_def": "نقاط تشابه",
+          "translation": "خصائص مشتركة"
+        },
+        {
+          "term": "Terminate",
+          "simple_def": "يتوقف عند تحقيق الهدف",
+          "translation": "ينتهي / ينهي"
+        },
+        {
+          "term": "Sustain the business",
+          "simple_def": "إبقاء الشركة تعمل",
+          "translation": "الحفاظ على استمرارية العمل"
+        }
+      ],
+      "explanation": "- يا بطل، هاي الشريحة بتوضحلك الفرق الجوهري بين 'المشروع' و 'العمليات التشغيلية'. هذا سؤال امتحاني بامتياز!\n- الاثنين بيشتركوا إنهم بيحتاجوا ناس وموارد وتخطيط، بس الفرق الكبير هو الهدف والمدة.\n- 'المشروع' له هدف محدد وبيخلص لما يتحقق الهدف (زي بناء بيت). أما 'العمليات التشغيلية' فهي الشغل اليومي اللي بيخلي الشركة شغالة ومستمرة (زي صيانة البيت بعد ما يخلص بناؤه).",
+      "page_number": 20,
+      "sticky_note": "📌 كبسولة سريعة: المشروع = مؤقت + هدف محدد. العمليات = مستمرة + للحفاظ على العمل.",
+      "summary_phrase": "💡 المشروع ينتهي بهدف، والعمليات تستمر للحفاظ على العمل."
+    },
+    {
+      "title": "أمثلة على المشاريع: مش بس سوفتوير!",
+      "example": "🚗 مثال واقعي: تخيل إنك قررت تعمل حفلة عيد ميلاد لصديقك. هاي تعتبر مشروع! لها بداية (التخطيط)، ونهاية (انتهاء الحفلة)، وهدف (إسعاد صديقك). لكن لو كنت بتغسل صحون كل يوم، هاي مش مشروع، هاي مهمة روتينية.",
+      "exam_tip": "⚠️ فخ امتحاني: الدكتور ممكن يجيبلك أمثلة ويسألك أي منها لا يعتبر مشروعاً. ركز على الأنشطة المستمرة أو الروتينية كإجابة.",
+      "vocabulary": [
+        {
+          "term": "Examples",
+          "simple_def": "حالات توضيحية",
+          "translation": "أمثلة"
+        },
+        {
+          "term": "Counterexamples",
+          "simple_def": "حالات لا تنطبق عليها القاعدة",
+          "translation": "أمثلة مضادة"
+        },
+        {
+          "term": "Maintaining",
+          "simple_def": "إبقاء الشيء يعمل",
+          "translation": "صيانة"
+        },
+        {
+          "term": "Managing personnel",
+          "simple_def": "الإشراف على العاملين",
+          "translation": "إدارة الموظفين"
+        }
+      ],
+      "explanation": "- يا بطل، هاي الشريحة بتوريك إنه مفهوم 'المشروع' مش بس مقتصر على السوفتوير أو الشغل الكبير.\n- أي شي له بداية ونهاية وهدف محدد ممكن نعتبره مشروع، حتى لو كان طبخ عشا!\n- ركز على الأمثلة اللي ممكن تكون 'مش مشاريع' زي الصيانة أو إدارة الموظفين، هاي بتكون عمليات مستمرة مش مشاريع مؤقتة.",
+      "page_number": 21,
+      "sticky_note": "📌 كبسولة سريعة: المشروع له بداية ونهاية وهدف، مش كل مهمة روتينية تعتبر مشروع!",
+      "summary_phrase": "💡 المشاريع متنوعة وتشمل كل شيء حولنا."
+    },
+    {
+      "title": "مشاريع تطوير البرمجيات: عالمنا الرقمي!",
+      "example": "🏢 مثال واقعي: بناء تطبيق جديد للبنك يعتبر 'مشروع تطوير برمجيات'. لكن تشغيل هذا التطبيق يومياً ومعالجة المعاملات البنكية هو 'عمليات تشغيلية'.",
+      "exam_tip": "⚠️ فخ امتحاني: ممكن يسألك عن الفرق بين 'Software Development Projects' و 'Operational Work' ويعطيك أمثلة لتصنيفها.",
+      "vocabulary": [
+        {
+          "term": "Software Development Projects",
+          "simple_def": "بناء برامج جديدة",
+          "translation": "مشاريع تطوير البرمجيات"
+        },
+        {
+          "term": "Operational Work",
+          "simple_def": "المهام اليومية المستمرة",
+          "translation": "العمليات التشغيلية"
+        }
+      ],
+      "explanation": "- يا دكتور، هاي الشريحة مجرد مقدمة بسيطة عشان تعرفنا إننا رح نركز على مشاريع تطوير البرمجيات.\n- المهم هون تميز بين 'المشروع' اللي له بداية ونهاية وهدف محدد، وبين 'العمل التشغيلي' اللي هو الشغل اليومي المستمر زي صيانة السيرفرات أو الرد على استفسارات العملاء.",
+      "page_number": 22,
+      "sticky_note": "📌 كبسولة سريعة: المشاريع مؤقتة، العمليات التشغيلية مستمرة.",
+      "summary_phrase": "💡 مشاريع السوفتوير هي أساس عملنا."
+    },
+    {
+      "title": "أنواع مشاريع السوفتوير: تنوع كبير!",
+      "example": "🏥 مثال واقعي: تخيل مستشفى بده يربط نظام المواعيد الجديد بنظام السجلات الطبية القديم. هذا يعتبر 'System Integration'. ولو بدهم يغيروا كل طريقة عمل قسم الطوارئ عشان يصير أسرع، هذا 'Process Re-engineering'.",
+      "exam_tip": "⚠️ فخ امتحاني: ممكن يجيبلك سيناريو ويطلب منك تحدد أي نوع من أنواع مشاريع السوفتوير ينطبق عليه.",
+      "vocabulary": [
+        {
+          "term": "Project Manager",
+          "simple_def": "الشخص المسؤول عن المشروع",
+          "translation": "مدير مشروع"
+        },
+        {
+          "term": "Application Development",
+          "simple_def": "بناء برامج جديدة",
+          "translation": "تطوير التطبيقات"
+        },
+        {
+          "term": "Process and Systems Re-engineering",
+          "simple_def": "تغيير جذري للعمليات",
+          "translation": "إعادة هندسة العمليات والأنظمة"
+        },
+        {
+          "term": "System Integration",
+          "simple_def": "ربط أنظمة مختلفة معاً",
+          "translation": "دمج الأنظمة"
+        },
+        {
+          "term": "Consulting Services",
+          "simple_def": "تقديم نصائح وخبرات",
+          "translation": "خدمات استشارية"
+        },
+        {
+          "term": "Installation and Training",
+          "simple_def": "إعداد الأنظمة وتدريب المستخدمين",
+          "translation": "التركيب والتدريب"
+        }
+      ],
+      "explanation": "- يا بطل، هاي الشريحة بتعطينا نظرة عامة على أنواع مشاريع السوفتوير اللي ممكن تشتغل عليها كمدير مشروع.\n- مش كل مشاريع السوفتوير بتكون بس 'بناء تطبيق من الصفر'، ممكن تكون إعادة تصميم لعمليات شركة، أو ربط أنظمة موجودة ببعض، أو حتى تقديم استشارات وتدريب.\n- كل نوع من هاي الأنواع له تحدياته وطرق إدارته الخاصة.",
+      "page_number": 23,
+      "sticky_note": "📌 كبسولة سريعة: مشاريع السوفتوير متنوعة وتشمل التطوير، إعادة الهندسة، الدمج، الاستشارات، والتدريب.",
+      "summary_phrase": "💡 مشاريع السوفتوير مش نوع واحد، لها أشكال مختلفة."
+    },
+    {
+      "title": "تطوير التطبيقات: من الصفر للتخصيص!",
+      "example": "🛍️ مثال واقعي: لو شركة بدها تطبيق لإدارة مخزونها بطريقة فريدة جداً ما في زيها بالسوق، هذا بيكون 'One-off'. لو بدها برنامج محاسبة عادي زي اللي بيستخدموه أغلب الشركات الصغيرة، هذا 'Off-the-shelf'. أما لو شركة كبيرة بدها نظام ERP زي SAP أو Oracle، هذا بيكون 'Customized off-the-shelf' لأنه بيحتاج تعديلات ضخمة عشان يناسب عملياتها المعقدة.",
+      "exam_tip": "⚠️ فخ امتحاني: الدكتور ممكن يجيبلك أمثلة لشركات ويطلب منك تحدد أي نوع من أنواع تطوير التطبيقات يناسبها. ركز على مدى التخصيص المطلوب.",
+      "vocabulary": [
+        {
+          "term": "Application",
+          "simple_def": "برنامج يؤدي وظيفة معينة",
+          "translation": "تطبيق"
+        },
+        {
+          "term": "Desktop",
+          "simple_def": "برامج تعمل على الكمبيوتر",
+          "translation": "سطح المكتب"
+        },
+        {
+          "term": "Web",
+          "simple_def": "برامج تعمل عبر المتصفح",
+          "translation": "الويب"
+        },
+        {
+          "term": "Mobile",
+          "simple_def": "برامج تعمل على الهواتف",
+          "translation": "الجوال"
+        },
+        {
+          "term": "Embedded",
+          "simple_def": "برامج داخل أجهزة معينة",
+          "translation": "مدمجة"
+        },
+        {
+          "term": "One-offs",
+          "simple_def": "برامج مصممة لعميل واحد",
+          "translation": "حلول فريدة"
+        },
+        {
+          "term": "Off-the-shelf",
+          "simple_def": "برامج عامة تباع جاهزة",
+          "translation": "جاهزة للاستخدام"
+        },
+        {
+          "term": "Customized off-the-shelf",
+          "simple_def": "برامج جاهزة تحتاج لتعديل",
+          "translation": "جاهزة ومخصصة"
+        },
+        {
+          "term": "Enterprise Resource Planning (ERP)",
+          "simple_def": "نظام لإدارة موارد الشركة",
+          "translation": "تخطيط موارد المؤسسات"
+        }
+      ],
+      "explanation": "- يا بطل، هاي الشريحة بتفصلنا أكثر في أول نوع من مشاريع السوفتوير اللي هو 'تطوير التطبيقات'.\n- الفكرة هون إنه مش كل التطبيقات بتنعمل بنفس الطريقة. عندك 3 أنواع رئيسية:\n  1. **One-offs**: زي ما تعمل بدلة تفصيل عند خياط، مصممة خصيصاً لعميل واحد.\n  2. **Off-the-shelf**: زي ما تشتري قميص جاهز من المحل، يناسب عدد كبير من الناس بدون تعديل.\n  3. **Customized off-the-shelf**: زي ما تشتري قميص جاهز بس توديه للخياط يضيقه أو يعدل فيه عشان يناسبك تماماً، وهذا النوع هو اللي بتشوفه كثير في أنظمة الـ ERP الكبيرة.",
+      "page_number": 24,
+      "sticky_note": "📌 كبسولة سريعة: تطوير التطبيقات يتراوح بين الحلول الفريدة (One-offs) والجاهزة (Off-the-shelf) والمخصصة (Customized off-the-shelf).",
+      "summary_phrase": "💡 تطوير التطبيقات له أشكال: من الفريد للمخصص."
+    },
+    {
+      "title": "إعادة هندسة العمليات والأنظمة: تغيير جذري للأفضل!",
+      "example": "🏭 مثال واقعي: تخيل مصنع سيارات بيصنع السيارات بطريقة تقليدية وبطيئة. لو قرروا يعملوا 'Process Re-engineering'، ممكن يغيروا خط الإنتاج بالكامل، يجيبوا روبوتات جديدة، ويغيروا تسلسل العمليات عشان يضاعفوا الإنتاج ويقللوا الأخطاء. هذا تغيير جذري مش مجرد تعديل بسيط.",
+      "exam_tip": "⚠️ فخ امتحاني: ممكن يسألك عن الفرق بين 'تحسين العمليات' (Process Improvement) و 'إعادة هندسة العمليات' (Process Re-engineering). ركز على أن إعادة الهندسة تغيير جذري وشامل، بينما التحسين يكون تدريجياً.",
+      "vocabulary": [
+        {
+          "term": "Process Re-engineering",
+          "simple_def": "إعادة تصميم جذرية للعمليات",
+          "translation": "إعادة هندسة العمليات"
+        },
+        {
+          "term": "Strategic Goal",
+          "simple_def": "هدف طويل المدى للشركة",
+          "translation": "هدف استراتيجي"
+        },
+        {
+          "term": "Efficient",
+          "simple_def": "إنجاز العمل بأقل جهد وموارد",
+          "translation": "فعال"
+        },
+        {
+          "term": "Accurate analysis",
+          "simple_def": "فحص مفصل للوضع الحالي",
+          "translation": "تحليل دقيق"
+        },
+        {
+          "term": "As is",
+          "simple_def": "كيف تسير الأمور الآن",
+          "translation": "الوضع الحالي"
+        },
+        {
+          "term": "ERP system",
+          "simple_def": "نظام شامل لإدارة الشركة",
+          "translation": "نظام تخطيط موارد المؤسسات"
+        },
+        {
+          "term": "Data integration",
+          "simple_def": "ربط البيانات من مصادر مختلفة",
+          "translation": "دمج البيانات"
+        }
+      ],
+      "explanation": "- يا دكتور، هذا النوع من المشاريع اللي هو 'إعادة هندسة العمليات والأنظمة' مش بس بتعمل تطبيق جديد، لأ! هون أنت بتغير طريقة الشغل كلها من جذورها.\n- الهدف مش بس تحسين بسيط، الهدف هو تحقيق قفزة نوعية في الأداء، زي إنك تصير أسرع أو جودتك أعلى.\n- عشان تعمل هيك، لازم تفهم الوضع الحالي للشركة (اللي بنسميه 'as is') بالتفصيل الممل، وبعدين تصمم طريقة شغل جديدة كلياً.\n- هاي المشاريع غالباً بتكون ضخمة وبتتضمن تركيب أنظمة ERP وربط بيانات كتير ببعضها.",
+      "page_number": 25,
+      "sticky_note": "📌 كبسولة سريعة: إعادة الهندسة هي تغيير جذري للعمليات لتحقيق أهداف استراتيجية كبيرة، تبدأ بتحليل دقيق للوضع الحالي.",
+      "summary_phrase": "💡 إعادة الهندسة: تغيير شامل لتحسين الأداء."
+    },
+    {
+      "title": "خدمات دمج الأنظمة: كيف نخلي كل شي يشتغل مع بعض؟",
+      "example": "🏢 مثال واقعي: تخيل عندك شركة كبيرة فيها نظام للمبيعات، ونظام للمخزون، ونظام للمحاسبة. لو ما في دمج، الموظف لازم ياخذ بيانات الطلب من نظام المبيعات، يدخلها يدويًا في نظام المخزون عشان يتأكد من توفر المنتج، وبعدين يدخلها في نظام المحاسبة عشان يصدر فاتورة. هذا شغل متعب وممكن يصير فيه أخطاء. لكن لو سوينا 'System Integration'، بمجرد ما العميل يطلب، النظام لحاله بيخصم من المخزون وبيصدر فاتورة وبيحدث سجلات المحاسبة، كل هذا بشكل آلي! هذا هو سحر دمج الأنظمة.",
+      "exam_tip": "⚠️ فخ امتحاني: ركز على الفرق بين 'Horizontal' و 'Vertical' Integration. الدكتور ممكن يجيب لك سيناريو ويسألك أي نوع تكامل هذا. تذكر: أفقي = نفس الشغل، عمودي = خطوات متتالية في إجراء.",
+      "vocabulary": [
+        {
+          "term": "System Integration Services",
+          "simple_def": "ربط برامج الشركة ببعض",
+          "translation": "خدمات دمج الأنظمة"
+        },
+        {
+          "term": "Automating",
+          "simple_def": "جعل الشغل آلي",
+          "translation": "أتمتة"
+        },
+        {
+          "term": "Information Flow",
+          "simple_def": "كيف تنتقل البيانات",
+          "translation": "تدفق المعلومات"
+        },
+        {
+          "term": "Horizontal Integration",
+          "simple_def": "ربط أنظمة متشابهة",
+          "translation": "تكامل أفقي"
+        },
+        {
+          "term": "Vertical Integration",
+          "simple_def": "ربط خطوات إجراء",
+          "translation": "تكامل عمودي"
+        }
+      ],
+      "explanation": "- يا بطل، هاي الشريحة بتحكي عن 'System Integration Services' أو خدمات دمج الأنظمة. الفكرة بكل بساطة إنك تخلي كل الأنظمة والبرامج اللي بتستخدمها الشركة تحكي مع بعضها وتتبادل المعلومات بشكل آلي وسلس.\n- الهدف الأساسي من هالخدمة هو 'automating the information flow' يعني أتمتة تدفق المعلومات، عشان ما تضطر تنقل البيانات يدويًا من نظام لنظام وتوفر وقت وجهد وتتجنب الأخطاء.\n- في نوعين رئيسيين للدمج: 'Horizontal Integration' (تكامل أفقي) وهذا لما نربط أنظمة بتسوي نفس الشغل، زي مثلاً ربط كل أنظمة المبيعات في الفروع المختلفة. أما 'Vertical Integration' (تكامل عمودي) فهذا لما نربط أنظمة بتسوي خطوات مختلفة في إجراء واحد، زي مثلاً ربط نظام طلبات الزبائن بنظام المخزون بنظام الشحن.",
+      "page_number": 26,
+      "sticky_note": "📌 كبسولة سريعة: دمج الأنظمة بيخلي برامج الشركة تشتغل كفريق واحد، وبيوفر وقت وجهد كبير!",
+      "summary_phrase": "💡 دمج الأنظمة: ربط الأقسام لتسهيل الشغل."
+    },
+    {
+      "title": "أنواع مشاريع ثانية: استشارات، تركيب، وتدريب!",
+      "example": "💻 مثال واقعي: تخيل شركة صغيرة بدها تنتقل لنظام إدارة علاقات العملاء (CRM) جديد. ممكن ما يكون عندها موظفين متخصصين في تركيب هذا النظام أو تدريب البقية عليه. فبتتعاقد مع شركة 'Consulting Services' عشان تختار لها أفضل نظام، وبعدين مع شركة 'Installation and Training Services' عشان تركب النظام وتدرب فريق المبيعات على استخدامه. حتى لو كان نظام الـ CRM مفتوح المصدر ومجاني، الشركة اللي بتقدم خدمات التركيب والتدريب هي اللي بتكسب فلوس من هالعملية.",
+      "exam_tip": "⚠️ فخ امتحاني: ممكن يسألك عن سبب لجوء الشركات للخدمات الاستشارية، أو كيف ممكن المشاريع مفتوحة المصدر تحقق إيرادات. تذكر: الخبرة الخارجية والتدريب هما المفتاح.",
+      "vocabulary": [
+        {
+          "term": "Consulting Services",
+          "simple_def": "نصيحة من خبراء",
+          "translation": "خدمات استشارية"
+        },
+        {
+          "term": "Know-how",
+          "simple_def": "معرفة تطبيقية",
+          "translation": "خبرة عملية"
+        },
+        {
+          "term": "Core Competence",
+          "simple_def": "الشي اللي الشركة شاطرة فيه",
+          "translation": "الكفاءة الأساسية"
+        },
+        {
+          "term": "Installation Services",
+          "simple_def": "تثبيت البرامج",
+          "translation": "خدمات التركيب"
+        },
+        {
+          "term": "Training Services",
+          "simple_def": "تعليم استخدام البرامج",
+          "translation": "خدمات التدريب"
+        },
+        {
+          "term": "Revenue Model",
+          "simple_def": "كيف الشركة بتكسب",
+          "translation": "نموذج الإيرادات"
+        },
+        {
+          "term": "Open Source Development",
+          "simple_def": "برامج كودها متاح للكل",
+          "translation": "تطوير مفتوح المصدر"
+        }
+      ],
+      "explanation": "- يا دكتور، غير عن مشاريع تطوير البرمجيات الأساسية، في أنواع ثانية من المشاريع اللي ممكن الشركات تقدمها أو تحتاجها. أول نوع هو 'Consulting Services' أو الخدمات الاستشارية.\n- متى بنحتاج استشارات؟ لما الشركة بدها 'gain a know-how outsize a company’s core competence' يعني بدها خبرة أو معرفة في مجال مش تخصصها الأساسي. مثلاً، شركة تصنيع سيارات بدها تدخل مجال الذكاء الاصطناعي، فبتجيب مستشارين متخصصين في AI.\n- النوع الثاني هو 'Installation and Training Services' يعني خدمات التركيب والتدريب. هاي واضحة، لما تشتري برنامج جديد، بتحتاج مين يركبه لك ويدرب موظفينك عليه. هاي الخدمات مهمة جداً لضمان استخدام فعال للبرامج.\n- في ملاحظة مهمة جداً هون: 'also a revenue model in open source development'. يعني حتى الشركات اللي بتطور برامج مفتوحة المصدر (مجانية الكود)، ممكن تكسب فلوس من تقديم خدمات التركيب والدعم والتدريب عليها. هاي نقطة ذكية!",
+      "page_number": 27,
+      "sticky_note": "📌 كبسولة سريعة: الاستشارات بتجيب لك الخبرة، والتركيب والتدريب بيضمنوا إنك تستخدم البرامج صح، وممكن يكونوا مصدر دخل للمشاريع المجانية!",
+      "summary_phrase": "💡 مشاريع إضافية: خبرة خارجية، تركيب برامج، وتدريب عليها."
+    },
+    {
+      "title": "المشاريع وبيئتها: مين هم اللاعبين؟",
+      "example": "⚽ مثال واقعي: تخيل مشروع بناء ملعب كرة قدم. 'البيئة' هي الأرض اللي رح ينبنى عليها الملعب، والظروف المحيطة (الطقس، القوانين المحلية). و'اللاعبون' هم المهندسين، العمال، الممولين، الحكومة، وحتى الجمهور اللي رح يستخدم الملعب. كل واحد منهم له دور وتأثير.",
+      "exam_tip": "⚠️ فخ امتحاني: هذه الشريحة تمهيدية، لكنها تمهد لمفهوم 'Stakeholders' اللي رح يجي بعدين وهو مهم جداً.",
+      "vocabulary": [
+        {
+          "term": "Projects",
+          "simple_def": "مهمة لها بداية ونهاية",
+          "translation": "مشاريع"
+        },
+        {
+          "term": "Environment",
+          "simple_def": "المحيط اللي بيصير فيه الشغل",
+          "translation": "بيئة"
+        },
+        {
+          "term": "Players",
+          "simple_def": "الأشخاص أو الجهات المعنية",
+          "translation": "اللاعبون"
+        }
+      ],
+      "explanation": "- يا بطل، هاي الشريحة مجرد مقدمة بسيطة للموضوع اللي جاي. الفكرة الأساسية هون هي 'Projects and their Environment' يعني المشاريع والبيئة اللي بتشتغل فيها. وكل مشروع، مهما كان نوعه، بيكون فيه 'The players' أو 'اللاعبون' اللي هم الأشخاص أو الجهات اللي لهم علاقة بالمشروع.\n- هاي الشريحة بتلمح إنك (أنت كمدير مشروع أو عضو فريق) واحد من هدول اللاعبين المهمين. الموضوع الجاي رح يفصل مين هم هدول اللاعبين بالضبط.",
+      "page_number": 28,
+      "sticky_note": "📌 كبسولة سريعة: هذه الشريحة للمقدمة فقط وغير مطلوبة للاختبار، بس بتجهزك للمفهوم الجاي!",
+      "summary_phrase": "💡 المشاريع: مين اللي بيشتغل فيها وبيأثر عليها؟"
+    },
+    {
+      "title": "أصحاب المصلحة (Stakeholders): مين هم اللي بيأثروا ويتأثروا بالمشروع؟",
+      "example": "🏗️ مثال واقعي: تخيل مشروع بناء جسر جديد في مدينة. مين هم أصحاب المصلحة؟\n1. **المهندسون والعمال:** مشاركين بفعالية.\n2. **الشركة المقاولة:** مشاركة بفعالية.\n3. **الحكومة:** هي اللي بتمول وبتشرف (مشاركة بفعالية).\n4. **سكان المنطقة اللي رح يمر فيها الجسر:** مصلحتهم بتتأثر إيجاباً (سهولة التنقل) أو سلباً (إزعاج البناء، تغيير في شكل المنطقة).\n5. **أصحاب المحلات القريبة من الجسر:** ممكن تتأثر مبيعاتهم إيجاباً (زيادة حركة الناس) أو سلباً (صعوبة الوصول خلال البناء).\nكل هدول يعتبروا 'Project Stakeholders'.",
+      "exam_tip": "⚠️ فخ امتحاني: ممكن يجيب لك أمثلة ويسألك مين فيهم صاحب مصلحة. تذكر التعريف الشامل: أي شخص أو منظمة تتأثر أو تشارك. لا تقتصر على فريق العمل فقط!",
+      "vocabulary": [
+        {
+          "term": "Project Stakeholder",
+          "simple_def": "كل من يتأثر بالمشروع",
+          "translation": "صاحب المصلحة في المشروع"
+        },
+        {
+          "term": "Individual",
+          "simple_def": "شخص واحد",
+          "translation": "فرد"
+        },
+        {
+          "term": "Organization",
+          "simple_def": "شركة أو جهة",
+          "translation": "منظمة"
+        },
+        {
+          "term": "Actively involved",
+          "simple_def": "له دور مباشر",
+          "translation": "مشارك بفعالية"
+        },
+        {
+          "term": "Interest might be affected",
+          "simple_def": "يتأثر بنتائج المشروع",
+          "translation": "مصلحته قد تتأثر"
+        },
+        {
+          "term": "Positively or negatively",
+          "simple_def": "تأثير جيد أو سيء",
+          "translation": "إيجاباً أو سلباً"
+        },
+        {
+          "term": "Project execution or completion",
+          "simple_def": "خلال أو بعد المشروع",
+          "translation": "تنفيذ المشروع أو اكتماله"
+        },
+        {
+          "term": "PMBOK",
+          "simple_def": "كتاب مرجعي لإدارة المشاريع",
+          "translation": "دليل PMBOK"
+        }
+      ],
+      "explanation": "- يا دكتور، هاي الشريحة بتعرف لنا مفهوم 'Project Stakeholder' أو 'صاحب المصلحة في المشروع'. هذا المفهوم أساسي جداً في إدارة المشاريع، فلازم تفهمه زي اسمك!\n- بكل بساطة، صاحب المصلحة هو 'any individual or an organization' يعني أي شخص أو أي جهة (شركة، حكومة، جمعية) 'that is actively involved in a project' يعني مشارك بشكل مباشر في المشروع، 'or whose interest might be affected (positively or negatively) as a result of project execution or completion' يعني مصلحته ممكن تتأثر (سواء بالإيجاب أو السلب) بسبب تنفيذ المشروع أو بعد ما يخلص.\n- يعني مش بس اللي بيشتغلوا في المشروع، حتى اللي بيتأثروا فيه هم أصحاب مصلحة. وهذا التعريف جاي من 'PMBOK' اللي هو دليل مرجعي عالمي لإدارة المشاريع.",
+      "page_number": 29,
+      "sticky_note": "📌 كبسولة سريعة: صاحب المصلحة هو أي حدا بيشتغل بالمشروع أو بيتأثر فيه، سواء كان فرد أو جهة، وبشكل إيجابي أو سلبي!",
+      "summary_phrase": "💡 أصحاب المصلحة: كل من له علاقة بالمشروع، إيجاباً أو سلباً."
+    },
+    {
+      "title": "اللاعبون (أصحاب المصلحة): صفاتهم وتأثيرهم",
+      "example": "📱 مثال واقعي: تخيل مشروع تطوير تطبيق جوال جديد. \n- **العميل (صاحب فكرة التطبيق):** له تأثير كبير ومسؤولية عالية.\n- **فريق التطوير (أنت وفريقك):** أدوار مختلفة، تأثير مباشر، وأنتم أصحاب مصلحة.\n- **المستخدمون المستهدفون:** تأثيرهم إيجابي (لو عجبهم التطبيق) أو سلبي (لو ما عجبهم). ممكن يكونوا 'difficult to identify' في البداية.\n- **متجر التطبيقات (Apple Store/Google Play):** له تأثير كبير (قوانين النشر، نسبة الأرباح).\n- **المنافسون:** تأثير سلبي محتمل (لو نزلوا تطبيق أفضل).\nلو ما عرفت مين هم المستخدمين المستهدفين صح، وما أشركتهم في اختبار التطبيق، 'lack of intervention' منهم ممكن يخلي التطبيق يفشل بعد الإطلاق. عشان هيك، تحديدهم وإشراكهم من البداية أمر حاسم.",
+      "exam_tip": "⚠️ فخ امتحاني: ركز على النقاط اللي بتحكي عن صعوبة تحديد أصحاب المصلحة وأهمية إشراكهم. ممكن يجيك سؤال عن عواقب عدم تحديد أصحاب المصلحة بشكل كامل. ولا تنسى إن مدير المشروع والفريق هم أيضاً أصحاب مصلحة!",
+      "vocabulary": [
+        {
+          "term": "Influence",
+          "simple_def": "مدى قدرتهم على التغيير",
+          "translation": "تأثير"
+        },
+        {
+          "term": "Responsibility",
+          "simple_def": "المهام الموكلة لهم",
+          "translation": "مسؤولية"
+        },
+        {
+          "term": "Roles",
+          "simple_def": "الوظائف اللي بيقوموا فيها",
+          "translation": "أدوار"
+        },
+        {
+          "term": "Identify",
+          "simple_def": "معرفة من هم",
+          "translation": "تحديد"
+        },
+        {
+          "term": "Lack of intervention",
+          "simple_def": "عدم المشاركة أو الاهتمام",
+          "translation": "عدم التدخل"
+        },
+        {
+          "term": "Negatively influence",
+          "simple_def": "يسبب مشاكل",
+          "translation": "يؤثر سلباً"
+        },
+        {
+          "term": "Involvement",
+          "simple_def": "جعلهم جزءاً من العملية",
+          "translation": "إشراك"
+        },
+        {
+          "term": "Project manager",
+          "simple_def": "قائد الفريق",
+          "translation": "مدير المشروع"
+        },
+        {
+          "term": "Project team",
+          "simple_def": "الأشخاص اللي بيشتغلوا بالمشروع",
+          "translation": "فريق المشروع"
+        }
+      ],
+      "explanation": "- يا بطل، بعد ما عرفنا مين هم أصحاب المصلحة، هاي الشريحة بتوضح لنا صفاتهم وكيف ممكن نتعامل معاهم. الموضوع مش بسيط زي ما تتخيل!\n- أول شي، 'They may have different influence and varying level of responsibility' يعني مش كلهم نفس القوة أو نفس المسؤولية. في ناس تأثيرها كبير ومسؤوليتها عالية (زي الممولين)، وفي ناس تأثيرها أقل (زي المستخدمين العاديين).\n- كمان 'They may play different roles' يعني كل واحد له دور مختلف: ممكن يكونوا عملاء، موردين، موظفين، حكومة، إلخ.\n- 'They may have positive or negative influence on the project' يعني ممكن يكونوا داعمين للمشروع ويساعدوا على نجاحه، أو ممكن يكونوا معارضين ويعيقوا تقدمه. لازم تعرف مين مع مين!\n- نقطة مهمة جداً: 'They may be difficult to identify'. أحياناً بيكون صعب تعرف كل أصحاب المصلحة، خصوصاً اللي تأثيرهم غير مباشر. وهذا بيقودنا للنقطة اللي بعدها: 'Their lack of intervention may negatively influence the project'. لو ما عرفت مين هم وما أشركتهم، ممكن عدم تدخلهم أو عدم اهتمامهم يأثر سلباً على المشروع. عشان هيك، 'need for identification and involvement' يعني لازم تحددهم وتشركهم من بدري.\n- وأخيراً، ملاحظة ذهبية: 'the project manager and the project team are project stakeholders'. يعني أنت وفريقك كمان أصحاب مصلحة! صحيح المصطلح غالباً بيستخدم للإشارة للجهات 'الخارجية'، بس لا تنسوا إنكم جزء أساسي من المعادلة.",
+      "page_number": 30,
+      "sticky_note": "📌 كبسولة سريعة: أصحاب المصلحة متنوعين، تأثيرهم مختلف، وممكن يكونوا صعبين التحديد. لازم تعرفهم وتشركهم عشان مشروعك ينجح!",
+      "summary_phrase": "💡 أصحاب المصلحة: متنوعون، مؤثرون، وقد يكونوا صعبين."
+    },
+    {
+      "title": "مين هم أصحاب المصلحة (Stakeholders) في أي مشروع؟",
+      "example": "🚗 مثال واقعي: تخيل إنك بتعمل مشروع لتطوير تطبيق جديد لطلب السيارات (زي أوبر أو كريم). مين هم الـ Stakeholders؟\n1. **أنت كمدير مشروع (Project Manager)**: المسؤول عن كل شيء.\n2. **فريقك (Project Team)**: المبرمجين والمصممين.\n3. **المستثمر اللي دفع الفلوس (Project Sponsor)**.\n4. **الشركة اللي بتنفذ التطبيق (Performing Organization)**.\n5. **شركات الخرائط أو الدفع الإلكتروني (Partners)**.\n6. **الناس اللي رح تستخدم التطبيق (Client/Users)**.\n7. **حتى سواقين التاكسي التقليديين (The 'rest')** ممكن يتأثروا بالمشروع، فهم Stakeholders كمان!",
+      "exam_tip": "⚠️ فخ امتحاني: ممكن يجيك سؤال يطلب منك تحدد مين هم الـ Stakeholders لمشروع معين، فانتبه إنك ما تنسى أي طرف، خصوصاً 'الآخرين' اللي ممكن يتأثروا.",
+      "vocabulary": [
+        {
+          "term": "Stakeholders",
+          "simple_def": "كل من له علاقة بالمشروع",
+          "translation": "أصحاب المصلحة"
+        },
+        {
+          "term": "Project manager",
+          "simple_def": "قائد الفريق والمسؤول",
+          "translation": "مدير المشروع"
+        },
+        {
+          "term": "Project team",
+          "simple_def": "الناس اللي بتشتغل",
+          "translation": "فريق المشروع"
+        },
+        {
+          "term": "Project sponsor",
+          "simple_def": "اللي بيدفع الفلوس",
+          "translation": "راعي المشروع"
+        },
+        {
+          "term": "Performing organizations",
+          "simple_def": "الشركات اللي بتنفذ",
+          "translation": "المنظمات المنفذة"
+        },
+        {
+          "term": "Partners",
+          "simple_def": "الجهات المتعاونة",
+          "translation": "الشركاء"
+        },
+        {
+          "term": "Client",
+          "simple_def": "اللي طلب المشروع",
+          "translation": "العميل"
+        },
+        {
+          "term": "Project outputs",
+          "simple_def": "النتائج النهائية للمشروع",
+          "translation": "مخرجات المشروع"
+        }
+      ],
+      "explanation": "- يا بطل، هاي الشريحة بتعرفنا على مين هم الـ 'Stakeholders' أو 'أصحاب المصلحة' في أي مشروع.\n- ببساطة، هم أي شخص أو جهة ممكن يتأثروا بالمشروع أو يأثروا فيه، سواء بشكل مباشر أو غير مباشر.\n- ركز على الأمثلة المذكورة، لأنها بتوضح لك مين هم اللاعبين الأساسيين في أي مشروع، من مدير المشروع وفريقه، للعميل والراعي، وحتى الناس اللي ممكن تتأثر بالنتائج.",
+      "page_number": 31,
+      "sticky_note": "📌 كبسولة سريعة: الـ Stakeholders هم كل من له مصلحة أو يتأثر بالمشروع، معرفتهم أساس لنجاح أي مشروع.",
+      "summary_phrase": "💡 أصحاب المصلحة: كل من يتأثر بالمشروع أو يؤثر فيه."
+    },
+    {
+      "title": "تصنيف أصحاب المصلحة: داخلي، خارجي، وبين البينين!",
+      "example": "🏢 مثال واقعي: تخيل مشروع بناء مستشفى جديد:\n- **داخليين (Internal)**: المهندسون المعماريون من شركة المقاولات، عمال البناء، مدير المشروع من الشركة.\n- **بين البينين (In between)**: وزارة الصحة (العميل/الجهة المستفيدة)، البنك اللي بيمول المشروع (Sponsor).\n- **خارجيين (External)**: سكان المنطقة المحيطة بالمستشفى (ممكن يتأثروا بالضوضاء أو حركة المرور)، منظمات حماية البيئة (Influencers) إذا كان في تأثير بيئي.",
+      "exam_tip": "⚠️ فخ امتحاني: ممكن يجيك سيناريو لمشروع ويطلب منك تصنف الـ Stakeholders فيه لداخلي وخارجي وبين البينين. ركز على تعريف كل فئة عشان ما تتلخبط.",
+      "vocabulary": [
+        {
+          "term": "Internal",
+          "simple_def": "من داخل المنظمة",
+          "translation": "داخلي"
+        },
+        {
+          "term": "Project team members",
+          "simple_def": "الناس اللي بتشتغل",
+          "translation": "أعضاء فريق المشروع"
+        },
+        {
+          "term": "Project management team",
+          "simple_def": "اللي بيديروا المشروع",
+          "translation": "فريق إدارة المشروع"
+        },
+        {
+          "term": "Customer/User",
+          "simple_def": "اللي بيستخدم المنتج",
+          "translation": "العميل/المستخدم"
+        },
+        {
+          "term": "Sponsor",
+          "simple_def": "اللي بيمول المشروع",
+          "translation": "الراعي"
+        },
+        {
+          "term": "Performing Organization",
+          "simple_def": "الشركة اللي بتنفذ",
+          "translation": "المنظمة المنفذة"
+        },
+        {
+          "term": "External",
+          "simple_def": "من خارج المنظمة",
+          "translation": "خارجي"
+        },
+        {
+          "term": "Influencers",
+          "simple_def": "الجهات اللي بتأثر",
+          "translation": "المؤثرون"
+        }
+      ],
+      "explanation": "- يا دكتور، بعد ما عرفنا مين هم الـ Stakeholders بشكل عام، هاي الشريحة بتصنفهم لثلاث مجموعات رئيسية عشان نفهم أدوارهم أحسن:\n1. **داخليين (Internal)**: هذول هم اللي جوا الشركة أو المنظمة اللي بتنفذ المشروع، زي فريق العمل وفريق الإدارة.\n2. **خارجيين (External)**: هذول من برا المنظمة، زي المؤثرين أو الجهات الحكومية اللي ممكن تأثر على المشروع.\n3. **بين البينين (In between)**: هذول ممكن يكونوا جوا وبرا بنفس الوقت، زي العميل اللي بيستخدم المنتج، أو الراعي اللي بيمول المشروع.",
+      "page_number": 32,
+      "sticky_note": "📌 كبسولة سريعة: تصنيف الـ Stakeholders بيساعدك تفهم مين تتعامل معاه وكيف تدير توقعاتهم.",
+      "summary_phrase": "💡 أصحاب المصلحة ينقسمون لداخليين، خارجيين، ومن هم بينهما."
+    },
+    {
+      "title": "تمرين عملي: كيف تحدد أصحاب المصلحة لمشاريع مختلفة؟",
+      "example": "🌉 مثال واقعي (حل جزئي لأحد الأمثلة): مشروع بناء جسر يربط جزيرة بالبر الرئيسي:\n- **العميل (Client)**: الحكومة أو وزارة الأشغال.\n- **الراعي (Sponsor)**: ممكن تكون الحكومة نفسها أو بنك تنمية.\n- **فريق المشروع (Project Team)**: المهندسون، عمال البناء، مدراء المشروع من شركة المقاولات.\n- **المتأثرون (The 'rest')**: سكان الجزيرة والبر الرئيسي (المستفيدون)، الصيادون (ممكن يتأثروا بمسار الجسر)، شركات الشحن البحري، منظمات حماية البيئة البحرية.",
+      "exam_tip": "⚠️ فخ امتحاني: ممكن يجيك سؤال في الامتحان يطلب منك تحدد الـ Stakeholders لمشروع معين لم يتم ذكره في المحاضرة، فلازم تكون فاهم المفهوم وتعرف تطبقه على أي سيناريو.",
+      "vocabulary": [
+        {
+          "term": "Identification",
+          "simple_def": "معرفة وتعيين",
+          "translation": "تحديد"
+        },
+        {
+          "term": "Exercise",
+          "simple_def": "ممارسة عملية",
+          "translation": "تمرين"
+        },
+        {
+          "term": "Bridge",
+          "simple_def": "معبر بين مكانين",
+          "translation": "جسر"
+        },
+        {
+          "term": "Landfill",
+          "simple_def": "مكان لتجميع القمامة",
+          "translation": "مكب نفايات"
+        },
+        {
+          "term": "Open source spreadsheet",
+          "simple_def": "برنامج مجاني ومتاح للجميع",
+          "translation": "برنامج جداول بيانات مفتوح المصدر"
+        },
+        {
+          "term": "Web-application",
+          "simple_def": "برنامج يعمل على المتصفح",
+          "translation": "تطبيق ويب"
+        },
+        {
+          "term": "Port",
+          "simple_def": "تعديل برنامج لمنصة أخرى",
+          "translation": "نقل/تكييف"
+        }
+      ],
+      "explanation": "- يا بطل، هاي الشريحة هي تمرين عملي عشان تثبت فهمك لمفهوم الـ Stakeholders.\n- الفكرة إنك تاخد كل مشروع من الأمثلة المذكورة، وتحاول تحدد مين هم أصحاب المصلحة فيه، وتصنفهم (داخلي، خارجي، بين البينين) زي ما تعلمنا بالشريحة اللي قبلها.\n- هذا النوع من التمارين بيخليك تفكر بشكل عملي وتطبق اللي درسته، وهو مهم جداً عشان تفهم المادة صح.",
+      "page_number": 33,
+      "sticky_note": "📌 كبسولة سريعة: التطبيق العملي هو مفتاح الفهم، حاول تحل الأمثلة بنفسك!",
+      "summary_phrase": "💡 تدريب على تحديد أصحاب المصلحة لمشاريع متنوعة."
+    },
+    {
+      "title": "مدير المشروع: أنت القائد والمسؤول عن كل شيء!",
+      "example": "🚀 مثال واقعي: تخيل إنك مدير مشروع لإطلاق صاروخ للفضاء. أنت المسؤول عن:\n- **التواصل (Communication)** مع فريق المهندسين، والعلماء، والجهات الحكومية، وحتى عائلات رواد الفضاء.\n- **التفاوض (Negotiation)** مع الموردين لقطع الغيار، ومع الجهات المنظمة للميزانية.\n- **القيادة (Leadership)** لفريقك في أصعب الظروف، خصوصاً لما يكون في مشاكل تقنية.\n- **التفكير خارج الصندوق (Thinking outside the schemes)** لما تواجه مشكلة غير متوقعة وتحتاج حلول إبداعية.\n- **الفطرة السليمة (Common sense)** عشان تتخذ قرارات حاسمة تحت الضغط.",
+      "exam_tip": "⚠️ فخ امتحاني: ممكن يجيك سؤال عن أهم المهارات لمدير المشروع، أو سيناريو يطلب منك تحدد أي مهارة يحتاجها مدير المشروع في موقف معين. ركز على المهارات غير التقنية زي التواصل والقيادة.",
+      "vocabulary": [
+        {
+          "term": "Responsible",
+          "simple_def": "عليه واجبات",
+          "translation": "مسؤول"
+        },
+        {
+          "term": "Expectations",
+          "simple_def": "ما ينتظره الآخرون",
+          "translation": "توقعات"
+        },
+        {
+          "term": "Communication skills",
+          "simple_def": "القدرة على التحدث بوضوح",
+          "translation": "مهارات التواصل"
+        },
+        {
+          "term": "Negotiation skills",
+          "simple_def": "القدرة على الوصول لاتفاق",
+          "translation": "مهارات التفاوض"
+        },
+        {
+          "term": "Predisposition to risk",
+          "simple_def": "الاستعداد لتحمل المخاطر",
+          "translation": "ميل للمخاطرة"
+        },
+        {
+          "term": "Goal orientation",
+          "simple_def": "التركيز على تحقيق الأهداف",
+          "translation": "التوجه نحو الهدف"
+        },
+        {
+          "term": "Leadership",
+          "simple_def": "القدرة على توجيه الفريق",
+          "translation": "القيادة"
+        },
+        {
+          "term": "Thinking outside the schemes",
+          "simple_def": "الإبداع والابتكار",
+          "translation": "التفكير خارج الصندوق"
+        },
+        {
+          "term": "Solid know-how",
+          "simple_def": "خبرة ومعرفة عميقة",
+          "translation": "معرفة قوية"
+        },
+        {
+          "term": "Professional correctness",
+          "simple_def": "الالتزام بالمعايير المهنية",
+          "translation": "صحة مهنية"
+        },
+        {
+          "term": "Common sense",
+          "simple_def": "المنطق والحكمة",
+          "translation": "الفطرة السليمة/المنطق"
+        },
+        {
+          "term": "Style",
+          "simple_def": "طريقة مميزة في العمل",
+          "translation": "أسلوب"
+        }
+      ],
+      "explanation": "- يا بطل، هاي الشريحة بتحطك أنت كـ 'مدير مشروع' في الواجهة، وبتوضح لك إنك مش بس مسؤول عن إدارة المشروع، بل كمان عن إدارة توقعات كل الـ Stakeholders اللي حكينا عنهم.\n- عشان تكون مدير مشروع ناجح، لازم يكون عندك مجموعة مهارات مش بس تقنية، زي مهارات التواصل والتفاوض، والقيادة، وحتى 'الفطرة السليمة' و'التفكير خارج الصندوق'.\n- هاي المهارات هي اللي بتخليك تقدر تتعامل مع التحديات وتوصل المشروع لبر الأمان.",
+      "page_number": 34,
+      "sticky_note": "📌 كبسولة سريعة: مدير المشروع هو القائد الذي يجمع بين المهارات التقنية والشخصية لإنجاح المشروع.",
+      "summary_phrase": "💡 مدير المشروع هو قائد السفينة، يحتاج مهارات متنوعة لإدارة المشروع والـ Stakeholders."
+    },
+    {
+      "title": "تنظيم تطوير مشاريع البرمجيات: مقدمة",
+      "example": "📚 مثال واقعي: تخيل إنك خلصت فصل دراسي كامل، وهاي الشريحة زي عنوان الفصل الجديد اللي رح تبدأ فيه. لسا ما دخلنا في التفاصيل، بس بنعرف شو الموضوع العام.",
+      "exam_tip": "⚠️ فخ امتحاني: لا يوجد فخ هنا، هذه الشريحة تمهيدية فقط.",
+      "vocabulary": [
+        {
+          "term": "Organizing",
+          "simple_def": "ترتيب وتنسيق",
+          "translation": "تنظيم"
+        },
+        {
+          "term": "Development",
+          "simple_def": "بناء وتحسين",
+          "translation": "تطوير"
+        },
+        {
+          "term": "Software Projects",
+          "simple_def": "مشاريع بناء برامج",
+          "translation": "مشاريع البرمجيات"
+        }
+      ],
+      "explanation": "- يا بطل، هاي الشريحة هي مجرد عنوان لموضوع جديد رح نبدأ فيه، وهو كيف ننظم عملية تطوير مشاريع البرمجيات.\n- اعتبرها فاصل إعلاني قبل ما ندخل في تفاصيل جديدة ومهمة جداً في إدارة المشاريع البرمجية.",
+      "page_number": 35,
+      "sticky_note": "📌 كبسولة سريعة: هذه الشريحة للمقدمة فقط وغير مطلوبة للاختبار.",
+      "summary_phrase": "💡 هذه الشريحة هي مقدمة لموضوع تنظيم تطوير مشاريع البرمجيات."
+    },
+    {
+      "title": "إدارة مشاريع البرمجيات: ليش نحتاجها؟",
+      "example": "🚗 مثال واقعي: تخيل إنك بدك تبني عمارة. زمان، كان ممكن تبنيها بدون مهندس أو مخططات دقيقة، بس لما صارت العمارات أكبر وأكثر تعقيداً، صرت تحتاج مهندس معماري ومدير مشروع عشان يخطط، ينسق، ويدير كل شيء صح. إدارة مشاريع البرمجيات هي بالضبط هذا المهندس والمدير لمشروعك البرمجي!",
+      "exam_tip": "⚠️ فخ امتحاني: ممكن يسألك عن 'أزمة البرمجيات' ومتى ظهرت، أو ليش نحتاج إدارة مشاريع البرمجيات. ركز على كلمة 'increasing complexity' كسبب رئيسي.",
+      "vocabulary": [
+        {
+          "term": "Software Project Management",
+          "simple_def": "تنظيم تطوير البرامج.",
+          "translation": "إدارة مشاريع البرمجيات"
+        },
+        {
+          "term": "Integration",
+          "simple_def": "خلط أشياء مع بعض.",
+          "translation": "دمج / تكامل"
+        },
+        {
+          "term": "Software Crisis",
+          "simple_def": "صعوبة تطوير برامج.",
+          "translation": "أزمة البرمجيات"
+        },
+        {
+          "term": "Specifications",
+          "simple_def": "متطلبات المنتج.",
+          "translation": "المواصفات"
+        }
+      ],
+      "explanation": "- يا بطل، الفكرة هون بكل بساطة إنه زمان، بالستينات، صارت مشكلة كبيرة اسمها 'أزمة البرمجيات' (Software Crisis).\n- ليش صارت؟ لأنه البرامج صارت معقدة جداً، وصار صعب نسلمها بالمواصفات المطلوبة والوقت المحدد.\n- عشان نحل هاي المشكلة، ظهرت 'إدارة مشاريع البرمجيات' (Software Project Management)، وهي باختصار دمج أساليب الإدارة العادية مع عملية تطوير البرمجيات عشان نسيطر على التعقيد ونطلع منتج صح.",
+      "page_number": 36,
+      "sticky_note": "📌 كبسولة سريعة: إدارة مشاريع البرمجيات هي الحل السحري لتعقيد البرامج، ظهرت بسبب 'أزمة البرمجيات' في الستينات.",
+      "summary_phrase": "💡 إدارة البرمجيات: دمج الإدارة مع التطوير لحل أزمة التعقيد."
+    },
+    {
+      "title": "شو يعني 'منتج برمجي'؟ أمثلة وتساؤلات!",
+      "example": "🍔 مثال واقعي: تخيل إنك بدك تعمل تطبيق لطلب الأكل. هذا منتج برمجي. لو فشل، يمكن الناس ما تاكل. طيب لو عملت نظام تحكم بفرن مصنع خبز كبير؟ لو فشل، يمكن المصنع كله يوقف ويخسر ملايين، وممكن يصير حريق! الفرق بين المثالين بيوضح ليش لازم نفكر بكل هاي الأسئلة اللي بالشريحة.",
+      "exam_tip": "⚠️ فخ امتحاني: ممكن يجيب لك أمثلة مختلفة ويسألك أيها يتطلب أعلى مستوى من إدارة المخاطر أو الكفاءات. ركز على الأمثلة الحرجة مثل 'automated breaking system'.",
+      "vocabulary": [
+        {
+          "term": "Application",
+          "simple_def": "برنامج صغير لغرض معين.",
+          "translation": "تطبيق"
+        },
+        {
+          "term": "Double-entry accounting system",
+          "simple_def": "نظام محاسبي دقيق.",
+          "translation": "نظام محاسبة القيد المزدوج"
+        },
+        {
+          "term": "Web service",
+          "simple_def": "برنامج يعمل على الإنترنت.",
+          "translation": "خدمة ويب"
+        },
+        {
+          "term": "Automated breaking system",
+          "simple_def": "نظام يوقف شيء تلقائياً.",
+          "translation": "نظام فرملة آلي"
+        },
+        {
+          "term": "Competencies",
+          "simple_def": "قدرات وخبرات.",
+          "translation": "كفاءات / مهارات"
+        },
+        {
+          "term": "Business model",
+          "simple_def": "كيفية تحقيق الربح.",
+          "translation": "نموذج عمل"
+        }
+      ],
+      "explanation": "- يا دكتور، هاي الشريحة بتوريك إنه 'المنتج البرمجي' مش بس تطبيق بسيط على الموبايل، ممكن يكون نظام معقد جداً لشركة كبيرة، أو حتى نظام أمان حيوي زي فرامل قطار!\n- كل نوع من هاي المنتجات له تحدياته الخاصة، ولهذا السبب الأسئلة اللي تحت الأمثلة مهمة جداً:\n  - شو مكوناته؟ (عشان نعرف شو بدنا نبني)\n  - شو ممكن يصير لو فشل؟ (عشان نعرف حجم الكارثة وندير المخاطر)\n  - شو المهارات اللي نحتاجها؟ (عشان نختار الفريق الصح)\n  - كيف رح يجيب مصاري؟ (عشان نعرف قيمته التجارية).",
+      "page_number": 37,
+      "sticky_note": "📌 كبسولة سريعة: المنتجات البرمجية تتنوع من البسيط للمعقد، وكل نوع يتطلب تقييم دقيق للمخاطر والموارد المطلوبة.",
+      "summary_phrase": "💡 المنتج البرمجي: من تطبيق بسيط لسيستم معقد، وكل واحد له تحدياته."
+    },
+    {
+      "title": "إطار عمل تطوير البرمجيات: خارطة طريق النجاح!",
+      "example": "🏗️ مثال واقعي: تخيل إنك بتبني بيت. إطار العمل هو زي المخطط الهندسي اللي بيحدد كل شيء: من الأساسات للجدران للتشطيبات. بيضمن إنه كل العمال عارفين شو لازم يعملوا، بيقلل الأخطاء، وبيخليك تشوف لو في أي انحراف عن المخطط الأصلي (مثلاً، لو عامل بنى جدار بمكان غلط). وبنفس الوقت، بيخلي المهندس يشجع العمال ويتابع شغلهم.",
+      "exam_tip": "⚠️ فخ امتحاني: ممكن يسألك عن أهمية 'Shared Vision' أو 'Reducing Uncertainties' كأحد أهداف إطار العمل. ركز على أن الإطار ليس فقط تقني بل إداري وتحفيزي أيضاً.",
+      "vocabulary": [
+        {
+          "term": "Framework",
+          "simple_def": "هيكل منظم للمشروع.",
+          "translation": "إطار عمل"
+        },
+        {
+          "term": "Shared vision",
+          "simple_def": "هدف واضح للجميع.",
+          "translation": "رؤية مشتركة"
+        },
+        {
+          "term": "Progressive refinement",
+          "simple_def": "تطوير خطوة بخطوة.",
+          "translation": "تحسين تدريجي"
+        },
+        {
+          "term": "Uncertainties and unknowns",
+          "simple_def": "أشياء غير متوقعة.",
+          "translation": "شكوك ومجهولات"
+        },
+        {
+          "term": "Deviation",
+          "simple_def": "خروج عن المسار.",
+          "translation": "انحراف"
+        },
+        {
+          "term": "Coherency",
+          "simple_def": "كل شيء ماشي صح.",
+          "translation": "اتساق / ترابط"
+        },
+        {
+          "term": "Artifacts",
+          "simple_def": "وثائق أو أجزاء من المشروع.",
+          "translation": "مخرجات / نواتج"
+        }
+      ],
+      "explanation": "- يا بطل، إطار عمل تطوير البرمجيات (Software Development Framework) هو زي الدليل أو الخريطة اللي بتمشي عليها عشان مشروعك ينجح.\n- شو فايدته؟ بيخلي كل الفريق على نفس الصفحة (Shared Vision)، بيقسم الشغل لخطوات صغيرة (Progressive Refinement)، بيقلل المفاجآت والمشاكل (Reduce Uncertainties)، وبيخليك تشوف لو في أي شيء ماشي غلط (Highlight Deviation) عشان تصلحه بسرعة.\n- والأهم من كل هذا، بيساعدك تحافظ على جودة الشغل (Coherency and Quality) وبيحفز فريقك (Motivate your team) عشان يشتغلوا بحماس.",
+      "page_number": 38,
+      "sticky_note": "📌 كبسولة سريعة: إطار العمل هو بوصلة المشروع: يوحد الرؤية، ينظم العمل، يقلل المخاطر، ويكشف الأخطاء مبكراً.",
+      "summary_phrase": "💡 إطار العمل: رؤية مشتركة، تنظيم، تقليل مخاطر، ومتابعة مستمرة."
+    },
+    {
+      "title": "هموم إدارة المشاريع: شو اللي بيقلقنا؟",
+      "example": "📱 مثال واقعي: تخيل إنك بتطور تطبيق جديد للموبايل. أول شيء بتعمله هو 'تقييم الجدوى': هل فكرة التطبيق قابلة للتطبيق؟ هل في سوق لها؟ بعدين بتحدد 'نطاق' التطبيق (شو الميزات اللي رح تكون فيه). بتحدد 'الوقت' اللي رح ياخذه و'التكلفة'. لو الزبون طلب ميزة جديدة، لازم تعمل 'إدارة تغيير'. ولو في مشكلة تقنية ممكن تظهر، لازم تعمل 'إدارة مخاطر'. وكل هذا بيتم مع 'إدارة فريق' المبرمجين والمصممين.",
+      "exam_tip": "⚠️ فخ امتحاني: ممكن يسألك عن أي من هذه الجوانب يعتبر الأهم في مرحلة معينة من المشروع، أو يطلب منك تعريف أحد المصطلحات مثل 'Change Control' أو 'Feasibility Assessment'.",
+      "vocabulary": [
+        {
+          "term": "Feasibility Assessment",
+          "simple_def": "هل المشروع ممكن؟",
+          "translation": "تقييم الجدوى"
+        },
+        {
+          "term": "Scope Management",
+          "simple_def": "تحديد حدود المشروع.",
+          "translation": "إدارة النطاق"
+        },
+        {
+          "term": "Change Control",
+          "simple_def": "إدارة طلبات التغيير.",
+          "translation": "التحكم بالتغيير"
+        },
+        {
+          "term": "Configuration Management",
+          "simple_def": "تتبع إصدارات المشروع.",
+          "translation": "إدارة التكوين"
+        },
+        {
+          "term": "Risk Management",
+          "simple_def": "توقع المشاكل وحلها.",
+          "translation": "إدارة المخاطر"
+        },
+        {
+          "term": "Human Resource Management",
+          "simple_def": "إدارة فريق العمل.",
+          "translation": "إدارة الموارد البشرية"
+        }
+      ],
+      "explanation": "- يا بطل، هاي الشريحة بتلخص لك كل الجوانب اللي لازم مدير المشروع يفكر فيها ويديرها عشان المشروع ينجح. تخيلها زي قائمة المهام الكبيرة لمدير المشروع.\n- لازم يبدأ بـ 'تقييم الجدوى' (Feasibility Assessment) عشان يتأكد إنه المشروع أصلاً ممكن يتنفذ.\n- بعدين بيجي دور إدارة الأهداف (Scope)، الوقت (Time)، التكلفة (Cost)، الجودة (Quality)، والمخاطر (Risk).\n- ولا تنسى 'إدارة التغيير' (Change Control) لأنه المشاريع البرمجية دائماً فيها تغييرات، و'إدارة الموارد البشرية' (Human Resource Management) عشان فريقك هو أهم أصل عندك.",
+      "page_number": 39,
+      "sticky_note": "📌 كبسولة سريعة: إدارة المشروع تشمل كل شيء من الجدوى للموارد البشرية، والتحكم بالتغيير والمخاطر نقاط محورية.",
+      "summary_phrase": "💡 هموم المشروع: من الجدوى للوقت للتكلفة للجودة، كل شيء لازم يندار صح."
+    },
+    {
+      "title": "ختام الشريحة: اسم المحاضر",
+      "example": "لا يوجد مثال لهذه الشريحة.",
+      "exam_tip": "⚠️ هذه الشريحة للمقدمة فقط وغير مطلوبة للاختبار.",
+      "vocabulary": [],
+      "explanation": "- يا بطل، هاي الشريحة هي بس عشان نعرف مين المحاضر. ما فيها معلومات جديدة للمادة.",
+      "page_number": 40,
+      "sticky_note": "📌 كبسولة سريعة: هذه الشريحة مجرد توقيع للمحاضر، لا تحتوي على معلومات دراسية.",
+      "summary_phrase": "💡 هذه الشريحة للمقدمة فقط وغير مطلوبة للاختبار."
+    }
+  ]
+}

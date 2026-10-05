@@ -254,15 +254,47 @@ def get_active_quota(user_id: str) -> dict:
     info = get_user_subscription_info(user_id)
     active = info.get("active_subscription")
     plan_name = "مجاني"
+    plan_price = 0.0
+    sub_plan = {}
     if active and "subscription_plans" in active:
-        plan_name = active["subscription_plans"].get("name", "مجاني")
+        sub_plan = active["subscription_plans"] or {}
+        plan_name = sub_plan.get("name", "مجاني")
+        try:
+            plan_price = float(sub_plan.get("price_ils", 0) or 0)
+        except Exception:
+            plan_price = 0.0
 
     profile = info.get("profile") or {}
+    username = profile.get("username") or ""
+    if not username and profile.get("device_metadata"):
+        try:
+            import json
+            meta = json.loads(profile["device_metadata"]) if isinstance(profile["device_metadata"], str) else profile["device_metadata"]
+            username = meta.get("seller_username") or ""
+        except Exception:
+            pass
+
+    # Strictly 100-ILS plan subscribers only can generate academic notebooks
+    plan_name_lower = plan_name.lower()
+    plan_en_lower = str(sub_plan.get("name_en", "")).lower()
+    is_100_plan = bool(
+        active and (
+            plan_price >= 100.0 or
+            "الذهبية" in plan_name or
+            "النخبة" in plan_name or
+            "elite" in plan_name_lower or
+            "full term" in plan_en_lower
+        )
+    )
+
     return {
         "quota_remaining": info.get("quota_remaining", 0),
         "quota_reset_at": profile.get("quota_reset_at"),
         "plan_id": profile.get("current_plan_id"),
         "plan_name": plan_name,
-        "full_name": profile.get("full_name")
+        "plan_price": plan_price,
+        "can_generate_notebook": is_100_plan,
+        "full_name": profile.get("full_name"),
+        "username": username
     }
 

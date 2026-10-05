@@ -3,6 +3,7 @@ import base64
 import glob
 import subprocess
 import requests
+from typing import Optional, List
 from app.core.config import settings
 from app.core.logger import logger
 
@@ -10,215 +11,268 @@ from app.core.logger import logger
 client = None
 is_openrouter = True
 
+
+def get_audio_duration_seconds(file_path: str) -> float:
+    """Returns duration in seconds using ffprobe, or 0.0 on failure."""
+    try:
+        cmd = [
+            "ffprobe", "-v", "error",
+            "-show_entries", "format=duration",
+            "-of", "default=noprint_wrappers=1:nokey=1",
+            file_path
+        ]
+        out = subprocess.check_output(cmd, stderr=subprocess.DEVNULL).decode().strip()
+        return float(out)
+    except Exception as e:
+        logger.warning(f"Could not read duration with ffprobe for {file_path}: {e}")
+        return 0.0
+
+
+def _transcribe_with_qwen3(file_path: str, format_ext: str) -> Optional[str]:
+    """Attempts transcription via OpenRouter Qwen3 ASR Flash."""
+    keys_to_try: List[str] = []
+    if settings.GPT_AUDIO_KEY:
+        keys_to_try.append(settings.GPT_AUDIO_KEY.strip())
+    if settings.OPENROUTER_API_KEY and settings.OPENROUTER_API_KEY.strip() not in keys_to_try:
+        keys_to_try.append(settings.OPENROUTER_API_KEY.strip())
+
+    if not keys_to_try:
+        return None
+
+    try:
+        with open(file_path, "rb") as f:
+            encoded_audio = base64.b64encode(f.read()).decode("utf-8")
+    except Exception as e:
+        logger.error(f"Failed to read/encode audio file {file_path}: {e}")
+        return None
+
+    openrouter_format = format_ext.replace(".", "").lower()
+    if openrouter_format == "m4a":
+        openrouter_format = "mp4"
+
+    model_name = "qwen/qwen3-asr-flash-2026-02-10"
+
+    for key_str in keys_to_try:
+        headers = {
+            "Authorization": f"Bearer {key_str}",
+            "HTTP-Referer": "https://lammah.site",
+            "X-Title": "Lammah AI",
+            "Content-Type": "application/json"
+        }
+        payload = {
+            "model": model_name,
+            "input_audio": {
+                "data": encoded_audio,
+                "format": openrouter_format
+            }
+        }
+        try:
+            logger.info(f"🎙️ [ASR] Trying Qwen3 ASR Flash for {os.path.basename(file_path)}...")
+            response = requests.post(
+                "https://openrouter.ai/api/v1/audio/transcriptions",
+                headers=headers,
+                json=payload,
+                timeout=180
+            )
+            if response.status_code == 200:
+                text = response.json().get("text", "").strip()
+                logger.info(f"✅ [ASR] Qwen3 transcription succeeded ({len(text)} chars)")
+                return text
+            else:
+                logger.warning(f"⚠️ [ASR] Qwen3 failed ({response.status_code}): {response.text[:200]}")
+        except Exception as ex:
+            logger.warning(f"⚠️ [ASR] Qwen3 request exception: {ex}")
+
+    return None
+
+
+def _transcribe_with_groq(file_path: str) -> Optional[str]:
+    """Attempts transcription via Groq Whisper Large V3 (fast, high precision Arabic)."""
+    groq_key = getattr(settings, "GROQ_API_KEY", None)
+    if not groq_key or not groq_key.strip():
+        return None
+
+    try:
+        from groq import Groq
+        groq_client = Groq(api_key=groq_key.strip())
+        logger.info(f"🎙️ [ASR] Fallback to Groq Whisper Large V3 for {os.path.basename(file_path)}...")
+        
+        with open(file_path, "rb") as f:
+            res = groq_client.audio.transcriptions.create(
+                file=(os.path.basename(file_path), f.read(), "audio/mpeg"),
+                model="whisper-large-v3",
+                timeout=120.0
+            )
+        text = (res.text or "").strip()
+        logger.info(f"✅ [ASR] Groq Whisper transcription succeeded ({len(text)} chars)")
+        return text
+    except Exception as ex:
+        logger.warning(f"⚠️ [ASR] Groq Whisper failed: {ex}")
+        return None
+
+
+def _transcribe_with_openrouter_whisper(file_path: str, model_name: str = "openai/whisper-large-v3") -> Optional[str]:
+    """Attempts transcription via OpenRouter OpenAI Whisper."""
+    keys_to_try: List[str] = []
+    if settings.OPENROUTER_API_KEY:
+        keys_to_try.append(settings.OPENROUTER_API_KEY.strip())
+    if settings.GPT_AUDIO_KEY and settings.GPT_AUDIO_KEY.strip() not in keys_to_try:
+        keys_to_try.append(settings.GPT_AUDIO_KEY.strip())
+
+    if not keys_to_try:
+        return None
+
+    try:
+        with open(file_path, "rb") as f:
+            encoded_audio = base64.b64encode(f.read()).decode("utf-8")
+    except Exception as e:
+        logger.error(f"Failed to read/encode audio for Whisper: {e}")
+        return None
+
+    for key_str in keys_to_try:
+        headers = {
+            "Authorization": f"Bearer {key_str}",
+            "HTTP-Referer": "https://lammah.site",
+            "X-Title": "Lammah AI",
+            "Content-Type": "application/json"
+        }
+        payload = {
+            "model": model_name,
+            "input_audio": {
+                "data": encoded_audio,
+                "format": "mp3"
+            }
+        }
+        try:
+            logger.info(f"🎙️ [ASR] Trying OpenRouter {model_name} for {os.path.basename(file_path)}...")
+            response = requests.post(
+                "https://openrouter.ai/api/v1/audio/transcriptions",
+                headers=headers,
+                json=payload,
+                timeout=180
+            )
+            if response.status_code == 200:
+                text = response.json().get("text", "").strip()
+                logger.info(f"✅ [ASR] OpenRouter {model_name} succeeded ({len(text)} chars)")
+                return text
+            else:
+                logger.warning(f"⚠️ [ASR] OpenRouter {model_name} failed ({response.status_code}): {response.text[:200]}")
+        except Exception as ex:
+            logger.warning(f"⚠️ [ASR] OpenRouter {model_name} error: {ex}")
+
+    return None
+
+
+def _transcribe_single_segment(file_path: str, format_ext: str = "mp3") -> str:
+    """
+    Transcribes a single audio file or chunk with multi-tier fallback:
+    1. Qwen3 ASR Flash (OpenRouter)
+    2. Groq Whisper Large V3
+    3. OpenRouter Whisper Large V3
+    4. OpenRouter Whisper-1
+    """
+    # Tier 1: Qwen3 ASR Flash
+    result = _transcribe_with_qwen3(file_path, format_ext)
+    if result is not None:
+        return result
+
+    # Tier 2: Groq Whisper Large V3
+    result = _transcribe_with_groq(file_path)
+    if result is not None:
+        return result
+
+    # Tier 3: OpenRouter Whisper Large V3
+    result = _transcribe_with_openrouter_whisper(file_path, "openai/whisper-large-v3")
+    if result is not None:
+        return result
+
+    # Tier 4: OpenRouter Whisper-1
+    result = _transcribe_with_openrouter_whisper(file_path, "openai/whisper-1")
+    if result is not None:
+        return result
+
+    raise RuntimeError("فشلت جميع محركات التفريغ الصوتي في معالجة الملف. يرجى التحقق من جودة الصوت أو المحاولة لاحقاً.")
+
+
 def transcribe_audio(file_path: str, progress_callback=None) -> str:
     """
-    Transcribes audio file using strictly Qwen3 ASR Flash API via OpenRouter.
-    Handles extra-large files by chunking them gracefully via ffmpeg if > 2MB.
+    Main transcription entry point:
+    - Automatically checks duration and size.
+    - If > 180 seconds (~3 min) or > 2.0 MB, chunks the file into 3-minute segments
+      to stay within provider duration limits and generate timestamps.
+    - Uses robust multi-tier fallback across Qwen3, Groq Whisper, and OpenRouter Whisper.
     """
     if not os.path.exists(file_path):
         raise FileNotFoundError(f"Audio file not found: {file_path}")
-        
+
     file_size_mb = os.path.getsize(file_path) / (1024 * 1024)
+    duration_sec = get_audio_duration_seconds(file_path)
+
     if progress_callback:
-        progress_callback(f"📦 حجم الملف: {file_size_mb:.2f} ميجابايت")
-    
-    if file_size_mb > 2.0:  # Auto-chunk files > 2MB for beautiful 5-minute timestamps!
+        progress_callback(f"📦 حجم الملف: {file_size_mb:.2f} ميجابايت (المدة: {int(duration_sec // 60)} دقيقة و {int(duration_sec % 60)} ثانية)")
+
+    # If audio is longer than 180 seconds or larger than 2.0 MB, chunk into 3-minute segments
+    if duration_sec > 180.0 or file_size_mb > 2.0:
         return _transcribe_large_audio(file_path, progress_callback)
-    
+
     if progress_callback:
         progress_callback("⚡ إرسال الملف لمحرك لمّاح الذكي...")
-    
-    try:
-        if progress_callback:
-            progress_callback("⚡ جاري الإرسال لمحرك لمّاح الصوتي الذكي...")
-        
-        # Get all available OpenRouter keys to try
-        keys_to_try = []
-        if settings.GPT_AUDIO_KEY:
-            keys_to_try.append(settings.GPT_AUDIO_KEY.strip())
-        if settings.OPENROUTER_API_KEY and settings.OPENROUTER_API_KEY.strip() not in keys_to_try:
-            keys_to_try.append(settings.OPENROUTER_API_KEY.strip())
-        
-        if not keys_to_try:
-            raise RuntimeError("No OpenRouter keys configured.")
-            
-        # Encode file to base64 (raw string, no prefix)
-        with open(file_path, "rb") as f:
-            encoded_audio = base64.b64encode(f.read()).decode('utf-8')
-        
-        ext = os.path.splitext(file_path)[1].replace(".", "").lower()
-        if ext == "m4a":
-            ext = "mp4"  # OpenRouter mapping
-            
-        model_name = "qwen/qwen3-asr-flash-2026-02-10"
-        last_error = ""
-        success = False
-        transcription_text = ""
-        
-        for key_str in keys_to_try:
-            headers = {
-                "Authorization": f"Bearer {key_str}",
-                "HTTP-Referer": "https://lammah.site",
-                "X-Title": "Lammah AI",
-                "Content-Type": "application/json"
-            }
-            try:
-                logger.info(f"🌐 [OR-FIX] Trying model: {model_name} with format: {ext}")
-                payload = {
-                    "model": model_name,
-                    "input_audio": {
-                        "data": encoded_audio,
-                        "format": ext
-                    }
-                }
-                
-                response = requests.post(
-                    "https://openrouter.ai/api/v1/audio/transcriptions",
-                    headers=headers,
-                    json=payload,
-                    timeout=300
-                )
-                
-                if response.status_code == 200:
-                    transcription_text = response.json().get("text", "")
-                    success = True
-                    break
-                else:
-                    last_error = f"Model {model_name} failed ({response.status_code}): {response.text}"
-                    logger.warning(last_error)
-                    continue 
-            except Exception as inner_e:
-                last_error = str(inner_e)
-                logger.error(f"❌ Error with model {model_name}: {last_error}")
-                continue
 
-        if success:
-            return transcription_text
-        
-        raise RuntimeError(f"OpenRouter failed Qwen3. Last error: {last_error}")
-    except Exception as e:
-        logger.error(f"❌ OpenRouter process error: {e}")
-        raise e
+    ext = os.path.splitext(file_path)[1].replace(".", "").lower() or "mp3"
+    return _transcribe_single_segment(file_path, ext)
 
 
 def _transcribe_large_audio(file_path: str, progress_callback=None) -> str:
-    """Splits large audio into 5-minute chunks and concatenates the transcriptions."""
+    """Splits large audio into 3-minute chunks and concatenates the transcriptions with timestamps."""
     chunk_dir = f"{file_path}_chunks"
     os.makedirs(chunk_dir, exist_ok=True)
-    
+
+    segment_seconds = 180  # 3-minute segments ensure Qwen3 provider limit (<290s) is never hit
+
     if progress_callback:
-        progress_callback("✂️ جاري تقسيم الملف لمقاطع (5 دقائق) لتوليد التوقيتات...")
-        
-    # Split into 5-minute segments using ffmpeg
+        progress_callback("✂️ جاري تقسيم الملف لمقاطع (3 دقائق) لتوليد التوقيتات الدقيقة...")
+
     try:
         subprocess.run([
             "ffmpeg", "-y", "-i", file_path,
-            "-f", "segment", "-segment_time", "300",
-            "-c:a", "libmp3lame", "-b:a", "48k", "-ac", "1",  # Re-encode to small mono MP3 for high reliability
+            "-f", "segment", "-segment_time", str(segment_seconds),
+            "-c:a", "libmp3lame", "-b:a", "48k", "-ac", "1",  # 48kbps mono MP3 (~1MB per 3 min)
             f"{chunk_dir}/chunk_%03d.mp3"
         ], check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     except subprocess.CalledProcessError as e:
         logger.error(f"❌ FFMPEG SPLIT FAILED: {e}")
-        raise RuntimeError("فشل لمّاح في تجهيز الملف الصوتي. يرجى التأكد من أن الملف سليم وغير تالف.")
-        
+        raise RuntimeError("فشل لمّاح في تجهيز وتجزئة الملف الصوتي. يرجى التأكد من أن الملف سليم وغير تالف.")
+
     chunks = sorted(glob.glob(f"{chunk_dir}/chunk_*.mp3"))
     if not chunks:
         raise RuntimeError("لم يتم إنتاج أي مقاطع من عملية التقسيم.")
-        
-    full_transcript = []
-    
+
+    full_transcript: List[str] = []
+
     for idx, chunk_path in enumerate(chunks):
         if progress_callback:
             progress_callback(f"🎧 جاري تفريغ المقطع {idx+1} من {len(chunks)}...")
-            
-        retries = 10
-        success = False
-        for attempt in range(retries):
+
+        try:
+            chunk_text = _transcribe_single_segment(chunk_path, "mp3")
+            m_start = idx * 3
+            m_end = (idx + 1) * 3
+            timestamp_label = f"\n\n⏱️ [{m_start:02d}:00 - {m_end:02d}:00]\n"
+            full_transcript.append(timestamp_label + chunk_text)
+        except Exception as e:
+            logger.error(f"❌ Chunk {idx+1} failed: {e}")
+            raise RuntimeError(f"فشل تفريغ المقطع #{idx+1} بعد استنفاد كافة المحركات المتاحة: {e}")
+        finally:
             try:
-                logger.info(f"🎙️ لمّاح يحاول التفريغ (محاولة {attempt+1}/{retries})...")
-                
-                # Get all available OpenRouter keys to try
-                keys_to_try = []
-                if settings.GPT_AUDIO_KEY:
-                    keys_to_try.append(settings.GPT_AUDIO_KEY.strip())
-                if settings.OPENROUTER_API_KEY and settings.OPENROUTER_API_KEY.strip() not in keys_to_try:
-                    keys_to_try.append(settings.OPENROUTER_API_KEY.strip())
-                
-                if not keys_to_try:
-                    raise RuntimeError("No OpenRouter keys configured.")
-                    
-                # Encode chunk to base64
-                with open(chunk_path, "rb") as f:
-                    encoded_chunk = base64.b64encode(f.read()).decode('utf-8')
-                
-                model_name = "qwen/qwen3-asr-flash-2026-02-10"
-                chunk_success = False
-                
-                for key_str in keys_to_try:
-                    headers = {
-                        "Authorization": f"Bearer {key_str}",
-                        "HTTP-Referer": "https://lammah.site",
-                        "X-Title": "Lammah AI",
-                        "Content-Type": "application/json"
-                    }
-                    try:
-                        logger.info(f"🎙️ [LAMMAH] Transcribing chunk with model: {model_name}")
-                        payload = {
-                            "model": model_name,
-                            "input_audio": {
-                                "data": encoded_chunk,
-                                "format": "mp3"
-                            }
-                        }
-                        
-                        response = requests.post(
-                            "https://openrouter.ai/api/v1/audio/transcriptions",
-                            headers=headers,
-                            json=payload,
-                            timeout=300
-                        )
-                        
-                        if response.status_code == 200:
-                            chunk_text = response.json().get("text", "").strip()
-                            m_start = idx * 5
-                            m_end = (idx + 1) * 5
-                            timestamp_label = f"\n\n⏱️ [{m_start:02d}:00 - {m_end:02d}:00]\n"
-                            full_transcript.append(timestamp_label + chunk_text)
-                            success = True
-                            chunk_success = True
-                            break
-                        else:
-                            logger.warning(f"Chunk fail with {model_name} ({response.status_code}): {response.text}")
-                    except Exception as chunk_e:
-                        logger.error(f"Chunk error with {model_name}: {chunk_e}")
-                        continue
-                
-                if chunk_success:
-                    break
-                else:
-                    raise RuntimeError(f"Qwen3 failed for chunk {idx}")
-            except Exception as e:
-                err_msg = str(e)
-                logger.error(f"❌ CHUNK {idx} FAILED (Attempt {attempt+1}): {err_msg}")
-                
-                if not success:
-                    if attempt < retries - 1:
-                        import time
-                        time.sleep(5)
-                        continue
-                    else:
-                        raise RuntimeError(f"⚠️ عذراً، محرك لمّاح يواجه ضغطاً شديداً حالياً. (REV-777)")
-        
-        if not success:
-            raise RuntimeError("فشل تفريغ أحد المقاطع بعد عدة محاولات مكثفة. يرجى المحاولة لاحقاً.")
-            
-        # Cleanup chunk
-        os.remove(chunk_path)
-        
-    # Cleanup directory
+                if os.path.exists(chunk_path):
+                    os.remove(chunk_path)
+            except Exception:
+                pass
+
     try:
-        os.rmdir(chunk_dir)
+        if os.path.exists(chunk_dir):
+            os.rmdir(chunk_dir)
     except Exception:
         pass
-        
-    return " ".join(full_transcript)
+
+    return " ".join(full_transcript).strip()

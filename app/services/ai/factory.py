@@ -1,4 +1,4 @@
-from typing import Optional
+from typing import Optional, List, Any
 from langchain_openai import ChatOpenAI
 from app.core.config import settings
 import logging
@@ -7,24 +7,74 @@ logger = logging.getLogger(__name__)
 
 def get_llm_for_user(user_id: Optional[str] = None, streaming: bool = False):
     """
-    Returns MiniMax M2.7 via OpenRouter for all users.
-    Gemini and Groq fallbacks have been removed — MiniMax M2.7 is the only model.
+    Returns an LLM client with automatic resilient fallbacks:
+    1. Primary: Google Gemini 2.5 Flash via OpenRouter (if OPENROUTER_API_KEY configured)
+    2. Fallback 1: Google Gemini direct via ChatGoogleGenerativeAI (if GEMINI_API_KEY configured)
+    3. Fallback 2: Groq LLaMA 3.3 70B via OpenAI-compatible endpoint (if GROQ_API_KEY configured)
     """
+    primary_llm = None
+    fallbacks: List[Any] = []
+
+    # 1. Primary: OpenRouter
     if settings.OPENROUTER_API_KEY:
-        logger.info(f"[LLM] Using MiniMax M2.7 via OpenRouter for user {user_id}")
-        return ChatOpenAI(
-            model="minimax/minimax-m2.7",
+        primary_llm = ChatOpenAI(
+            model="google/gemini-2.5-flash",
             openai_api_key=settings.OPENROUTER_API_KEY,
             base_url="https://openrouter.ai/api/v1",
             temperature=0.2,
             streaming=streaming,
-            request_timeout=90,
-            max_retries=1,
+            request_timeout=120,
+            max_retries=2,
             default_headers={
                 "HTTP-Referer": "https://lammah.site",
                 "X-Title": "Lammah Platform"
             }
         )
 
-    logger.error("[LLM] OPENROUTER_API_KEY is not configured! Cannot return any LLM.")
-    raise RuntimeError("OPENROUTER_API_KEY is not configured. Please set it in your .env file.")
+    # 2. Fallback 1: Google Gemini Direct
+    if settings.GEMINI_API_KEY:
+        try:
+            from langchain_google_genai import ChatGoogleGenerativeAI
+            gemini_llm = ChatGoogleGenerativeAI(
+                model="gemini-2.5-flash",
+                google_api_key=settings.GEMINI_API_KEY,
+                temperature=0.2,
+                streaming=streaming,
+                max_retries=2
+            )
+            if primary_llm is None:
+                primary_llm = gemini_llm
+            else:
+                fallbacks.append(gemini_llm)
+        except Exception as e:
+            logger.warning(f"[LLM] Failed to initialize Gemini fallback: {e}")
+
+    # 3. Fallback 2: Groq via OpenAI client
+    if settings.GROQ_API_KEY:
+        try:
+            groq_llm = ChatOpenAI(
+                model="llama-3.3-70b-versatile",
+                openai_api_key=settings.GROQ_API_KEY,
+                base_url="https://api.groq.com/openai/v1",
+                temperature=0.2,
+                streaming=streaming,
+                request_timeout=120,
+                max_retries=2
+            )
+            if primary_llm is None:
+                primary_llm = groq_llm
+            else:
+                fallbacks.append(groq_llm)
+        except Exception as e:
+            logger.warning(f"[LLM] Failed to initialize Groq fallback: {e}")
+
+    if primary_llm is None:
+        logger.error("[LLM] No AI API keys configured (OPENROUTER_API_KEY, GEMINI_API_KEY, GROQ_API_KEY)!")
+        raise RuntimeError("No AI API keys configured. Please configure OPENROUTER_API_KEY, GEMINI_API_KEY, or GROQ_API_KEY.")
+
+    if fallbacks:
+        logger.info(f"[LLM] Returning primary LLM with {len(fallbacks)} configured fallback provider(s) for user {user_id}")
+        return primary_llm.with_fallbacks(fallbacks)
+
+    logger.info(f"[LLM] Returning primary LLM for user {user_id}")
+    return primary_llm

@@ -1,5 +1,5 @@
-from fastapi import APIRouter, File, UploadFile, HTTPException, Depends, Request, Form, BackgroundTasks
-from fastapi.responses import StreamingResponse
+from fastapi import APIRouter, File, UploadFile, HTTPException, Depends, Request, Form, BackgroundTasks, Query
+from fastapi.responses import StreamingResponse, FileResponse
 import shutil
 import os
 import uuid
@@ -9,13 +9,13 @@ import asyncio
 import subprocess
 import re
 from pydantic import BaseModel
-from typing import List, Optional
+from typing import List, Optional, Any, Dict
 from app.services.audio_service import transcribe_audio
 from app.services.pdf_service import extract_pages_from_pdf
 from app.services.ai.orchestrator import AIOrchestrator
 from app.services.subscription_service import use_lecture_quota, log_usage_failure, get_supabase, refund_lecture_quota
 from app.services.link_ingest_service import download_audio_from_link
-from app.core.auth_guard import check_quota, verify_phone_active, get_user_profile, verify_token
+from app.core.auth_guard import check_quota, verify_phone_active, get_user_profile, verify_token, verify_admin
 from app.core.queue_manager import queue_manager, JobStatus
 from app.core.logger import logger
 from app.services.ai.factory import get_llm_for_user
@@ -98,11 +98,15 @@ async def background_worker(row: LectureRow, user_id: str, plan_name: str, histo
     Updates progress in Supabase usage_logs table.
     """
     supabase = get_supabase()
-    def update_progress(step: str, message: str, is_error: bool = False, is_done: bool = False, result: dict = None):
+    def update_progress(step: str, message: str, is_error: bool = False, is_done: bool = False, result: Optional[dict] = None):
         try:
             # Re-fetch current metadata to avoid overwriting other fields
             res = supabase.table("usage_logs").select("metadata").eq("id", history_id).execute()
-            meta = res.data[0].get("metadata", {}) if res.data else {}
+            meta: dict[str, Any] = {}
+            if res.data and isinstance(res.data[0], dict):
+                raw_meta = res.data[0].get("metadata")
+                if isinstance(raw_meta, dict):
+                    meta = raw_meta
             
             meta["progress_step"] = step
             meta["message"] = message
@@ -158,6 +162,13 @@ async def background_worker(row: LectureRow, user_id: str, plan_name: str, histo
             if os.path.exists(temp_p):
                 pdf_path = os.path.join(upload_dir, f"{unique_id}_{row.pdf_temp_id}")
                 shutil.move(temp_p, pdf_path)
+                
+                # If PPTX, immediately convert to PDF as the canonical single source of truth
+                if pdf_path.lower().endswith((".pptx", ".ppt")):
+                    update_progress("1/5", "📑 جاري تحويل ملف البوربوينت إلى PDF لضمان مطابقة الشرائح 100%...")
+                    from app.services.pptx_converter import convert_pptx_to_pdf
+                    pdf_path = await asyncio.to_thread(convert_pptx_to_pdf, pdf_path, upload_dir)
+                    logger.info(f"[BG_WORKER] PPTX converted immediately to PDF: {pdf_path}")
 
         is_document_only = (audio_path is None)
 
@@ -192,29 +203,25 @@ async def background_worker(row: LectureRow, user_id: str, plan_name: str, histo
             transcript = ""
         else:
             update_progress("3/5", "🎧 جاري تحويل الكلام إلى نص بدقة عالية...")
+            if not audio_path:
+                raise ValueError("لم يتم توفير ملف صوتي للمعالجة")
             transcript = await asyncio.to_thread(transcribe_audio, audio_path)
         
         # 6. PDF and AI
         pdf_context = []
         if pdf_path:
-            if pdf_path.lower().endswith(".pptx"):
-                update_progress("3/5", "📑 جاري استخراج محتوى شرائح البوربوينت...")
-                from app.services.pptx_converter import extract_text_from_pptx
-                pptx_pages = await asyncio.to_thread(extract_text_from_pptx, pdf_path)
-                logger.info(f"[PROCESS_LECTURE] PPTX extracted {len(pptx_pages)} slides from {pdf_path}")
-                if is_free_trial:
-                    pptx_pages = pptx_pages[:6]
-                pdf_context = [f"--- الشريحة {p['page_number']} ---\n{p['text']}" for p in pptx_pages]
-            else:
-                update_progress("3/5", "🔍 جاري تحليل محتوى الشرائح...")
-                pages = await asyncio.to_thread(extract_pages_from_pdf, pdf_path)
-                logger.info(f"[PROCESS_LECTURE] PDF extracted {len(pages)} pages from {pdf_path}")
-                if is_free_trial:
-                    pages = pages[:6]
-                pdf_context = [p['text'] for p in pages]
+            update_progress("3/5", "🔍 جاري تحليل محتوى الشرائح بدقة...")
+            pages = await asyncio.to_thread(extract_pages_from_pdf, pdf_path)
+            logger.info(f"[BG_WORKER] PDF extracted {len(pages)} pages from {pdf_path}")
+            if is_free_trial:
+                pages = pages[:6]
+            pdf_context = [f"--- الشريحة {p['page_number']} ---\n{p['text']}" for p in pages]
 
 
-        update_progress("4/5", "🧠 لمّاح يفكّر الآن... جاري استنتاج أهم النقاط...")
+        if is_document_only:
+            update_progress("4/5", "🧠 لمّاح يخطط الشرائح ويشرحها بالعامية ويترجم المصطلحات...")
+        else:
+            update_progress("4/5", "🧠 لمّاح يفكّر الآن... جاري استنتاج أهم النقاط...")
         orchestrator = AIOrchestrator()
         llm = get_llm_for_user(user_id)
         annotations = await orchestrator.generate_complete_annotations(llm, transcript, pdf_context)
@@ -237,22 +244,28 @@ async def background_worker(row: LectureRow, user_id: str, plan_name: str, histo
             output_pdf_path = os.path.join(base_dir, "outputs", f"{job.job_id}.pdf")
             os.makedirs(os.path.dirname(output_pdf_path), exist_ok=True)
             
-            annotatable_pdf_path = pdf_path
-            if pdf_path.lower().endswith(".pptx"):
-                try:
-                    from app.services.pptx_converter import convert_pptx_to_pdf
-                    annotatable_pdf_path = await asyncio.to_thread(convert_pptx_to_pdf, pdf_path, os.path.dirname(pdf_path))
-                except Exception as pptx_err:
-                    logger.error(f"Failed to convert PPTX to PDF for annotation: {pptx_err}")
-                    raise Exception("فشل تحويل ملف البوربوينت إلى PDF للرسم والتلوين. يرجى رفع ملف PDF مباشرة.")
-            
             from app.services.pdf_annotator import annotate_pdf
-            await asyncio.to_thread(annotate_pdf, annotatable_pdf_path, output_pdf_path, annotations, is_free_trial)
+            await asyncio.to_thread(annotate_pdf, pdf_path, output_pdf_path, annotations, is_free_trial)
             download_url = f"/api/v1/summarize/download/{job.job_id}.pdf"
 
 
         # Generate AI Title
         ai_title = await generate_ai_title(llm, transcript, pdf_context)
+
+        # Save sidecar metadata for downloads
+        if pdf_path:
+            try:
+                meta_path = os.path.join(base_dir, "outputs", f"{job.job_id}.meta.json")
+                with open(meta_path, "w", encoding="utf-8") as mf:
+                    json.dump({
+                        "title": ai_title,
+                        "has_audio": bool(audio_path),
+                        "has_pdf": bool(pdf_path),
+                        "is_prep": not bool(audio_path),
+                        "type": "summarize"
+                    }, mf, ensure_ascii=False)
+            except Exception as meta_e:
+                logger.warning(f"Failed to write sidecar meta for {job.job_id}: {meta_e}")
 
         update_progress("تم", "✅ المعالجة اكتملت بنجاح", is_done=True, result={
             "title": ai_title,
@@ -304,10 +317,10 @@ async def batch_process(req: BatchRequest, bg_tasks: BackgroundTasks, profile=De
         if not history_id:
             continue
             
-        supabase.table("usage_logs").update({"status": "processing"}).eq("id", history_id).execute()
+        supabase.table("usage_logs").update({"status": "processing"}).eq("id", str(history_id)).execute()
         
-        bg_tasks.add_task(background_worker, row, user_id, plan_name, history_id, is_free_trial)
-        results.append({"row_id": row.row_id, "history_id": history_id})
+        bg_tasks.add_task(background_worker, row, user_id, plan_name, str(history_id), is_free_trial)
+        results.append({"row_id": row.row_id, "history_id": str(history_id)})
     
     return {"status": "success", "jobs": results}
 
@@ -316,12 +329,13 @@ async def get_job_status(history_id: str):
     """Pollable endpoint for background job status."""
     supabase = get_supabase()
     res = supabase.table("usage_logs").select("*").eq("id", history_id).execute()
-    if not res.data:
+    if not res.data or not isinstance(res.data[0], dict):
         raise HTTPException(status_code=404, detail="Job not found")
         
-    log = res.data[0]
-    meta = log.get("metadata", {})
-    status = log["status"]
+    log: dict[str, Any] = res.data[0]
+    raw_meta = log.get("metadata", {})
+    meta: dict[str, Any] = raw_meta if isinstance(raw_meta, dict) else {}
+    status = str(log.get("status", ""))
     
     ui_status = status
     if status == "success" and meta.get("progress_step") != "تم":
@@ -525,7 +539,7 @@ async def process_batch_lectures(
             while job.status == JobStatus.QUEUED:
                 status = queue_manager.get_job_status(job.job_id)
                 current_msg = queue_messages[msg_idx % len(queue_messages)]
-                pos = status['position']
+                pos = status['position'] if (status and 'position' in status) else 1
                 yield f"data: {json.dumps({'type': 'queued', 'position': pos, 'message': f'#{pos} | {current_msg}'}, ensure_ascii=False)}\n\n"
                 msg_idx += 1
                 await asyncio.sleep(4)
@@ -578,6 +592,10 @@ async def process_batch_lectures(
             # 6. Document Handling
             pdf_context = []
             if pdf_path:
+                if pdf_path.lower().endswith((".pptx", ".ppt")):
+                    yield f"data: {json.dumps({'type': 'progress', 'step': '2/5', 'message': '📑 2/5 جاري تحويل ملف البوربوينت إلى PDF لضمان المطابقة 100%...'}, ensure_ascii=False)}\n\n"
+                    from app.services.pptx_converter import convert_pptx_to_pdf
+                    pdf_path = await asyncio.to_thread(convert_pptx_to_pdf, pdf_path, os.path.dirname(pdf_path))
                 yield f"data: {json.dumps({'type': 'progress', 'step': '2/5', 'message': '🔍 2/5 جاري قراءة محتوى الشابتر المرفق بدقة هندسية...'}, ensure_ascii=False)}\n\n"
                 pdf_pages = await asyncio.to_thread(extract_pages_from_pdf, pdf_path)
                 pdf_context = [f"--- Page {p['page_number']} ---\n{p['text']}" for p in pdf_pages[:150]]
@@ -597,7 +615,7 @@ async def process_batch_lectures(
             
             if not anno_task.done():
                 anno_task.cancel()
-                annotations = {"highlights": [], "sticky_notes": [], "slide_explanations": [], "mcqs": [], "flashcards": []}
+                annotations: dict[str, Any] = {"highlights": [], "sticky_notes": [], "slide_explanations": [], "mcqs": [], "flashcards": []}
             else:
                 annotations = await anno_task
 
@@ -633,19 +651,21 @@ async def process_batch_lectures(
                 output_pdf_path = os.path.join(base_dir_out, "outputs", f"{unique_id}.pdf")
                 os.makedirs(os.path.dirname(output_pdf_path), exist_ok=True)
 
-                annotatable_pdf_path = pdf_path
-                if pdf_path.lower().endswith(".pptx"):
-                    try:
-                        from app.services.pptx_converter import convert_pptx_to_pdf
-                        annotatable_pdf_path = await asyncio.to_thread(convert_pptx_to_pdf, pdf_path, os.path.dirname(pdf_path))
-                    except Exception as pptx_err:
-                        logger.error(f"Failed to convert PPTX to PDF for batch annotation: {pptx_err}")
-                        yield f"data: {json.dumps({'type': 'error', 'message': 'فشل تحويل ملف البوربوينت إلى PDF للرسم والتلوين. يرجى رفع ملف PDF مباشرة.'}, ensure_ascii=False)}\n\n"
-                        return
-
                 from app.services.pdf_annotator import annotate_pdf
-                await asyncio.to_thread(annotate_pdf, annotatable_pdf_path, output_pdf_path, annotations, is_free_trial)
+                await asyncio.to_thread(annotate_pdf, pdf_path, output_pdf_path, annotations, is_free_trial)
                 download_url = f"/api/v1/summarize/download/{unique_id}.pdf"
+                try:
+                    meta_path = os.path.join(base_dir_out, "outputs", f"{unique_id}.meta.json")
+                    with open(meta_path, "w", encoding="utf-8") as mf:
+                        json.dump({
+                            "title": ai_title,
+                            "has_audio": True,
+                            "has_pdf": bool(pdf_path),
+                            "is_prep": False,
+                            "type": "summarize"
+                        }, mf, ensure_ascii=False)
+                except Exception as meta_e:
+                    logger.warning(f"Failed to write sidecar meta for {unique_id}: {meta_e}")
 
 
             # Emit events matching what the frontend stream reader expects (metadata + done)
@@ -779,6 +799,7 @@ async def process_lecture(
 
     async def event_stream():
         nonlocal audio_path, pdf_path
+        actual_pdf_path: Optional[str] = None
         try:
             # 0. Flush initial headers & Padding
             padding = ":" + " " * 1024 + "\n\n"
@@ -826,32 +847,41 @@ async def process_lecture(
             duration_seconds = 0
             import math
 
+            # Convert PPTX to PDF immediately as the single source of truth for quota, AI, and annotation
+            if pdf_path and (pdf_path.lower().endswith(".pptx") or pdf_path.lower().endswith(".ppt")):
+                yield f"data: {json.dumps({'type': 'progress', 'step': '0/5', 'message': '📑 جاري تحويل ملف البوربوينت إلى PDF لضمان مطابقة الشرائح 100%...'}, ensure_ascii=False)}\n\n"
+                from app.services.pptx_converter import convert_pptx_to_pdf
+                temp_pdf_dir = os.path.dirname(pdf_path)
+                pdf_path = await asyncio.to_thread(convert_pptx_to_pdf, pdf_path, temp_pdf_dir)
+                logger.info(f"[PROCESS_LECTURE] PPTX converted immediately to PDF: {pdf_path}")
+
             if is_document_only:
                 # Calculate cost based on PDF page count
                 yield f"data: {json.dumps({'type': 'progress', 'step': '0/5', 'message': '📏 جاري حساب حجم الوثيقة وتكلفة المعالجة...'}, ensure_ascii=False)}\n\n"
                 try:
-                    if pdf_path and pdf_path.lower().endswith(".pptx"):
-                        from app.services.pptx_converter import extract_text_from_pptx
-                        pptx_pages_cost = await asyncio.to_thread(extract_text_from_pptx, pdf_path)
-                        num_pages = len(pptx_pages_cost)
-                    elif pdf_path:
+                    if pdf_path:
                         pages_cost = await asyncio.to_thread(extract_pages_from_pdf, pdf_path)
                         num_pages = len(pages_cost)
                     else:
                         num_pages = 10
+
+                    if is_free_trial:
+                        num_pages = min(num_pages, 6)
+
                     # 1 minute per 2 slides/pages, minimum 3 minutes
                     calculated_cost = max(3, math.ceil(num_pages / 2))
                 except Exception:
-                    calculated_cost = 5
+                    calculated_cost = 3 if is_free_trial else 5
             else:
                 yield f"data: {json.dumps({'type': 'progress', 'step': '0/5', 'message': '📏 جاري فحص مدة المحاضرة وحساب الحصة...'}, ensure_ascii=False)}\n\n"
                 try:
                     import subprocess
                     cmd = ["ffprobe", "-v", "error", "-show_entries", "format=duration", "-of", "default=noprint_wrappers=1:nokey=1", audio_path]
-                    duration_str = (await asyncio.to_thread(subprocess.check_output, cmd)).decode().strip()
+                    raw_out = await asyncio.to_thread(subprocess.check_output, cmd)
+                    duration_str = raw_out.decode().strip() if isinstance(raw_out, bytes) else str(raw_out).strip()
                     duration_seconds = float(duration_str)
                 except Exception:
-                    duration_seconds = os.path.getsize(audio_path) / (128000 / 8)
+                    duration_seconds = (os.path.getsize(audio_path) / (128000 / 8)) if (audio_path and os.path.exists(audio_path)) else 60.0
 
                 if is_free_trial:
                     duration_seconds = min(duration_seconds, 300)
@@ -903,7 +933,7 @@ async def process_lecture(
             while job.status == JobStatus.QUEUED:
                 status = queue_manager.get_job_status(job.job_id)
                 current_msg = queue_messages[msg_idx % len(queue_messages)]
-                pos = status['position']
+                pos = status['position'] if (status and 'position' in status) else 1
                 yield f"data: {json.dumps({'type': 'queued', 'position': pos, 'message': f'#{pos} | {current_msg}'}, ensure_ascii=False)}\n\n"
                 msg_idx += 1
                 await asyncio.sleep(4)
@@ -918,6 +948,9 @@ async def process_lecture(
                 yield f"data: {json.dumps({'type': 'progress', 'step': '1/5', 'message': '📄 1/5 وضع الوثيقة فقط: سيتم توليد الملخص مباشرة من الملف...'}, ensure_ascii=False)}\n\n"
             else:
                 yield f"data: {json.dumps({'type': 'progress', 'step': '1/5', 'time_estimate': 180, 'message': '🎧 1/5 جاري تفريغ الصوت آلياً... نعدك بدقة عالية!'}, ensure_ascii=False)}\n\n"
+                if not audio_path:
+                    yield f"data: {json.dumps({'type': 'error', 'message': 'لم يتم العثور على مسار الملف الصوتي للتفريغ.'}, ensure_ascii=False)}\n\n"
+                    return
                 
                 import queue
                 progress_q = queue.Queue()
@@ -947,17 +980,10 @@ async def process_lecture(
             pdf_context = []
             if pdf_path:
                 max_pages = 6 if is_free_trial else 150
-                if pdf_path.lower().endswith(".pptx"):
-                    yield f"data: {json.dumps({'type': 'progress', 'step': '2/5', 'message': '📑 2/5 اكتشفنا ملف بوربوينت! جاري استخراج محتوى الشرائح...'}, ensure_ascii=False)}\n\n"
-                    from app.services.pptx_converter import extract_text_from_pptx
-                    pptx_pages = await asyncio.to_thread(extract_text_from_pptx, pdf_path)
-                    logger.info(f"[PROCESS_LECTURE] PPTX extracted {len(pptx_pages)} slides from {pdf_path}")
-                    pdf_context = [f"--- الشريحة {p['page_number']} ---\n{p['text']}" for p in pptx_pages[:max_pages]]
-                else:
-                    yield f"data: {json.dumps({'type': 'progress', 'step': '2/5', 'message': '🔍 2/5 جاري قراءة محتوى الشرائح بدقة هندسية...'}, ensure_ascii=False)}\n\n"
-                    pdf_pages = await asyncio.to_thread(extract_pages_from_pdf, pdf_path)
-                    logger.info(f"[PROCESS_LECTURE] PDF extracted {len(pdf_pages)} pages from {pdf_path}")
-                    pdf_context = [f"--- Page {p['page_number']} ---\n{p['text']}" for p in pdf_pages[:max_pages]]
+                yield f"data: {json.dumps({'type': 'progress', 'step': '2/5', 'message': '🔍 2/5 جاري قراءة محتوى الشرائح بدقة هندسية...'}, ensure_ascii=False)}\n\n"
+                pdf_pages = await asyncio.to_thread(extract_pages_from_pdf, pdf_path)
+                logger.info(f"[PROCESS_LECTURE] PDF extracted {len(pdf_pages)} pages from {pdf_path}")
+                pdf_context = [f"--- الشريحة {p['page_number']} ---\n{p['text']}" for p in pdf_pages[:max_pages]]
 
                 if not pdf_context:
                     logger.warning(f"[PROCESS_LECTURE] pdf_context is EMPTY after extraction — file may be image-based or corrupted: {pdf_path}")
@@ -982,7 +1008,7 @@ async def process_lecture(
             if not anno_task.done():
                 anno_task.cancel()
                 logger.warning("[ORCHESTRATOR] AI timeout after 10 minutes — returning empty annotations.")
-                annotations = {"highlights": [], "sticky_notes": [], "slide_explanations": [], "mcqs": [], "flashcards": []}
+                annotations: dict[str, Any] = {"highlights": [], "sticky_notes": [], "slide_explanations": [], "mcqs": [], "flashcards": []}
             else:
                 annotations = await anno_task
 
@@ -1002,25 +1028,13 @@ async def process_lecture(
             if pdf_path:
                 yield f"data: {json.dumps({'type': 'progress', 'step': '5/5', 'message': '🎨 5/5 اللمسات الأخيرة! جاري تلوين الشرائح وإضافة الملاحظات الذكية...'}, ensure_ascii=False)}\n\n"
                 
-                actual_pdf_path = pdf_path
-                if pdf_path.lower().endswith(".pptx"):
-                    try:
-                        from app.services.pptx_converter import convert_pptx_to_pdf
-                        temp_pdf_dir = os.path.dirname(pdf_path)
-                        actual_pdf_path = await asyncio.to_thread(convert_pptx_to_pdf, pdf_path, temp_pdf_dir)
-                        logger.info(f"[PROCESS_LECTURE] PPTX converted successfully to PDF: {actual_pdf_path}")
-                    except Exception as ce:
-                        logger.error(f"[PROCESS_LECTURE] Failed to convert PPTX to PDF for annotation: {ce}")
-                        actual_pdf_path = None
+                base_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
+                output_pdf_path = os.path.join(base_dir, "outputs", f"{job.job_id}.pdf")
+                os.makedirs(os.path.dirname(output_pdf_path), exist_ok=True)
                 
-                if actual_pdf_path:
-                    base_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
-                    output_pdf_path = os.path.join(base_dir, "outputs", f"{job.job_id}.pdf")
-                    os.makedirs(os.path.dirname(output_pdf_path), exist_ok=True)
-                    
-                    from app.services.pdf_annotator import annotate_pdf
-                    await asyncio.to_thread(annotate_pdf, actual_pdf_path, output_pdf_path, annotations, is_free_trial)
-                    download_url = f"/api/v1/summarize/download/{job.job_id}.pdf"
+                from app.services.pdf_annotator import annotate_pdf
+                await asyncio.to_thread(annotate_pdf, pdf_path, output_pdf_path, annotations, is_free_trial)
+                download_url = f"/api/v1/summarize/download/{job.job_id}.pdf"
  
             # 5. Save History & Finalize
             # Generate AI Title
@@ -1031,9 +1045,26 @@ async def process_lecture(
                 "transcript": transcript,
                 "annotations": annotations,
                 "job_id": job.job_id,
-                "has_pdf": bool(pdf_path)
+                "has_pdf": bool(pdf_path),
+                "is_prep": is_document_only,
+                "has_audio": not is_document_only
             }
             log_id = use_lecture_quota(profile["id"], metadata=history_meta, cost=calculated_cost)
+
+            # Save sidecar metadata for downloads
+            if pdf_path:
+                try:
+                    meta_path = os.path.join(base_dir, "outputs", f"{job.job_id}.meta.json")
+                    with open(meta_path, "w", encoding="utf-8") as mf:
+                        json.dump({
+                            "title": ai_title,
+                            "has_audio": not is_document_only,
+                            "has_pdf": bool(pdf_path),
+                            "is_prep": is_document_only,
+                            "type": "summarize"
+                        }, mf, ensure_ascii=False)
+                except Exception as meta_e:
+                    logger.warning(f"Failed to write sidecar meta for {job.job_id}: {meta_e}")
             
             yield f"data: {json.dumps({'type': 'metadata', 'annotations': annotations}, ensure_ascii=False)}\n\n"
             yield f"data: {json.dumps({'type': 'done', 'download_url': download_url, 'history_id': log_id, 'title': ai_title, 'annotations': annotations}, ensure_ascii=False)}\n\n"
@@ -1059,13 +1090,27 @@ async def process_lecture(
     })
 
 @router.get("/download/{job_id}.pdf")
-async def download_annotated_pdf(job_id: str):
-    """Secure PDF download checking both backend and project root outputs."""
+async def download_annotated_pdf(
+    job_id: str,
+    title: Optional[str] = Query(None),
+    mode: Optional[str] = Query(None),
+    is_prep: Optional[bool] = Query(None),
+    download: bool = Query(True)
+):
+    """Secure PDF download checking both backend and project root outputs.
+    Includes Path Traversal protection and accurate Arabic filename metadata:
+    - [اسم المادة] - تحضير سلايدات - لمّاح.pdf (عند رفع الملف فقط بدون فويسات)
+    - [اسم المادة] - مخططة فويسات - لمّاح.pdf (عند دمج الفويسات مع الملف)
+    """
+    if not re.match(r'^[a-zA-Z0-9_\-]+$', job_id) or os.path.basename(job_id) != job_id:
+        raise HTTPException(status_code=400, detail="Invalid job ID format")
+
     routes_dir = os.path.dirname(os.path.abspath(__file__))
     backend_dir = os.path.dirname(os.path.dirname(os.path.dirname(routes_dir)))
+    base_dir = os.path.dirname(backend_dir)
     
     path_1 = os.path.join(backend_dir, "outputs", f"{job_id}.pdf")
-    path_2 = os.path.join(os.path.dirname(backend_dir), "outputs", f"{job_id}.pdf")
+    path_2 = os.path.join(base_dir, "outputs", f"{job_id}.pdf")
     
     resolved_path = None
     if os.path.exists(path_1):
@@ -1076,9 +1121,65 @@ async def download_annotated_pdf(job_id: str):
     if not resolved_path:
         logger.error(f"[DOWNLOAD] File not found for job_id={job_id}. Checked paths: {path_1} and {path_2}")
         raise HTTPException(status_code=404, detail="File not found")
-        
-    from fastapi.responses import FileResponse
-    return FileResponse(resolved_path, media_type="application/pdf")
+
+    # Determine title and prep status
+    resolved_title = title
+    resolved_is_prep = is_prep
+    if resolved_is_prep is None and mode is not None:
+        resolved_is_prep = mode.lower() in ["prep", "slides", "document", "document_only"]
+
+    # 1. Check sidecar metadata file (.meta.json)
+    meta_path_1 = os.path.join(backend_dir, "outputs", f"{job_id}.meta.json")
+    meta_path_2 = os.path.join(base_dir, "outputs", f"{job_id}.meta.json")
+    for mp in [meta_path_1, meta_path_2]:
+        if os.path.exists(mp):
+            try:
+                with open(mp, "r", encoding="utf-8") as mf:
+                    meta_data = json.load(mf)
+                    if not resolved_title and meta_data.get("title"):
+                        resolved_title = meta_data.get("title")
+                    if resolved_is_prep is None and "is_prep" in meta_data:
+                        resolved_is_prep = bool(meta_data["is_prep"])
+                break
+            except Exception as meta_err:
+                logger.warning(f"Error reading sidecar {mp}: {meta_err}")
+
+    # 2. Check Supabase usage logs if title or mode still unresolved
+    if not resolved_title or resolved_is_prep is None:
+        try:
+            from app.services.subscription_service import get_supabase
+            supabase = get_supabase()
+            res = supabase.table("usage_logs").select("metadata").eq("metadata->>job_id", job_id).execute()
+            if res.data and len(res.data) > 0 and isinstance(res.data[0], dict):
+                raw_meta = res.data[0].get("metadata")
+                sb_meta: dict = raw_meta if isinstance(raw_meta, dict) else {}
+                if not resolved_title:
+                    resolved_title = str(sb_meta.get("title", "")) if sb_meta.get("title") else None
+                if resolved_is_prep is None:
+                    if "is_prep" in sb_meta:
+                        resolved_is_prep = bool(sb_meta["is_prep"])
+                    elif "has_audio" in sb_meta:
+                        resolved_is_prep = not bool(sb_meta["has_audio"])
+                    else:
+                        tr = str(sb_meta.get("transcript", ""))
+                        resolved_is_prep = len(tr.strip()) == 0
+        except Exception as sb_err:
+            logger.warning(f"Supabase lookup failed for {job_id}: {sb_err}")
+
+    from app.services.filename_helper import format_arabic_download_filename
+    arabic_filename = format_arabic_download_filename(
+        title=resolved_title,
+        is_notebook=False,
+        is_prep=bool(resolved_is_prep)
+    )
+
+    disposition = "attachment" if download else "inline"
+    return FileResponse(
+        resolved_path,
+        media_type="application/pdf",
+        filename=arabic_filename,
+        content_disposition_type=disposition
+    )
 
 
 @router.post("/youtube-to-mp3")
@@ -1187,7 +1288,7 @@ async def upload_temp(
     }
 
 
-@router.get("/debug-env")
+@router.get("/debug-env", dependencies=[Depends(verify_admin)])
 async def debug_env():
     """
     Temporary diagnostic endpoint — shows TEMP_DIR, UPLOAD_DIR, and their contents.
@@ -1228,7 +1329,7 @@ async def debug_env():
     font_test_status = "Not tested"
     if reg_exists:
         try:
-            import fitz
+            import fitz  # type: ignore
             doc = fitz.open()
             page = doc.new_page()
             page.insert_font(fontname="arfont", fontfile=amiri_reg_path)
@@ -1255,3 +1356,53 @@ async def debug_env():
             "test_status": font_test_status
         }
     }
+
+
+@router.post("/convert-pptx-stream")
+async def convert_pptx_stream(file: UploadFile = File(...)):
+    """
+    In-memory, ephemeral PowerPoint to PDF converter for Focus Study.
+    Zero server disk storage: consumes PPTX bytes from stream, synthesizes
+    PDF in RAM, and immediately streams back PDF binary.
+    """
+    import io
+    from app.services.pptx_converter import convert_pptx_bytes_to_pdf_bytes
+
+    filename = file.filename or "presentation.pptx"
+    if not (filename.lower().endswith(".pptx") or filename.lower().endswith(".ppt")):
+        raise HTTPException(
+            status_code=400,
+            detail={"user_message": "يرجى رفع ملف عرض تقديمي بصيغة PowerPoint (.pptx)"}
+        )
+
+    try:
+        pptx_bytes = await file.read()
+        if len(pptx_bytes) == 0:
+            raise HTTPException(
+                status_code=400,
+                detail={"user_message": "الملف المرفوع فارغ."}
+            )
+
+        pdf_bytes = await asyncio.to_thread(convert_pptx_bytes_to_pdf_bytes, pptx_bytes)
+        
+        base_name = os.path.splitext(filename)[0]
+        safe_filename = f"{base_name}.pdf"
+
+        return StreamingResponse(
+            io.BytesIO(pdf_bytes),
+            media_type="application/pdf",
+            headers={
+                "Content-Disposition": f'attachment; filename="{safe_filename}"',
+                "Content-Length": str(len(pdf_bytes)),
+                "Access-Control-Expose-Headers": "Content-Disposition, Content-Length"
+            }
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"[PPTX Stream Conversion Error]: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=500,
+            detail={"user_message": f"تعذر تحويل ملف PowerPoint: {str(e)}"}
+        )
+
