@@ -100,11 +100,11 @@ async def get_only_transcript(
                             import subprocess
                             cmd = ["ffprobe", "-v", "error", "-show_entries", "format=duration", "-of", "default=noprint_wrappers=1:nokey=1", path]
                             duration_str = subprocess.check_output(cmd).decode().strip()
-                            if float(duration_str) > 900:
-                                await msg_queue.put("✂️ نسخة مجانية: يتم قص أول 15 دقيقة فقط...")
+                            if float(duration_str) > 1200:
+                                await msg_queue.put("✂️ نسخة مجانية: يتم قص أول 20 دقيقة فقط...")
                                 ext = os.path.splitext(path)[1]
                                 trimmed = path + "_trimmed" + ext
-                                subprocess.run(["ffmpeg", "-y", "-i", path, "-t", "900", "-c", "copy", trimmed], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                                subprocess.run(["ffmpeg", "-y", "-i", path, "-t", "1200", "-c", "copy", trimmed], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
                                 os.replace(trimmed, path)
                         except: pass
 

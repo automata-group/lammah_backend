@@ -49,10 +49,10 @@ async def generate_ai_title(llm, transcript: str, pdf_context: Optional[List[str
         logger.error(f"Error generating AI title: {e}")
     return f"محاضرة {datetime.now().strftime('%Y-%m-%d %H:%M')}"
 
-def trim_audio_to_5_mins(input_path: str) -> str:
+def trim_audio_to_limit(input_path: str, max_seconds: int = 1200) -> str:
     """
-    Trims the input audio file to the first 5 minutes (300 seconds) using ffmpeg
-    if it is longer than 5 minutes. Returns the new file path or the original if it fails.
+    Trims the input audio file to max_seconds (default 1200s = 20 minutes) using ffmpeg
+    if it is longer than max_seconds. Returns the new file path or the original if it fails.
     """
     if not input_path or not os.path.exists(input_path):
         return input_path
@@ -62,26 +62,30 @@ def trim_audio_to_5_mins(input_path: str) -> str:
         cmd = ["ffprobe", "-v", "error", "-show_entries", "format=duration", "-of", "default=noprint_wrappers=1:nokey=1", input_path]
         duration_str = subprocess.check_output(cmd).decode().strip()
         duration = float(duration_str)
-        if duration <= 300:
-            logger.info(f"[TRIM] Audio duration ({duration}s) is <= 5 minutes. Skipping trim.")
+        if duration <= max_seconds:
+            logger.info(f"[TRIM] Audio duration ({duration}s) is <= {max_seconds}s. Skipping trim.")
             return input_path
     except Exception as e:
         logger.warning(f"[TRIM] Failed to probe duration for {input_path}: {e}")
         # Proceed with trimming anyway to be safe
 
-    output_path = f"{os.path.splitext(input_path)[0]}_trimmed_5m.mp3"
+    mins_label = int(max_seconds // 60)
+    output_path = f"{os.path.splitext(input_path)[0]}_trimmed_{mins_label}m.mp3"
     try:
-        logger.info(f"[TRIM] Trimming audio to 5 minutes: {input_path} -> {output_path}")
+        logger.info(f"[TRIM] Trimming audio to {mins_label} minutes ({max_seconds}s): {input_path} -> {output_path}")
         subprocess.run([
-            "ffmpeg", "-y", "-ss", "0", "-t", "300", "-i", input_path,
+            "ffmpeg", "-y", "-ss", "0", "-t", str(max_seconds), "-i", input_path,
             "-c:a", "libmp3lame", "-b:a", "128k", output_path
         ], check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
         if os.path.exists(output_path):
-            logger.info(f"✂️ Successfully trimmed audio to 5 minutes: {output_path}")
+            logger.info(f"✂️ Successfully trimmed audio to {mins_label} minutes: {output_path}")
             return output_path
     except Exception as e:
         logger.error(f"Failed to trim audio: {e}")
     return input_path
+
+# Backward-compatible alias
+trim_audio_to_5_mins = trim_audio_to_limit
 
 class LectureRow(BaseModel):
     row_id: str
@@ -175,9 +179,9 @@ async def background_worker(row: LectureRow, user_id: str, plan_name: str, histo
         if not audio_path and not pdf_path:
             raise Exception("No source files provided. Please upload either audio or a document.")
 
-        # Trimming audio to 5 minutes if free trial
+        # Trimming audio to 20 minutes (1200 seconds) if free trial
         if is_free_trial and audio_path:
-            trimmed = trim_audio_to_5_mins(audio_path)
+            trimmed = trim_audio_to_limit(audio_path, max_seconds=1200)
             if trimmed != audio_path:
                 try:
                     os.remove(audio_path)
@@ -214,7 +218,7 @@ async def background_worker(row: LectureRow, user_id: str, plan_name: str, histo
             pages = await asyncio.to_thread(extract_pages_from_pdf, pdf_path)
             logger.info(f"[BG_WORKER] PDF extracted {len(pages)} pages from {pdf_path}")
             if is_free_trial:
-                pages = pages[:6]
+                pages = pages[:20]
             pdf_context = [f"--- الشريحة {p['page_number']} ---\n{p['text']}" for p in pages]
 
 
@@ -226,15 +230,15 @@ async def background_worker(row: LectureRow, user_id: str, plan_name: str, histo
         llm = get_llm_for_user(user_id)
         annotations = await orchestrator.generate_complete_annotations(llm, transcript, pdf_context)
 
-        # Trial Limits
+        # Trial Limits (20 slides max)
         if is_free_trial:
             if isinstance(annotations.get("slide_explanations"), list):
-                annotations["slide_explanations"] = annotations["slide_explanations"][:6]
+                annotations["slide_explanations"] = annotations["slide_explanations"][:20]
                 annotations["slides_locked"] = True
             if isinstance(annotations.get("expected_questions"), list):
-                annotations["expected_questions"] = annotations["expected_questions"][:6]
+                annotations["expected_questions"] = annotations["expected_questions"][:20]
             if isinstance(annotations.get("flashcards"), list):
-                annotations["flashcards"] = annotations["flashcards"][:6]
+                annotations["flashcards"] = annotations["flashcards"][:20]
 
         # 7. Annotation and Finalize
         download_url = None
@@ -488,6 +492,17 @@ async def process_batch_lectures(
                 audio_durations.append(duration_seconds)
                 total_seconds += duration_seconds
 
+            is_free_trial = profile.get("current_plan_id") is None or profile.get("current_plan_id") == "free"
+            
+            # If free trial, trim audio to 20 minutes max (1200s)
+            if is_free_trial and audio_paths:
+                trimmed_paths = []
+                for a_path in audio_paths:
+                    t_path = trim_audio_to_limit(a_path, max_seconds=1200)
+                    trimmed_paths.append(t_path)
+                audio_paths = trimmed_paths
+                total_seconds = min(total_seconds, 1200)
+
             calculated_cost = math.ceil(total_seconds / 60)
             if calculated_cost < 1:
                 calculated_cost = 1
@@ -498,11 +513,16 @@ async def process_batch_lectures(
             remaining_quota = sub_info.get("quota_remaining", 0)
             
             if remaining_quota < calculated_cost:
-                yield f"data: {json.dumps({'type': 'error', 'message': f'🚫 رصيدك الحالي ({remaining_quota} دقيقة) لا يكفي لتلخيص هذه المحاضرات (المطلوب: {calculated_cost} دقيقة). يرجى شحن رصيدك أو ترقية اشتراكك.'}, ensure_ascii=False)}\n\n"
-                return
+                if is_free_trial and remaining_quota > 0:
+                    calculated_cost = remaining_quota
+                    if audio_paths:
+                        audio_paths[0] = trim_audio_to_limit(audio_paths[0], max_seconds=remaining_quota * 60)
+                else:
+                    yield f"data: {json.dumps({'type': 'error', 'message': f'🚫 رصيدك الحالي ({remaining_quota} دقيقة) لا يكفي لتلخيص هذه المحاضرات (المطلوب: {calculated_cost} دقيقة). يرجى شحن رصيدك أو ترقية اشتراكك.'}, ensure_ascii=False)}\n\n"
+                    return
 
-            # No trimming — all users get full audio processing
-            is_audio_trimmed = False
+            # Audio is trimmed to 20 minutes if free trial
+            is_audio_trimmed = is_free_trial
 
             # 4. Queueing
             yield f"data: {json.dumps({'type': 'progress', 'step': '0/5', 'message': '🎟️ تم حجز مكان لك في طابور المعالجة...'}, ensure_ascii=False)}\n\n"
@@ -823,9 +843,9 @@ async def process_lecture(
             elif not is_document_only:
                 yield f"data: {json.dumps({'type': 'progress', 'step': '0/5', 'message': '📥 تم استلام وتجهيز الملفات بنجاح.'}, ensure_ascii=False)}\n\n"
             
-            # Trim audio file if free trial
+            # Trim audio file if free trial to max 20 minutes (1200s)
             if not is_document_only and is_free_trial and audio_path:
-                trimmed = trim_audio_to_5_mins(audio_path)
+                trimmed = trim_audio_to_limit(audio_path, max_seconds=1200)
                 if trimmed != audio_path:
                     try:
                         os.remove(audio_path)
@@ -866,7 +886,7 @@ async def process_lecture(
                         num_pages = 10
 
                     if is_free_trial:
-                        num_pages = min(num_pages, 6)
+                        num_pages = min(num_pages, 20)
 
                     # 1 minute per 2 slides/pages, minimum 3 minutes
                     calculated_cost = max(3, math.ceil(num_pages / 2))
@@ -884,7 +904,7 @@ async def process_lecture(
                     duration_seconds = (os.path.getsize(audio_path) / (128000 / 8)) if (audio_path and os.path.exists(audio_path)) else 60.0
 
                 if is_free_trial:
-                    duration_seconds = min(duration_seconds, 300)
+                    duration_seconds = min(duration_seconds, 1200)
 
                 calculated_cost = math.ceil(duration_seconds / 60)
                 if calculated_cost < 1:
@@ -896,8 +916,14 @@ async def process_lecture(
             remaining_quota = sub_info.get("quota_remaining", 0)
             
             if remaining_quota < calculated_cost:
-                yield f"data: {json.dumps({'type': 'error', 'message': f'🚫 رصيدك الحالي ({remaining_quota} دقيقة) لا يكفي لتلخيص هذه المحاضرة (المطلوب: {calculated_cost} دقيقة). يرجى شحن رصيدك أو ترقية اشتراكك.'}, ensure_ascii=False)}\n\n"
-                return
+                # If free trial user has some remaining quota, auto-clip down to their available quota!
+                if is_free_trial and remaining_quota > 0:
+                    calculated_cost = remaining_quota
+                    if not is_document_only and audio_path:
+                        audio_path = trim_audio_to_limit(audio_path, max_seconds=remaining_quota * 60)
+                else:
+                    yield f"data: {json.dumps({'type': 'error', 'message': f'🚫 رصيدك الحالي ({remaining_quota} دقيقة) لا يكفي لتلخيص هذه المحاضرة (المطلوب: {calculated_cost} دقيقة). يرجى شحن رصيدك أو ترقية اشتراكك.'}, ensure_ascii=False)}\n\n"
+                    return
 
             # 3. Queue Job
             yield f"data: {json.dumps({'type': 'progress', 'step': '0/5', 'message': '🎟️ تم حجز مكان لك في طابور المعالجة...'}, ensure_ascii=False)}\n\n"
@@ -979,7 +1005,7 @@ async def process_lecture(
             # 2. Document Handling
             pdf_context = []
             if pdf_path:
-                max_pages = 6 if is_free_trial else 150
+                max_pages = 20 if is_free_trial else 150
                 yield f"data: {json.dumps({'type': 'progress', 'step': '2/5', 'message': '🔍 2/5 جاري قراءة محتوى الشرائح بدقة هندسية...'}, ensure_ascii=False)}\n\n"
                 pdf_pages = await asyncio.to_thread(extract_pages_from_pdf, pdf_path)
                 logger.info(f"[PROCESS_LECTURE] PDF extracted {len(pdf_pages)} pages from {pdf_path}")
@@ -1012,15 +1038,15 @@ async def process_lecture(
             else:
                 annotations = await anno_task
 
-            # Trial Limits
+            # Trial Limits (20 slides max)
             if is_free_trial:
                 if isinstance(annotations.get("slide_explanations"), list):
-                    annotations["slide_explanations"] = annotations["slide_explanations"][:6]
+                    annotations["slide_explanations"] = annotations["slide_explanations"][:20]
                     annotations["slides_locked"] = True
                 if isinstance(annotations.get("expected_questions"), list):
-                    annotations["expected_questions"] = annotations["expected_questions"][:6]
+                    annotations["expected_questions"] = annotations["expected_questions"][:20]
                 if isinstance(annotations.get("flashcards"), list):
-                    annotations["flashcards"] = annotations["flashcards"][:6]
+                    annotations["flashcards"] = annotations["flashcards"][:20]
             
 
             # 4. Final PDF

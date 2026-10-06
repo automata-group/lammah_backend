@@ -77,9 +77,9 @@ async def generate_smart_annotations(transcript: str, pdf_context: List[str], us
     if not llm:
         return {"highlights": [], "sticky_notes": []}
 
-    # Context Truncation Logic (Remains here as a guard)
-    MAX_TRANSCRIPT_CHARS = 3000
-    MAX_PDF_CONTEXT_CHARS = 2000
+    # Context Truncation Logic (Remains here as a guard: 25k chars ~ 20 min speech, 20k chars ~ 20 slides)
+    MAX_TRANSCRIPT_CHARS = 25000
+    MAX_PDF_CONTEXT_CHARS = 20000
     
     from app.services.subscription_service import get_user_subscription_info
     try:

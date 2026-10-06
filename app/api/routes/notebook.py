@@ -26,10 +26,10 @@ from app.core.config import settings
 
 router = APIRouter()
 
-def trim_audio_to_5_mins(input_path: str) -> str:
+def trim_audio_to_limit(input_path: str, max_seconds: int = 1200) -> str:
     """
-    Trims the input audio file to the first 5 minutes (300 seconds) using ffmpeg
-    if it is longer than 5 minutes. Returns the new file path or the original if it fails.
+    Trims the input audio file to max_seconds (default 1200s = 20 minutes) using ffmpeg
+    if it is longer than max_seconds. Returns the new file path or the original if it fails.
     """
     if not input_path or not os.path.exists(input_path):
         return input_path
@@ -39,26 +39,30 @@ def trim_audio_to_5_mins(input_path: str) -> str:
         cmd = ["ffprobe", "-v", "error", "-show_entries", "format=duration", "-of", "default=noprint_wrappers=1:nokey=1", input_path]
         duration_str = subprocess.check_output(cmd).decode().strip()
         duration = float(duration_str)
-        if duration <= 300:
-            logger.info(f"[TRIM] Audio duration ({duration}s) is <= 5 minutes. Skipping trim.")
+        if duration <= max_seconds:
+            logger.info(f"[TRIM] Audio duration ({duration}s) is <= {max_seconds}s. Skipping trim.")
             return input_path
     except Exception as e:
         logger.warning(f"[TRIM] Failed to probe duration for {input_path}: {e}")
         # Proceed with trimming anyway to be safe
 
-    output_path = f"{os.path.splitext(input_path)[0]}_trimmed_5m.mp3"
+    mins_label = int(max_seconds // 60)
+    output_path = f"{os.path.splitext(input_path)[0]}_trimmed_{mins_label}m.mp3"
     try:
-        logger.info(f"[TRIM] Trimming audio to 5 minutes: {input_path} -> {output_path}")
+        logger.info(f"[TRIM] Trimming audio to {mins_label} minutes ({max_seconds}s): {input_path} -> {output_path}")
         subprocess.run([
-            "ffmpeg", "-y", "-ss", "0", "-t", "300", "-i", input_path,
+            "ffmpeg", "-y", "-ss", "0", "-t", str(max_seconds), "-i", input_path,
             "-c:a", "libmp3lame", "-b:a", "128k", output_path
         ], check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
         if os.path.exists(output_path):
-            logger.info(f"✂️ Successfully trimmed audio to 5 minutes: {output_path}")
+            logger.info(f"✂️ Successfully trimmed audio to {mins_label} minutes: {output_path}")
             return output_path
     except Exception as e:
         logger.error(f"Failed to trim audio: {e}")
     return input_path
+
+# Backward-compatible alias
+trim_audio_to_5_mins = trim_audio_to_limit
 
 # Helper: Instantiate primary Lammah model or fallback Gemini model
 def get_notebook_llm(user_id: str):
@@ -303,11 +307,11 @@ async def process_notebook(
             else:
                 yield f"data: {json.dumps({'type': 'progress', 'step': '1/5', 'message': '📥 تم استلام وتجهيز الملفات الدراسية.'}, ensure_ascii=False)}\n\n"
 
-            # Trim audio files to 5 minutes if it is a free trial
+            # Trim audio files to 20 minutes (1200s) if it is a free trial
             if is_free_trial and audio_paths:
                 trimmed_paths = []
                 for idx, path in enumerate(audio_paths):
-                    trimmed = trim_audio_to_5_mins(path)
+                    trimmed = trim_audio_to_limit(path, max_seconds=1200)
                     if trimmed != path:
                         try:
                             os.remove(path)
@@ -342,7 +346,7 @@ async def process_notebook(
                         if os.path.exists(path):
                             total_seconds += os.path.getsize(path) / (128000 / 8)
                 if is_free_trial:
-                    total_seconds = min(total_seconds, 300)
+                    total_seconds = min(total_seconds, 1200)
                 calculated_cost = math.ceil(total_seconds / 60)
                 if calculated_cost < 1:
                     calculated_cost = 1
@@ -355,7 +359,7 @@ async def process_notebook(
                         num_pages = len(pages)
                         
                         if is_free_trial:
-                            num_pages = min(num_pages, 6)
+                            num_pages = min(num_pages, 20)
                         # Charge 1 minute per 2 slides/pages, minimum 3 minutes
                         calculated_cost = max(3, math.ceil(num_pages / 2))
                     except Exception as page_err:
@@ -407,7 +411,7 @@ async def process_notebook(
             pdf_context = []
             if pdf_path:
                 yield f"data: {json.dumps({'type': 'progress', 'step': '3.5/5', 'message': '📑 جاري مطابقة شرح الدكتور مع محتوى السلايدات...'}, ensure_ascii=False)}\n\n"
-                max_slides = 6 if is_free_trial else 150
+                max_slides = 20 if is_free_trial else 150
                 if pdf_path.lower().endswith(".pptx"):
                     from app.services.pptx_converter import extract_text_from_pptx
                     pptx_pages = await asyncio.to_thread(extract_text_from_pptx, pdf_path)
