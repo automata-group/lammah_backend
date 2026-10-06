@@ -54,6 +54,7 @@ jobs:
           host: ${{ secrets.SERVER_IP }}
           username: ${{ secrets.SERVER_USER }}
           key: ${{ secrets.SSH_PRIVATE_SERVER }}
+          port: ${{ secrets.SERVER_PORT || 2222 }}
           script: |
             # Cleanup
             docker system prune -f
