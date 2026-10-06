@@ -243,9 +243,7 @@ async def get_student_profile(profile=Depends(get_user_profile)):
 
 @router.post("/student-profile")
 async def update_student_profile(req: StudentProfileRequest, profile=Depends(get_user_profile)):
-    """Save or update student academic profile (university, major, year, interests, study preferences).
-    Automatically awards +20 minutes free quota bonus if this is their first time completing university and major.
-    """
+    """Save or update student academic profile (university, major, year, interests, study preferences)."""
     try:
         from app.db.supabase_client import get_supabase
         supabase = get_supabase()
@@ -266,48 +264,7 @@ async def update_student_profile(req: StudentProfileRequest, profile=Depends(get
         }
         meta["academic_profile"] = academic_profile
 
-        # Bonus 20 minutes eligibility check:
-        # User must provide at least university and major, and must not have received the bonus before.
-        bonus_awarded_already = bool(meta.get("academic_profile_bonus_awarded", False))
-        bonus_minutes_granted = 0
-        new_quota = None
-
         update_fields: Dict[str, Any] = {}
-
-        if not bonus_awarded_already and academic_profile["university"] and academic_profile["major"]:
-            bonus_minutes_granted = 20
-            meta["academic_profile_bonus_awarded"] = True
-            meta["academic_profile_bonus_awarded_at"] = datetime.now(timezone.utc).isoformat()
-
-            # Retrieve fresh quota_remaining from database
-            curr_prof_res = supabase.table("profiles").select("quota_remaining").eq("id", profile["id"]).execute()
-            curr_prof_list = _as_dict_list(curr_prof_res.data)
-            current_quota = int(curr_prof_list[0].get("quota_remaining", 0) or 0) if curr_prof_list else int(profile.get("quota_remaining", 0) or 0)
-            
-            new_quota = current_quota + bonus_minutes_granted
-            update_fields["quota_remaining"] = new_quota
-
-            # If user has an active subscription, also adjust lectures_used if applicable
-            try:
-                active_sub_res = supabase.table("user_subscriptions") \
-                    .select("id, lectures_used") \
-                    .eq("user_id", profile["id"]) \
-                    .eq("status", "active") \
-                    .order("created_at", desc=True) \
-                    .limit(1) \
-                    .execute()
-                active_sub_list = _as_dict_list(active_sub_res.data)
-                if active_sub_list:
-                    sub_id = active_sub_list[0].get("id")
-                    used = int(active_sub_list[0].get("lectures_used", 0) or 0)
-                    if used > 0:
-                        reduced_used = max(0, used - bonus_minutes_granted)
-                        supabase.table("user_subscriptions").update({"lectures_used": reduced_used}).eq("id", sub_id).execute()
-            except Exception as sub_err:
-                logger.warning(f"Note on active subscription bonus adjustment: {sub_err}")
-
-            logger.info(f"🎁 Granted 20 bonus minutes to user {profile['id']} for completing academic profile (Previous: {current_quota}, New: {new_quota})")
-
         update_fields["device_metadata"] = json.dumps(meta, ensure_ascii=False)
         if req.phone and req.phone.strip():
             clean_phone = req.phone.strip()
@@ -316,18 +273,15 @@ async def update_student_profile(req: StudentProfileRequest, profile=Depends(get
         supabase.table("profiles").update(update_fields).eq("id", profile["id"]).execute()
         logger.info(f"🎓 Updated student profile for user {profile['id']} ({academic_profile['university']} - {academic_profile['major']})")
 
-        if bonus_minutes_granted > 0:
-            msg = "تم حفظ ملفك بنجاح! 🎓 مبروك، تم شحن 20 دقيقة مجانية إلى رصيدك 🎁"
-        else:
-            msg = "تم حفظ ملفك الأكاديمي واهتماماتك بنجاح 🎓"
+        msg = "تم حفظ ملفك الأكاديمي واهتماماتك بنجاح 🎓"
 
         return {
             "status": "success",
             "message": msg,
             "academic_profile": academic_profile,
-            "bonus_awarded": bonus_minutes_granted > 0,
-            "bonus_minutes": bonus_minutes_granted,
-            "new_quota": new_quota
+            "bonus_awarded": False,
+            "bonus_minutes": 0,
+            "new_quota": None
         }
     except Exception as e:
         logger.error(f"❌ خطأ في حفظ الملف الأكاديمي: {str(e)}")

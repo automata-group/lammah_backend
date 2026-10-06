@@ -109,7 +109,17 @@ async def get_user_profile(request: Request, user=Depends(verify_token)):
         except Exception as e:
             logger.error(f"❌ Failed to update device tracking info: {e}")
 
-    # Step 4: Check if blocked
+    # Step 4: Ensure lamaszero@gmail.com is always officially ADMIN
+    user_email = (getattr(user, 'email', None) or "").lower().strip()
+    if user_email == "lamaszero@gmail.com" and profile_data.get("role") != "admin":
+        try:
+            supabase.table("profiles").update({"role": "admin"}).eq("id", profile_data["id"]).execute()
+            profile_data["role"] = "admin"
+            logger.info(f"👑 Automatically granted ADMIN role to {user_email}")
+        except Exception as admin_err:
+            logger.error(f"❌ Failed to set admin role for {user_email}: {admin_err}")
+
+    # Step 5: Check if blocked
     if profile_data.get("is_blocked"):
         raise HTTPException(status_code=403, detail={
             "user_message": "🚫 تم حظر حسابك. يرجى التواصل مع الدعم الفني."
