@@ -13,6 +13,10 @@ class BaseAgent:
     def __init__(self, prompt_filename: str):
         self.prompt_path = Path(__file__).parent.parent / "prompts" / prompt_filename
         self.prompt_template = self._load_prompt()
+        self.prompt = ChatPromptTemplate.from_messages([
+            ("system", self.prompt_template),
+            ("human", "{input}")
+        ])
 
     def _load_prompt(self) -> str:
         if not self.prompt_path.exists():
@@ -57,11 +61,7 @@ class BaseAgent:
 
     async def run_with_retry(self, llm, input_data: str, retries: int = 2) -> Union[Dict, List, Any]:
         """Runs the agent with an exponential backoff retry logic."""
-        prompt = ChatPromptTemplate.from_messages([
-            ("system", self.prompt_template),
-            ("human", "{input}")
-        ])
-        chain = prompt | llm
+        chain = self.prompt | llm
         
         last_error = None
         for attempt in range(retries + 1):

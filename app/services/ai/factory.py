@@ -5,13 +5,22 @@ import logging
 
 logger = logging.getLogger(__name__)
 
+_LLM_CACHE: dict[str, Any] = {}
+
 def get_llm_for_user(user_id: Optional[str] = None, streaming: bool = False):
     """
     Returns an LLM client with automatic resilient fallbacks:
     1. Primary: Google Gemini 2.5 Flash via OpenRouter (if OPENROUTER_API_KEY configured)
     2. Fallback 1: Google Gemini direct via ChatGoogleGenerativeAI (if GEMINI_API_KEY configured)
     3. Fallback 2: Groq LLaMA 3.3 70B via OpenAI-compatible endpoint (if GROQ_API_KEY configured)
+    
+    Caches LLM client instances to reuse underlying HTTP connection pools (eliminating TLS handshakes)
+    per OpenAI & Anthropic latency optimization guidelines.
     """
+    cache_key = f"streaming_{streaming}"
+    if cache_key in _LLM_CACHE:
+        return _LLM_CACHE[cache_key]
+
     primary_llm = None
     fallbacks: List[Any] = []
 
@@ -72,9 +81,11 @@ def get_llm_for_user(user_id: Optional[str] = None, streaming: bool = False):
         logger.error("[LLM] No AI API keys configured (OPENROUTER_API_KEY, GEMINI_API_KEY, GROQ_API_KEY)!")
         raise RuntimeError("No AI API keys configured. Please configure OPENROUTER_API_KEY, GEMINI_API_KEY, or GROQ_API_KEY.")
 
+    final_llm = primary_llm.with_fallbacks(fallbacks) if fallbacks else primary_llm
+    _LLM_CACHE[cache_key] = final_llm
+
     if fallbacks:
         logger.info(f"[LLM] Returning primary LLM with {len(fallbacks)} configured fallback provider(s) for user {user_id}")
-        return primary_llm.with_fallbacks(fallbacks)
-
-    logger.info(f"[LLM] Returning primary LLM for user {user_id}")
-    return primary_llm
+    else:
+        logger.info(f"[LLM] Returning primary LLM for user {user_id}")
+    return final_llm
