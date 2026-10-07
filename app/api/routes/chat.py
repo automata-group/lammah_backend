@@ -184,18 +184,43 @@ async def chat_with_lecture(request: ChatRequest, user: dict = Depends(get_user_
         with open(prompt_path, "r", encoding="utf-8") as f:
             prompt_template = f.read()
 
-        max_chars = 50000 if any(term in plan_name for term in ["متقدم", "VIP", "برو", "Advanced", "Pro", "النخبة", "الذهبية", "الفصل الدراسي", "Elite", "التفوق", "Premium"]) else 15000
+        # Determine if lecture is document-only (slides only without audio)
+        is_doc_only = bool(
+            metadata.get("is_prep") is True
+            or metadata.get("is_document_only") is True
+            or metadata.get("has_audio") is False
+            or not transcript.strip()
+        )
+
+        if is_doc_only:
+            mode_directive = (
+                "⚠️ [وضع دراسة السلايدات والمستندات - بدون صوت]:\n"
+                "- تنبيه صارم وحاسم: هذه المادة تم رفعها كشرائح وسلايدات/مستند فقط ولا يوجد أي تسجيل صوتي أو شرح صوتي مرفق معها إطلاقاً.\n"
+                "- يُمنع منعاً باتاً ذكر كلمات مثل: 'الدكتور'، 'شرح الدكتور'، 'ما قاله الدكتور'، 'أوضح الدكتور'، 'الأستاذ'، أو الإيحاء بأن هناك صوتاً تم الاستماع إليه.\n"
+                "- انسب جميع إجاباتك وشروحاتك حصراً ومباشرة إلى 'الشرائح'، 'السلايدات'، أو 'المستند الدراسي'.\n"
+                "- استخدم دائماً عبارات بديلة مثل: 'توضح الشريحة رقم 2...'، 'بحسب ما ورد في السلايدات...'، 'المذكور في هذا الجزء من السلايدات هو...'."
+            )
+        else:
+            mode_directive = (
+                "🎙️ [وضع المحاضرة الكاملة - تسجيل صوتي وسلايدات]:\n"
+                "- تتضمن هذه المحاضرة تسجيلاً صوتياً لشرح الدكتور مدمجاً مع الشرائح والسلايدات.\n"
+                "- يمكنك ربط كلام وشرح الدكتور بما هو مكتوب في الشرائح وتوضيح ما ركز عليه الدكتور في شرحه بدقة."
+            )
 
         # Build combined context from transcript and/or slides
         context_parts = []
         if transcript:
-            context_parts.append(f"### تفريغ كلام الدكتور في المحاضرة الصوتي:\n{transcript[:max_chars]}")
+            if is_doc_only:
+                context_parts.append(f"### محتوى المادة المستخرج من السلايدات والمستند:\n{transcript[:max_chars]}")
+            else:
+                context_parts.append(f"### تفريغ كلام الدكتور في المحاضرة الصوتي:\n{transcript[:max_chars]}")
         if slides_text:
             context_parts.append(f"### محتوى وسلايدات المادة الدراسية (الشرائح والشروحات):\n{slides_text[:max_chars]}")
 
-        combined_context = "\n\n".join(context_parts) if context_parts else transcript[:max_chars]
+        combined_context = "\n\n".join(context_parts) if context_parts else (slides_text[:max_chars] or transcript[:max_chars])
 
         system_instruction = prompt_template.format(
+            mode_directive=mode_directive,
             transcript=combined_context,
             rag_text=rag_text if rag_text else "اعتمد بدقة على نصوص وسلايدات المادة وشروحاتها المرفقة أعلاه للإجابة بأعلى دقة أكاديمية."
         )
