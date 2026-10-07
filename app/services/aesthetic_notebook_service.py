@@ -210,14 +210,6 @@ class _S:
         c.showPage()
         self.page_num += 1
         _bg(c, is_rtl=self.main_rtl)   # Use document-level, not per-para
-        if self.is_free_trial:
-            c.saveState()
-            c.setFont("HW-Reg", 18)
-            c.setFillColor(HexColor("#888888"))
-            c.setFillAlpha(0.2)
-            wm_text = get_display(arabic_reshaper.reshape("Created by Free Trial - اشترك للحصول على الملزمة كاملة وبدون علامة"))
-            c.drawString(40, H / 2, wm_text)
-            c.restoreState()
         self._footer(c)
         self.y = H - MARGIN - 18
 
@@ -1643,31 +1635,12 @@ def generate_aesthetic_notebook_pdf(
 
     # 1. Cover Page
     _cover(cv, lecture_title, student_name, stats=stats, language_mode=language_mode)
-    if is_free_trial:
-        cv.saveState()
-        cv.setFont("HW-Reg", 18)
-        cv.setFillColor(HexColor("#888888"))
-        cv.setFillAlpha(0.2)
-        wm_msg = "Created by Free Trial - Subscribe to unlock full notebook" if language_mode == "english" else "Created by Free Trial - اشترك للحصول على الملزمة كاملة وبدون علامة"
-        wm_text, _ = _bidi(wm_msg)
-        cv.drawString(40, H / 2, wm_text)
-        cv.restoreState()
-
     # 2. Main Content Init
     is_main_rtl = False if language_mode == "english" else (_has_ar(continuous_markdown[:2000]) if continuous_markdown else True)
     st = _S(page_num=2, student_name=student_name, is_rtl=is_main_rtl, is_free_trial=is_free_trial)
 
     # 2a. Study Strategy & TL;DR page (Page 2)
     _draw_study_strategy_and_tldr(cv, st, lecture_title, study_strategy=study_strategy, tldr=tldr)
-    if is_free_trial:
-        cv.saveState()
-        cv.setFont("HW-Reg", 18)
-        cv.setFillColor(HexColor("#888888"))
-        cv.setFillAlpha(0.2)
-        wm_text, _ = _bidi("Created by Free Trial - اشترك للحصول على الملزمة كاملة وبدون علامة")
-        cv.drawString(40, H / 2, wm_text)
-        cv.restoreState()
-
     # 2b. Continuous Markdown (Seamlessly flow onto Page 2 if space remains, otherwise new page)
     if st.y - 180 < BOTTOM:
         st.new_page(cv)
@@ -1889,15 +1862,6 @@ def generate_course_podcast_notebook_pdf(
 
     # 1. Cover Page
     _cover_podcast(cv, lecture_title, student_name, stats=stats)
-    if is_free_trial:
-        cv.saveState()
-        cv.setFont("HW-Reg", 18)
-        cv.setFillColor(HexColor("#888888"))
-        cv.setFillAlpha(0.2)
-        wm_text, _ = _bidi("Created by Free Trial - اشترك للحصول على الملزمة كاملة وبدون علامة")
-        cv.drawString(40, H / 2, wm_text)
-        cv.restoreState()
-
     # 2. Main Content Setup
     st = _S(page_num=2, student_name=student_name, is_rtl=True, is_free_trial=is_free_trial)
     _bg(cv, is_rtl=True)

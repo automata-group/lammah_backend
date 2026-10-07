@@ -179,17 +179,7 @@ async def background_worker(row: LectureRow, user_id: str, plan_name: str, histo
         if not audio_path and not pdf_path:
             raise Exception("No source files provided. Please upload either audio or a document.")
 
-        # Trimming audio to 20 minutes (1200 seconds) if free trial
-        if is_free_trial and audio_path:
-            trimmed = trim_audio_to_limit(audio_path, max_seconds=1200)
-            if trimmed != audio_path:
-                try:
-                    os.remove(audio_path)
-                except:
-                    pass
-                audio_path = trimmed
-                
-        is_audio_trimmed = is_free_trial
+        is_audio_trimmed = False
 
         # 4. Queue and Process
         update_progress("2/5", "🎟️ في طابور المعالجة...")
@@ -217,8 +207,6 @@ async def background_worker(row: LectureRow, user_id: str, plan_name: str, histo
             update_progress("3/5", "🔍 جاري تحليل محتوى الشرائح بدقة...")
             pages = await asyncio.to_thread(extract_pages_from_pdf, pdf_path)
             logger.info(f"[BG_WORKER] PDF extracted {len(pages)} pages from {pdf_path}")
-            if is_free_trial:
-                pages = pages[:20]
             pdf_context = [f"--- الشريحة {p['page_number']} ---\n{p['text']}" for p in pages]
 
 
@@ -230,16 +218,6 @@ async def background_worker(row: LectureRow, user_id: str, plan_name: str, histo
         llm = get_llm_for_user(user_id)
         annotations = await orchestrator.generate_complete_annotations(llm, transcript, pdf_context)
 
-        # Trial Limits (20 slides max)
-        if is_free_trial:
-            if isinstance(annotations.get("slide_explanations"), list):
-                annotations["slide_explanations"] = annotations["slide_explanations"][:20]
-                annotations["slides_locked"] = True
-            if isinstance(annotations.get("expected_questions"), list):
-                annotations["expected_questions"] = annotations["expected_questions"][:20]
-            if isinstance(annotations.get("flashcards"), list):
-                annotations["flashcards"] = annotations["flashcards"][:20]
-
         # 7. Annotation and Finalize
         download_url = None
         if pdf_path:
@@ -249,7 +227,7 @@ async def background_worker(row: LectureRow, user_id: str, plan_name: str, histo
             os.makedirs(os.path.dirname(output_pdf_path), exist_ok=True)
             
             from app.services.pdf_annotator import annotate_pdf
-            await asyncio.to_thread(annotate_pdf, pdf_path, output_pdf_path, annotations, is_free_trial)
+            await asyncio.to_thread(annotate_pdf, pdf_path, output_pdf_path, annotations, False)
             download_url = f"/api/v1/summarize/download/{job.job_id}.pdf"
 
 
@@ -307,7 +285,7 @@ async def batch_process(req: BatchRequest, bg_tasks: BackgroundTasks, profile=De
         raise HTTPException(status_code=403, detail=f"رصيدك الحالي ({quota}) لا يكفي لمعالجة ({len(req.lectures)}) ملفات.")
 
     plan_name = "مجاني"
-    is_free_trial = profile.get("current_plan_id") is None or profile.get("current_plan_id") == "free"
+    is_free_trial = False
     if sub_info.get("active_subscription"):
         plan_name = sub_info["active_subscription"].get("subscription_plans", {}).get("name", "مجاني")
 
@@ -374,7 +352,7 @@ async def process_batch_lectures(
     Provides a massive combined transcript for a single PDF.
     """
     logger.info(f"🚀 [BATCH_LECTURE] Request received: urls={lecture_urls}, temp_ids={audio_temp_ids}")
-    is_free_trial = profile.get("current_plan_id") is None or profile.get("current_plan_id") == "free"
+    is_free_trial = False
     unique_id = str(uuid.uuid4())[:8]
     base_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))))
     upload_dir_env = os.getenv("UPLOAD_DIR", "backend/uploads")
@@ -494,16 +472,7 @@ async def process_batch_lectures(
                 audio_durations.append(duration_seconds)
                 total_seconds += duration_seconds
 
-            is_free_trial = profile.get("current_plan_id") is None or profile.get("current_plan_id") == "free"
-            
-            # If free trial, trim audio to 20 minutes max (1200s)
-            if is_free_trial and audio_paths:
-                trimmed_paths = []
-                for a_path in audio_paths:
-                    t_path = trim_audio_to_limit(a_path, max_seconds=1200)
-                    trimmed_paths.append(t_path)
-                audio_paths = trimmed_paths
-                total_seconds = min(total_seconds, 1200)
+            is_free_trial = False
 
             calculated_cost = math.ceil(total_seconds / 60)
             if calculated_cost < 1:
@@ -515,16 +484,10 @@ async def process_batch_lectures(
             remaining_quota = sub_info.get("quota_remaining", 0)
             
             if remaining_quota < calculated_cost:
-                if is_free_trial and remaining_quota > 0:
-                    calculated_cost = remaining_quota
-                    if audio_paths:
-                        audio_paths[0] = trim_audio_to_limit(audio_paths[0], max_seconds=remaining_quota * 60)
-                else:
-                    yield f"data: {json.dumps({'type': 'error', 'message': f'🚫 رصيدك الحالي ({remaining_quota} دقيقة) لا يكفي لتلخيص هذه المحاضرات (المطلوب: {calculated_cost} دقيقة). يرجى شحن رصيدك أو ترقية اشتراكك.'}, ensure_ascii=False)}\n\n"
-                    return
+                yield f"data: {json.dumps({'type': 'error', 'message': f'🚫 رصيدك الحالي ({remaining_quota} دقيقة) لا يكفي لتلخيص هذه المحاضرات (المطلوب: {calculated_cost} دقيقة). يرجى شحن رصيدك أو ترقية اشتراكك.'}, ensure_ascii=False)}\n\n"
+                return
 
-            # Audio is trimmed to 20 minutes if free trial
-            is_audio_trimmed = is_free_trial
+            is_audio_trimmed = False
 
             # 4. Queueing
             yield f"data: {json.dumps({'type': 'progress', 'step': '0/5', 'message': '🎟️ تم حجز مكان لك في طابور المعالجة...'}, ensure_ascii=False)}\n\n"
@@ -678,16 +641,6 @@ async def process_batch_lectures(
             else:
                 annotations = await anno_task
 
-            # Apply free trial limits if active
-            if is_free_trial:
-                if isinstance(annotations.get("slide_explanations"), list):
-                    annotations["slide_explanations"] = annotations["slide_explanations"][:2]
-                    annotations["slides_locked"] = True
-                if isinstance(annotations.get("expected_questions"), list):
-                    annotations["expected_questions"] = annotations["expected_questions"][:2]
-                if isinstance(annotations.get("flashcards"), list):
-                    annotations["flashcards"] = annotations["flashcards"][:2]
-
             # Generate AI Title
             ai_title = await generate_ai_title(llm, transcript, pdf_context)
             
@@ -716,7 +669,7 @@ async def process_batch_lectures(
 
                 from app.services.pdf_annotator import annotate_pdf
                 annotate_task = asyncio.create_task(asyncio.to_thread(
-                    annotate_pdf, pdf_path, output_pdf_path, annotations, is_free_trial, on_pdf_progress
+                    annotate_pdf, pdf_path, output_pdf_path, annotations, False, on_pdf_progress
                 ))
 
                 cur_slide = 1
@@ -825,7 +778,7 @@ async def process_lecture(
     Returns a StreamingResponse immediately to provide real-time background updates.
     """
     logger.info(f"🚀 [PROCESS_LECTURE] Request received: audio_temp_id={audio_temp_id}, pdf_temp_id={pdf_temp_id}, url={lecture_url}")
-    is_free_trial = profile.get("current_plan_id") is None or profile.get("current_plan_id") == "free"
+    is_free_trial = False
     
     if lecture_url:
         lower_url = lecture_url.strip().lower()
@@ -924,10 +877,6 @@ async def process_lecture(
             is_document_only = (audio_path is None) and (not lecture_url)
 
             # Block URL processing for free trial users — send upgrade message instead
-            if lecture_url and is_free_trial:
-                yield f"data: {json.dumps({'type': 'error', 'message': '🔒 معالجة روابط يوتيوب متاحة للباقات المدفوعة فقط. قم بالترقية لتتمكن من رفع روابط يوتيوب وغيرها!'}, ensure_ascii=False)}\n\n"
-                return
-
             # 1. Finalize Audio Path (Download if URL)
             if lecture_url and not audio_path:
                 yield f"data: {json.dumps({'type': 'progress', 'step': '0/5', 'message': '🔗 جاري تحميل المحاضرة من الرابط...'}, ensure_ascii=False)}\n\n"
@@ -935,16 +884,6 @@ async def process_lecture(
                 is_document_only = False
             elif not is_document_only:
                 yield f"data: {json.dumps({'type': 'progress', 'step': '0/5', 'message': '📥 تم استلام وتجهيز الملفات بنجاح.'}, ensure_ascii=False)}\n\n"
-            
-            # Trim audio file if free trial to max 20 minutes (1200s)
-            if not is_document_only and is_free_trial and audio_path:
-                trimmed = trim_audio_to_limit(audio_path, max_seconds=1200)
-                if trimmed != audio_path:
-                    try:
-                        os.remove(audio_path)
-                    except:
-                        pass
-                    audio_path = trimmed
             
             if pdf_path:
                 if is_document_only:
@@ -956,7 +895,7 @@ async def process_lecture(
                 return
 
             # 2. Quota Check (dynamic by actual duration or page count)
-            is_audio_trimmed = is_free_trial
+            is_audio_trimmed = False
             duration_seconds = 0
             import math
 
@@ -978,13 +917,10 @@ async def process_lecture(
                     else:
                         num_pages = 10
 
-                    if is_free_trial:
-                        num_pages = min(num_pages, 20)
-
                     # 1 minute per 2 slides/pages, minimum 3 minutes
                     calculated_cost = max(3, math.ceil(num_pages / 2))
                 except Exception:
-                    calculated_cost = 3 if is_free_trial else 5
+                    calculated_cost = 5
             else:
                 yield f"data: {json.dumps({'type': 'progress', 'step': '0/5', 'message': '📏 جاري فحص مدة المحاضرة وحساب الحصة...'}, ensure_ascii=False)}\n\n"
                 try:
@@ -996,9 +932,6 @@ async def process_lecture(
                 except Exception:
                     duration_seconds = (os.path.getsize(audio_path) / (128000 / 8)) if (audio_path and os.path.exists(audio_path)) else 60.0
 
-                if is_free_trial:
-                    duration_seconds = min(duration_seconds, 1200)
-
                 calculated_cost = math.ceil(duration_seconds / 60)
                 if calculated_cost < 1:
                     calculated_cost = 1
@@ -1009,14 +942,8 @@ async def process_lecture(
             remaining_quota = sub_info.get("quota_remaining", 0)
             
             if remaining_quota < calculated_cost:
-                # If free trial user has some remaining quota, auto-clip down to their available quota!
-                if is_free_trial and remaining_quota > 0:
-                    calculated_cost = remaining_quota
-                    if not is_document_only and audio_path:
-                        audio_path = trim_audio_to_limit(audio_path, max_seconds=remaining_quota * 60)
-                else:
-                    yield f"data: {json.dumps({'type': 'error', 'message': f'🚫 رصيدك الحالي ({remaining_quota} دقيقة) لا يكفي لتلخيص هذه المحاضرة (المطلوب: {calculated_cost} دقيقة). يرجى شحن رصيدك أو ترقية اشتراكك.'}, ensure_ascii=False)}\n\n"
-                    return
+                yield f"data: {json.dumps({'type': 'error', 'message': f'🚫 رصيدك الحالي ({remaining_quota} دقيقة) لا يكفي لتلخيص هذه المحاضرة (المطلوب: {calculated_cost} دقيقة). يرجى شحن رصيدك أو ترقية اشتراكك.'}, ensure_ascii=False)}\n\n"
+                return
 
             # 3. Queue Job
             yield f"data: {json.dumps({'type': 'progress', 'step': '0/5', 'message': '🎟️ تم حجز مكان لك في طابور المعالجة...'}, ensure_ascii=False)}\n\n"
@@ -1110,7 +1037,7 @@ async def process_lecture(
             pdf_pages = []
             pdf_context = []
             if pdf_path:
-                max_pages = 20 if is_free_trial else 150
+                max_pages = 150
                 doc_rem = est_ai_sec + est_pdf_sec + 3
                 yield f"data: {json.dumps({'type': 'progress', 'step': '2/5', 'progress_percent': 54, 'time_estimate': doc_rem, 'message': '🔍 2/5 جاري قراءة محتوى الشرائح بدقة هندسية...'}, ensure_ascii=False)}\n\n"
                 pdf_pages = await asyncio.to_thread(extract_pages_from_pdf, pdf_path)
@@ -1150,17 +1077,6 @@ async def process_lecture(
             else:
                 annotations = await anno_task
 
-            # Trial Limits (20 slides max)
-            if is_free_trial:
-                if isinstance(annotations.get("slide_explanations"), list):
-                    annotations["slide_explanations"] = annotations["slide_explanations"][:20]
-                    annotations["slides_locked"] = True
-                if isinstance(annotations.get("expected_questions"), list):
-                    annotations["expected_questions"] = annotations["expected_questions"][:20]
-                if isinstance(annotations.get("flashcards"), list):
-                    annotations["flashcards"] = annotations["flashcards"][:20]
-            
-
             # 4. Final PDF with live slide-by-slide progress
             download_url = None
             if pdf_path:
@@ -1174,7 +1090,7 @@ async def process_lecture(
 
                 from app.services.pdf_annotator import annotate_pdf
                 annotate_task = asyncio.create_task(asyncio.to_thread(
-                    annotate_pdf, pdf_path, output_pdf_path, annotations, is_free_trial, on_pdf_progress
+                    annotate_pdf, pdf_path, output_pdf_path, annotations, False, on_pdf_progress
                 ))
 
                 cur_slide = 1

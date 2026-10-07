@@ -163,9 +163,6 @@ def annotate_pdf(input_path: str, output_path: str, annotations: dict, is_free_t
     new_doc = None
     try:
         doc = fitz.open(input_path)
-        if is_free_trial and len(doc) > 20:
-            logger.info(f"[PDF_ANNOTATOR] Truncating PDF to first 20 pages for free trial user.")
-            doc.select(range(20))
         
         # Stop words filter: never highlight trivial grammatical words in isolation
         STOP_WORDS = {

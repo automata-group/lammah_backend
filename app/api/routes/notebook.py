@@ -307,19 +307,6 @@ async def process_notebook(
             else:
                 yield f"data: {json.dumps({'type': 'progress', 'step': '1/5', 'message': '📥 تم استلام وتجهيز الملفات الدراسية.'}, ensure_ascii=False)}\n\n"
 
-            # Trim audio files to 20 minutes (1200s) if it is a free trial
-            if is_free_trial and audio_paths:
-                trimmed_paths = []
-                for idx, path in enumerate(audio_paths):
-                    trimmed = trim_audio_to_limit(path, max_seconds=1200)
-                    if trimmed != path:
-                        try:
-                            os.remove(path)
-                        except:
-                            pass
-                    trimmed_paths.append(trimmed)
-                audio_paths = trimmed_paths
-
             # If presentation file (PPTX/PPT), convert immediately to PDF as single source of truth
             if pdf_path and (pdf_path.lower().endswith(".pptx") or pdf_path.lower().endswith(".ppt")):
                 yield f"data: {json.dumps({'type': 'progress', 'step': '1/5', 'message': '📑 جاري فحص وتحضير شرائح العرض (PowerPoint)...'}, ensure_ascii=False)}\n\n"
@@ -345,8 +332,6 @@ async def process_notebook(
                         logger.warning(f"ffprobe failed for {path}: {e}. Falling back to file size calculation.")
                         if os.path.exists(path):
                             total_seconds += os.path.getsize(path) / (128000 / 8)
-                if is_free_trial:
-                    total_seconds = min(total_seconds, 1200)
                 calculated_cost = math.ceil(total_seconds / 60)
                 if calculated_cost < 1:
                     calculated_cost = 1
@@ -358,8 +343,6 @@ async def process_notebook(
                         pages = await asyncio.to_thread(extract_pages_from_pdf, pdf_path)
                         num_pages = len(pages)
                         
-                        if is_free_trial:
-                            num_pages = min(num_pages, 20)
                         # Charge 1 minute per 2 slides/pages, minimum 3 minutes
                         calculated_cost = max(3, math.ceil(num_pages / 2))
                     except Exception as page_err:
@@ -411,7 +394,7 @@ async def process_notebook(
             pdf_context = []
             if pdf_path:
                 yield f"data: {json.dumps({'type': 'progress', 'step': '3.5/5', 'message': '📑 جاري مطابقة شرح الدكتور مع محتوى السلايدات...'}, ensure_ascii=False)}\n\n"
-                max_slides = 20 if is_free_trial else 150
+                max_slides = 150
                 if pdf_path.lower().endswith(".pptx"):
                     from app.services.pptx_converter import extract_text_from_pptx
                     pptx_pages = await asyncio.to_thread(extract_text_from_pptx, pdf_path)
@@ -873,14 +856,6 @@ async def process_notebook(
                     shareable_quotes = parsed.get("shareable_quotes", [])
                     resources_tools = parsed.get("resources_tools", [])
                     
-                    if is_free_trial:
-                        concept_breakdown = concept_breakdown[:4]
-                        key_takeaways = key_takeaways[:3]
-                        actionable_blueprint = actionable_blueprint[:3]
-                        roadblocks_solutions = roadblocks_solutions[:2]
-                        reflection_prompts = reflection_prompts[:2]
-                        shareable_quotes = shareable_quotes[:2]
-                        resources_tools = resources_tools[:2]
                     logger.info(f"[NOTEBOOK] Call 2 Course/Podcast Parsed: {len(key_takeaways)} takeaways, {len(concept_breakdown)} concepts, {len(actionable_blueprint)} actions.")
                 else:
                     study_strategy = parsed.get("study_strategy", study_strategy)
@@ -889,11 +864,6 @@ async def process_notebook(
                     mcqs = parsed.get("mcqs", [])
                     comparisons = parsed.get("comparisons", [])
                     
-                    if is_free_trial:
-                        tldr = tldr[:3]
-                        cheat_sheet = cheat_sheet[:6]
-                        mcqs = mcqs[:2]
-                        comparisons = comparisons[:1]
                     logger.info(f"[NOTEBOOK] Call 2 University Parsed: {len(cheat_sheet)} cheat items, {len(mcqs)} MCQs, {len(comparisons)} comparisons.")
             except Exception as parse_err:
                 logger.error(f"[NOTEBOOK] Call 2 JSON parse failed: {parse_err}. Raw JSON content: {raw_json_content}")
