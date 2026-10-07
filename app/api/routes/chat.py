@@ -184,6 +184,8 @@ async def chat_with_lecture(request: ChatRequest, user: dict = Depends(get_user_
         with open(prompt_path, "r", encoding="utf-8") as f:
             prompt_template = f.read()
 
+        max_chars = 50000 if any(term in plan_name for term in ["متقدم", "VIP", "برو", "Advanced", "Pro", "النخبة", "الذهبية", "الفصل الدراسي", "Elite", "التفوق", "Premium"]) else 15000
+
         # Determine if lecture is document-only (slides only without audio)
         is_doc_only = bool(
             metadata.get("is_prep") is True
