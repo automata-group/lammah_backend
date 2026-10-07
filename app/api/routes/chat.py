@@ -89,20 +89,85 @@ async def chat_with_lecture(request: ChatRequest, user: dict = Depends(get_user_
                         "limit": limit
                     })
 
-        # 2. Context Retrieval (RAG)
+        # 2. Context Retrieval (Transcript, Slide Texts, Annotations, and RAG)
+        import os
         metadata = log_result.data.get("metadata", {})
-        transcript = metadata.get("transcript", "")
+        transcript = (metadata.get("transcript") or "").strip()
+        slides_text = (metadata.get("slides_text") or "").strip()
         document_id = metadata.get("document_id", None)
-        
-        if not transcript and not document_id:
-            raise HTTPException(status_code=400, detail="Lecture data is missing (no transcript or pdf)")
+        annotations = metadata.get("annotations", {})
+
+        # If slides_text is not stored directly, extract from annotations (slide_explanations, focus_points, vocabulary)
+        if not slides_text and isinstance(annotations, dict):
+            slide_parts = []
+            explanations = annotations.get("slide_explanations", [])
+            for s in explanations:
+                if isinstance(s, dict):
+                    p_num = s.get("page_number", "")
+                    title = s.get("title", "")
+                    expl = s.get("ai_explanation") or s.get("explanation") or s.get("student_explanation") or s.get("summary_phrase") or ""
+                    example = s.get("example", "")
+                    tip = s.get("exam_tip", "")
+                    vocabs = s.get("vocabulary", [])
+                    vocab_str = ", ".join([f"{v.get('term', '')}: {v.get('definition', '')}" for v in vocabs if isinstance(v, dict)]) if vocabs else ""
+
+                    part = f"--- الشريحة {p_num}: {title} ---\n{expl}".strip()
+                    if example:
+                        part += f"\nمثال: {example}"
+                    if tip:
+                        part += f"\nنصيحة/فخ امتحاني: {tip}"
+                    if vocab_str:
+                        part += f"\nالمصطلحات: {vocab_str}"
+                    if part:
+                        slide_parts.append(part)
+
+            focus_pts = annotations.get("focus_points", [])
+            if focus_pts:
+                pts_str = "\n".join([f"- ص {fp.get('page_number', '')}: {fp.get('point', '')} - {fp.get('explanation', '')}" for fp in focus_pts if isinstance(fp, dict)])
+                if pts_str.strip():
+                    slide_parts.append(f"--- أهم نقاط التركيز بالمادة ---\n{pts_str}")
+
+            if slide_parts:
+                slides_text = "\n\n".join(slide_parts)
+
+        # Fallback: check if the PDF exists on disk in outputs/
+        if not transcript and not slides_text and metadata.get("job_id"):
+            job_id = metadata.get("job_id")
+            base_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
+            candidates = [
+                os.path.join(base_dir, "outputs", f"{job_id}.pdf"),
+                os.path.join(base_dir, "backend", "outputs", f"{job_id}.pdf"),
+                f"/var/www/lammah-backend/outputs/{job_id}.pdf"
+            ]
+            for pdf_candidate in candidates:
+                if os.path.exists(pdf_candidate):
+                    try:
+                        import fitz  # PyMuPDF
+                        doc = fitz.open(pdf_candidate)
+                        extracted = []
+                        for i, page in enumerate(doc):
+                            txt = page.get_text().strip()
+                            if txt:
+                                extracted.append(f"--- الشريحة {i+1} ---\n{txt}")
+                        doc.close()
+                        if extracted:
+                            slides_text = "\n\n".join(extracted)
+                            break
+                    except Exception as e:
+                        logger.warning(f"Failed to extract PDF text from {pdf_candidate}: {e}")
+
+        # Ensure we have at least one knowledge source
+        if not transcript and not slides_text and not document_id:
+            raise HTTPException(status_code=400, detail="Lecture data is missing (no transcript or slides content available)")
 
         rag_context_snippets = []
         if document_id:
-            # RAG to pull only relevant sections
-            rag_context_snippets = query_relevant_context(request.question, n_results=4, document_id=document_id)
-            
-        rag_text = "\n".join(rag_context_snippets) if rag_context_snippets else "لا يوجد سياق إضافي من الشرائح."
+            try:
+                rag_context_snippets = query_relevant_context(request.question, n_results=4, document_id=document_id)
+            except Exception as e:
+                logger.warning(f"RAG query error: {e}")
+
+        rag_text = "\n".join(rag_context_snippets) if rag_context_snippets else ""
 
         # 3. Sliding Window Memory (Last 4 turns = 8 messages)
         full_history = request.chat_history or []
@@ -112,15 +177,24 @@ async def chat_with_lecture(request: ChatRequest, user: dict = Depends(get_user_
         # 4. System Prompt Optimization (Externalized to chat_agent.md)
         from pathlib import Path
         prompt_path = Path(__file__).parent.parent.parent / "services" / "ai" / "prompts" / "chat_agent.md"
-        
+
         with open(prompt_path, "r", encoding="utf-8") as f:
             prompt_template = f.read()
-            
-        max_chars = 50000 if any(term in plan_name for term in ["متقدم", "VIP", "برو", "Advanced", "Pro"]) else 3000
-        
+
+        max_chars = 50000 if any(term in plan_name for term in ["متقدم", "VIP", "برو", "Advanced", "Pro", "النخبة", "الذهبية", "الفصل الدراسي", "Elite", "التفوق", "Premium"]) else 15000
+
+        # Build combined context from transcript and/or slides
+        context_parts = []
+        if transcript:
+            context_parts.append(f"### تفريغ كلام الدكتور في المحاضرة الصوتي:\n{transcript[:max_chars]}")
+        if slides_text:
+            context_parts.append(f"### محتوى وسلايدات المادة الدراسية (الشرائح والشروحات):\n{slides_text[:max_chars]}")
+
+        combined_context = "\n\n".join(context_parts) if context_parts else transcript[:max_chars]
+
         system_instruction = prompt_template.format(
-            transcript=transcript[:max_chars],
-            rag_text=rag_text
+            transcript=combined_context,
+            rag_text=rag_text if rag_text else "اعتمد بدقة على نصوص وسلايدات المادة وشروحاتها المرفقة أعلاه للإجابة بأعلى دقة أكاديمية."
         )
 
         model = get_llm_for_user(user_id=user["id"], streaming=True)

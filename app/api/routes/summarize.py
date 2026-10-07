@@ -695,6 +695,7 @@ async def process_batch_lectures(
             history_meta = {
                 "title": ai_title,
                 "transcript": transcript,
+                "slides_text": "\n\n".join(pdf_context) if pdf_context else "",
                 "annotations": annotations,
                 "job_id": unique_id,
                 "has_pdf": bool(pdf_path)
@@ -1231,6 +1232,7 @@ async def process_lecture(
             history_meta = {
                 "title": ai_title,
                 "transcript": transcript,
+                "slides_text": "\n\n".join(pdf_context) if pdf_context else "",
                 "annotations": annotations,
                 "job_id": job.job_id,
                 "has_pdf": bool(pdf_path),
