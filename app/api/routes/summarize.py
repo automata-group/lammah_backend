@@ -400,7 +400,9 @@ async def process_batch_lectures(
     temp_ids_list = [t.strip() for t in audio_temp_ids.split(",")] if audio_temp_ids else []
     
     if not urls_list and not temp_ids_list:
-        raise HTTPException(status_code=400, detail="Missing audio sources. Provide at least one URL or file.")
+        raise HTTPException(status_code=400, detail={
+            "user_message": "🚫 لم يتم استلام أي تسجيلات صوتية صالحة. يرجى الانتظار حتى اكتمال رفع كافة الملفات الصوتية والمحاولة مجدداً."
+        })
         
     # Handle PDF — wait up to 10 seconds for it to appear from Go Uploader shared volume
     pdf_path = None
