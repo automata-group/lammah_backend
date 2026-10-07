@@ -39,12 +39,14 @@ async def chat_with_lecture(request: ChatRequest, user: dict = Depends(get_user_
         else:
             log_result = supabase.table("usage_logs").select("*").eq("id", request.history_id).eq("user_id", user["id"]).single().execute()
         
-        if not log_result.data:
+        if not log_result.data or not isinstance(log_result.data, dict):
             raise HTTPException(status_code=404, detail="Lecture not found or unauthorized")
 
-        current_count = log_result.data.get("chat_count", 0) or 0
+        row_data: dict = log_result.data
+        current_count = int(row_data.get("chat_count", 0) or 0)
 
         # 1. Plan Verification & Limits (Per-Lecture Limit)
+        plan_name: str = "الباقة المجانية"
         if is_demo_lecture:
             plan_name = "محاضرة تجريبية"
             limit = 25
@@ -58,9 +60,10 @@ async def chat_with_lecture(request: ChatRequest, user: dict = Depends(get_user_
                 .limit(1) \
                 .execute()
             
-            if sub_check.data:
+            if sub_check.data and isinstance(sub_check.data, list) and len(sub_check.data) > 0:
                 subscription = sub_check.data[0]
-                plan_name = subscription["subscription_plans"]["name"]
+                sub_plans = subscription.get("subscription_plans") if isinstance(subscription, dict) else {}
+                plan_name = str(sub_plans.get("name", "") if isinstance(sub_plans, dict) else "")
                 
                 # Determine plan tier and message limit per lecture
                 if any(term in plan_name for term in ["الذهبية", "الفصل الدراسي", "برو", "VIP", "Elite", "Pro", "النخبة"]):
@@ -91,9 +94,9 @@ async def chat_with_lecture(request: ChatRequest, user: dict = Depends(get_user_
 
         # 2. Context Retrieval (Transcript, Slide Texts, Annotations, and RAG)
         import os
-        metadata = log_result.data.get("metadata", {})
-        transcript = (metadata.get("transcript") or "").strip()
-        slides_text = (metadata.get("slides_text") or "").strip()
+        metadata: dict = row_data.get("metadata") if isinstance(row_data.get("metadata"), dict) else {}
+        transcript = str(metadata.get("transcript") or "").strip()
+        slides_text = str(metadata.get("slides_text") or "").strip()
         document_id = metadata.get("document_id", None)
         annotations = metadata.get("annotations", {})
 
