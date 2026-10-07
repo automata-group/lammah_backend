@@ -719,6 +719,16 @@ async def process_batch_lectures(
                 cur_slide = 1
                 total_slides = max(1, len(pdf_pages) if pdf_pages else 20)
                 pdf_start = asyncio.get_event_loop().time()
+
+                init_pdf_evt = json.dumps({
+                    'type': 'progress',
+                    'step': '5/5',
+                    'progress_percent': 89,
+                    'time_estimate': max(6, int(total_slides * 0.7)),
+                    'message': f'🎨 5/5 جاري تجهيز ملفك المخطط مع كامل الملاحظات: شريحة 1 من {total_slides}...'
+                }, ensure_ascii=False)
+                yield f"data: {init_pdf_evt}\n\n"
+
                 while not annotate_task.done():
                     try:
                         while True:
@@ -743,7 +753,7 @@ async def process_batch_lectures(
                         'step': '5/5',
                         'progress_percent': pdf_pct,
                         'time_estimate': pdf_rem,
-                        'message': f'🎨 5/5 جاري رسم وتنسيق الملزمة: شريحة {cur_slide} من {total_slides}...'
+                        'message': f'🎨 5/5 جاري تجهيز ملفك المخطط مع كامل الملاحظات: شريحة {cur_slide} من {total_slides}...'
                     }, ensure_ascii=False)
                     yield f"data: {pdf_evt}\n\n"
                     await asyncio.sleep(1.2)
@@ -767,9 +777,10 @@ async def process_batch_lectures(
             yield f"data: {json.dumps({'type': 'progress', 'step': '5/5', 'progress_percent': 100, 'time_estimate': 0, 'message': '🎉 اكتملت المعالجة بنجاح! جاري تحضير دفترك...'}, ensure_ascii=False)}\n\n"
 
             # Emit events matching what the frontend stream reader expects (metadata + done)
+            _done_history_id = log_id if (log_id and isinstance(log_id, str)) else unique_id
             _meta_msg = json.dumps({'type': 'metadata', 'transcript': transcript, 'annotations': annotations}, ensure_ascii=False)
             yield f"data: {_meta_msg}\n\n"
-            _done_msg = json.dumps({'type': 'done', 'download_url': download_url, 'history_id': log_id, 'title': ai_title}, ensure_ascii=False)
+            _done_msg = json.dumps({'type': 'done', 'download_url': download_url, 'history_id': _done_history_id, 'title': ai_title}, ensure_ascii=False)
             yield f"data: {_done_msg}\n\n"
 
         except Exception as e:
@@ -1166,6 +1177,16 @@ async def process_lecture(
                 cur_slide = 1
                 total_slides = max(1, len(pdf_pages) if pdf_pages else 20)
                 pdf_start = asyncio.get_event_loop().time()
+
+                init_pdf_evt = json.dumps({
+                    'type': 'progress',
+                    'step': '5/5',
+                    'progress_percent': 89,
+                    'time_estimate': max(6, int(total_slides * 0.7)),
+                    'message': f'🎨 5/5 جاري تجهيز ملفك المخطط مع كامل الملاحظات: شريحة 1 من {total_slides}...'
+                }, ensure_ascii=False)
+                yield f"data: {init_pdf_evt}\n\n"
+
                 while not annotate_task.done():
                     try:
                         while True:
@@ -1190,7 +1211,7 @@ async def process_lecture(
                         'step': '5/5',
                         'progress_percent': pdf_pct,
                         'time_estimate': pdf_rem,
-                        'message': f'🎨 5/5 جاري رسم وتنسيق الملزمة: شريحة {cur_slide} من {total_slides}...'
+                        'message': f'🎨 5/5 جاري تجهيز ملفك المخطط مع كامل الملاحظات: شريحة {cur_slide} من {total_slides}...'
                     }, ensure_ascii=False)
                     yield f"data: {pdf_evt}\n\n"
                     await asyncio.sleep(1.2)
@@ -1231,8 +1252,9 @@ async def process_lecture(
                 except Exception as meta_e:
                     logger.warning(f"Failed to write sidecar meta for {job.job_id}: {meta_e}")
             
+            _done_history_id = log_id if (log_id and isinstance(log_id, str)) else job.job_id
             yield f"data: {json.dumps({'type': 'metadata', 'annotations': annotations}, ensure_ascii=False)}\n\n"
-            yield f"data: {json.dumps({'type': 'done', 'download_url': download_url, 'history_id': log_id, 'title': ai_title, 'annotations': annotations}, ensure_ascii=False)}\n\n"
+            yield f"data: {json.dumps({'type': 'done', 'download_url': download_url, 'history_id': _done_history_id, 'title': ai_title, 'annotations': annotations}, ensure_ascii=False)}\n\n"
 
         except Exception as e:
             logger.error(f"STREAM ERROR: {str(e)}", exc_info=True)

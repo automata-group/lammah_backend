@@ -132,11 +132,22 @@ def use_lecture_quota(user_id: str, metadata: dict = None, cost: int = 15):
             log_data["metadata"] = metadata
             
         result = supabase.table("usage_logs").insert(log_data).execute()
-        return result.data[0]["id"] if result.data else True
+        return result.data[0]["id"] if (result.data and len(result.data) > 0) else None
     except Exception as e:
         logger.error(f"⚠️ فشل تسجيل سجل الاستخدام للمستخدم {user_id}: {str(e)}")
+        try:
+            # Fallback: Retry with lighter metadata (e.g. truncated transcript) in case payload exceeded PostgREST limit
+            if metadata and "transcript" in metadata and len(str(metadata["transcript"])) > 15000:
+                light_meta = dict(metadata)
+                light_meta["transcript"] = str(metadata["transcript"])[:15000] + "\n...[الأرشيف الكامل محفوظ في ملف التحميل]"
+                log_data["metadata"] = light_meta
+                retry_res = supabase.table("usage_logs").insert(log_data).execute()
+                if retry_res.data and len(retry_res.data) > 0:
+                    return retry_res.data[0]["id"]
+        except Exception as re_err:
+            logger.error(f"⚠️ فشل التسجيل البديل: {re_err}")
         
-    return True
+    return None
 
 
 def log_usage_failure(user_id: str, error_message: str):
