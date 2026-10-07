@@ -69,7 +69,7 @@ def trim_audio_to_limit(input_path: str, max_seconds: int = 1200) -> str:
         logger.warning(f"[TRIM] Failed to probe duration for {input_path}: {e}")
         # Proceed with trimming anyway to be safe
 
-    mins_label = int(max_seconds // 60)
+    mins_label = max_seconds // 60
     output_path = f"{os.path.splitext(input_path)[0]}_trimmed_{mins_label}m.mp3"
     try:
         logger.info(f"[TRIM] Trimming audio to {mins_label} minutes ({max_seconds}s): {input_path} -> {output_path}")
@@ -569,17 +569,28 @@ async def process_batch_lectures(
                 return
 
             # 5. Transcribe MULTIPLE sources sequentially
-            est_audio_per_file = 16
+            # Calculate dynamic realistic estimates based on actual audio duration & inputs
+            file_estimates = []
+            for d in audio_durations:
+                # ~4.5% of audio duration + 10s per file overhead
+                f_est = max(14, min(70, int(d * 0.045) + 10))
+                file_estimates.append(f_est)
+            if not file_estimates:
+                file_estimates = [22] * max(1, len(audio_paths))
+
+            est_audio_total = sum(file_estimates)
             est_slides_sec = 6 if pdf_path else 0
-            est_ai_sec = 20
-            est_pdf_sec = 8 if pdf_path else 0
-            total_batch_sec = (len(audio_paths) * est_audio_per_file) + est_slides_sec + est_ai_sec + est_pdf_sec
+            est_ai_sec = max(25, min(80, 20 + len(audio_paths) * 6 + (20 if pdf_path else 0)))
+            est_pdf_sec = 20 if pdf_path else 0
+            total_batch_sec = est_audio_total + est_slides_sec + est_ai_sec + est_pdf_sec
             
-            yield f"data: {json.dumps({'type': 'progress', 'step': '1/5', 'progress_percent': 5, 'time_estimate': total_batch_sec, 'message': '🎧 1/5 جاري تفريغ الصوت آلياً... نعدك بدقة عالية وسرعة فائقة!'}, ensure_ascii=False)}\n\n"
+            yield f"data: {json.dumps({'type': 'progress', 'step': '1/5', 'progress_percent': 6, 'time_estimate': total_batch_sec, 'message': '🎧 1/5 جاري تفريغ الصوت آلياً... نعدك بدقة عالية وسرعة فائقة!'}, ensure_ascii=False)}\n\n"
             
             transcripts = []
             for idx, path in enumerate(audio_paths):
-                files_remaining_after_this = len(audio_paths) - idx - 1
+                f_est = file_estimates[idx] if idx < len(file_estimates) else 22
+                rem_files_est = sum(file_estimates[idx+1:]) if (idx + 1 < len(file_estimates)) else 0
+                
                 import queue
                 progress_q = queue.Queue()
                 def audio_progress_cb(msg):
@@ -588,7 +599,7 @@ async def process_batch_lectures(
                 transcription_task = asyncio.create_task(asyncio.to_thread(transcribe_audio, path, audio_progress_cb))
                 
                 last_audio_msg = f'جاري تفريغ المحاضرة #{idx + 1} من {len(audio_paths)}...'
-                file_elapsed = 0
+                file_start = asyncio.get_event_loop().time()
                 while not transcription_task.done():
                     try:
                         while True:
@@ -596,15 +607,18 @@ async def process_batch_lectures(
                     except queue.Empty:
                         pass
                     
-                    file_elapsed += 1
-                    cur_file_rem = max(2, est_audio_per_file - file_elapsed)
-                    cur_total_rem = (files_remaining_after_this * est_audio_per_file) + cur_file_rem + est_slides_sec + est_ai_sec + est_pdf_sec
-                    completed_so_far = (idx * est_audio_per_file) + min(est_audio_per_file, file_elapsed)
-                    pct = max(6, min(65, int((completed_so_far / max(1, total_batch_sec)) * 65)))
+                    elapsed_f = asyncio.get_event_loop().time() - file_start
+                    cur_file_rem = max(2, int(f_est - elapsed_f))
+                    cur_total_rem = rem_files_est + cur_file_rem + est_slides_sec + est_ai_sec + est_pdf_sec
+                    
+                    completed_files = idx
+                    f_progress = min(1.0, elapsed_f / max(1, f_est))
+                    overall_audio_ratio = (completed_files + f_progress) / max(1, len(audio_paths))
+                    pct = max(6, min(62, int(6 + overall_audio_ratio * 56)))
                     
                     yield f": ping\n\n"
                     yield f"data: {json.dumps({'type': 'progress', 'step': '1/5', 'progress_percent': pct, 'time_estimate': cur_total_rem, 'message': f'🎧 1/5 المحاضرة #{idx + 1} من {len(audio_paths)}: {last_audio_msg}'}, ensure_ascii=False)}\n\n"
-                    await asyncio.sleep(1.5)
+                    await asyncio.sleep(1.2)
                     
                 t = transcription_task.result()
                 if t:
@@ -622,14 +636,15 @@ async def process_batch_lectures(
             yield f"data: {json.dumps({'type': 'transcript', 'text': transcript}, ensure_ascii=False)}\n\n"
             
             # 6. Document Handling
+            pdf_pages = []
             pdf_context = []
             if pdf_path:
                 cur_rem = est_ai_sec + est_pdf_sec + 5
                 if pdf_path.lower().endswith((".pptx", ".ppt")):
-                    yield f"data: {json.dumps({'type': 'progress', 'step': '2/5', 'progress_percent': 67, 'time_estimate': cur_rem, 'message': '📑 2/5 جاري تحويل ملف البوربوينت إلى PDF لضمان المطابقة 100%...'}, ensure_ascii=False)}\n\n"
+                    yield f"data: {json.dumps({'type': 'progress', 'step': '2/5', 'progress_percent': 64, 'time_estimate': cur_rem, 'message': '📑 2/5 جاري تحويل ملف البوربوينت إلى PDF لضمان المطابقة 100%...'}, ensure_ascii=False)}\n\n"
                     from app.services.pptx_converter import convert_pptx_to_pdf
                     pdf_path = await asyncio.to_thread(convert_pptx_to_pdf, pdf_path, os.path.dirname(pdf_path))
-                yield f"data: {json.dumps({'type': 'progress', 'step': '2/5', 'progress_percent': 70, 'time_estimate': cur_rem - 3, 'message': '🔍 2/5 جاري قراءة محتوى الشابتر المرفق بدقة هندسية...'}, ensure_ascii=False)}\n\n"
+                yield f"data: {json.dumps({'type': 'progress', 'step': '2/5', 'progress_percent': 68, 'time_estimate': cur_rem - 3, 'message': '🔍 2/5 جاري قراءة محتوى الشابتر المرفق بدقة هندسية...'}, ensure_ascii=False)}\n\n"
                 pdf_pages = await asyncio.to_thread(extract_pages_from_pdf, pdf_path)
                 pdf_context = [f"--- Page {p['page_number']} ---\n{p['text']}" for p in pdf_pages[:150]]
             
@@ -638,16 +653,22 @@ async def process_batch_lectures(
             llm = get_llm_for_user(profile["id"])
             anno_task = asyncio.create_task(orchestrator.generate_complete_annotations(llm, transcript, pdf_context))
             
+            num_slides = len(pdf_context) if pdf_context else 0
+            est_ai_sec = max(25, min(80, 20 + int(num_slides * 0.7)))
+            
             AI_TIMEOUT_SECONDS = 900  # 15 minutes for massive batch processing
-            elapsed = 0
-            while not anno_task.done() and elapsed < AI_TIMEOUT_SECONDS:
-                ai_rem = max(3, est_ai_sec - elapsed)
+            ai_start = asyncio.get_event_loop().time()
+            while not anno_task.done():
+                elapsed = asyncio.get_event_loop().time() - ai_start
+                if elapsed >= AI_TIMEOUT_SECONDS:
+                    break
+                ai_rem = max(3, int(est_ai_sec - elapsed))
                 total_ai_rem = ai_rem + est_pdf_sec
-                pct = min(88, 73 + int((elapsed / max(1, est_ai_sec)) * 15))
+                ratio = min(1.0, elapsed / max(1, est_ai_sec))
+                pct = min(88, 70 + int(ratio * 18))
                 yield f": ping\n\n"
-                yield f"data: {json.dumps({'type': 'progress', 'step': '4/5', 'progress_percent': pct, 'time_estimate': total_ai_rem, 'message': f'🧠 4/5 لمّاح يطابق المفاهيم والأسئلة المتوقعة... ({elapsed}s)'}, ensure_ascii=False)}\n\n"
-                await asyncio.sleep(1.5)
-                elapsed += 1
+                yield f"data: {json.dumps({'type': 'progress', 'step': '4/5', 'progress_percent': pct, 'time_estimate': total_ai_rem, 'message': f'🧠 4/5 لمّاح يطابق المفاهيم والأسئلة المتوقعة... ({int(elapsed)}s)'}, ensure_ascii=False)}\n\n"
+                await asyncio.sleep(1.2)
             
             if not anno_task.done():
                 anno_task.cancel()
@@ -678,23 +699,54 @@ async def process_batch_lectures(
             }
             log_id = use_lecture_quota(profile["id"], metadata=history_meta, cost=calculated_cost)
 
-            # 8. Generate Output PDF - using the SAME annotator as process_lecture
+            # 8. Generate Output PDF with real slide throughput progress
             download_url = None
             if pdf_path and annotations.get("slide_explanations"):
                 base_dir_out = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
                 output_pdf_path = os.path.join(base_dir_out, "outputs", f"{unique_id}.pdf")
                 os.makedirs(os.path.dirname(output_pdf_path), exist_ok=True)
 
+                import queue
+                pdf_progress_q = queue.Queue()
+                def on_pdf_progress(cur, total):
+                    pdf_progress_q.put((cur, total))
+
                 from app.services.pdf_annotator import annotate_pdf
-                annotate_task = asyncio.create_task(asyncio.to_thread(annotate_pdf, pdf_path, output_pdf_path, annotations, is_free_trial))
-                pdf_elapsed = 0
+                annotate_task = asyncio.create_task(asyncio.to_thread(
+                    annotate_pdf, pdf_path, output_pdf_path, annotations, is_free_trial, on_pdf_progress
+                ))
+
+                cur_slide = 1
+                total_slides = max(1, len(pdf_pages) if pdf_pages else 20)
+                pdf_start = asyncio.get_event_loop().time()
                 while not annotate_task.done():
-                    pdf_rem = max(2, est_pdf_sec - pdf_elapsed)
-                    pdf_pct = min(98, 89 + int((pdf_elapsed / est_pdf_sec) * 9))
+                    try:
+                        while True:
+                            cur_slide, total_slides = pdf_progress_q.get_nowait()
+                    except queue.Empty:
+                        pass
+                    
+                    elapsed = asyncio.get_event_loop().time() - pdf_start
+                    slides_rem = max(0, total_slides - cur_slide)
+                    if cur_slide > 1:
+                        avg_per_slide = elapsed / cur_slide
+                        pdf_rem = max(1, int(slides_rem * avg_per_slide))
+                    else:
+                        pdf_rem = max(2, int(slides_rem * 0.45))
+                    
+                    slide_ratio = cur_slide / max(1, total_slides)
+                    pdf_pct = min(99, 89 + int(slide_ratio * 10))
+
                     yield f": ping\n\n"
-                    yield f"data: {json.dumps({'type': 'progress', 'step': '5/5', 'progress_percent': pdf_pct, 'time_estimate': pdf_rem, 'message': '🎨 5/5 جاري رسم الملزمة المدمجة وتنسيقها...'}, ensure_ascii=False)}\n\n"
-                    await asyncio.sleep(2)
-                    pdf_elapsed += 2
+                    pdf_evt = json.dumps({
+                        'type': 'progress',
+                        'step': '5/5',
+                        'progress_percent': pdf_pct,
+                        'time_estimate': pdf_rem,
+                        'message': f'🎨 5/5 جاري رسم وتنسيق الملزمة: شريحة {cur_slide} من {total_slides}...'
+                    }, ensure_ascii=False)
+                    yield f"data: {pdf_evt}\n\n"
+                    await asyncio.sleep(1.2)
 
                 await annotate_task
                 download_url = f"/api/v1/summarize/download/{unique_id}.pdf"
@@ -846,6 +898,7 @@ async def process_lecture(
     async def event_stream():
         nonlocal audio_path, pdf_path
         actual_pdf_path: Optional[str] = None
+        base_dir_out = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
         try:
             # 0. Flush initial headers & Padding
             padding = ":" + " " * 1024 + "\n\n"
@@ -995,11 +1048,11 @@ async def process_lecture(
                 return
 
             # 1. Transcribe (skip in document-only mode)
-            est_audio_sec = 18
+            est_audio_sec = max(16, min(65, int(duration_seconds * 0.045) + 10)) if not is_document_only else 0
             est_slides_sec = 4 if pdf_path else 0
-            est_ai_sec = 16
-            est_pdf_sec = 6 if pdf_path else 0
-            total_single_sec = (0 if is_document_only else est_audio_sec) + est_slides_sec + est_ai_sec + est_pdf_sec
+            est_ai_sec = 25 if not is_document_only else 18
+            est_pdf_sec = 18 if pdf_path else 0
+            total_single_sec = est_audio_sec + est_slides_sec + est_ai_sec + est_pdf_sec
 
             if is_document_only:
                 transcript = ""
@@ -1018,7 +1071,7 @@ async def process_lecture(
                 transcription_task = asyncio.create_task(asyncio.to_thread(transcribe_audio, audio_path, audio_progress_cb))
                 
                 last_audio_msg = 'لمّاح يستمع بتركيز... جاري تحويل الكلام لنص بدقة عالية!'
-                audio_elapsed = 0
+                audio_start = asyncio.get_event_loop().time()
                 while not transcription_task.done():
                     try:
                         while True:
@@ -1026,20 +1079,21 @@ async def process_lecture(
                     except queue.Empty:
                         pass
                     
-                    audio_elapsed += 1
-                    rem_audio = max(3, est_audio_sec - audio_elapsed)
+                    audio_elapsed = asyncio.get_event_loop().time() - audio_start
+                    rem_audio = max(2, int(est_audio_sec - audio_elapsed))
                     cur_rem = rem_audio + est_slides_sec + est_ai_sec + est_pdf_sec
-                    pct = max(10, min(50, int((audio_elapsed / max(1, est_audio_sec)) * 45) + 8))
+                    pct = max(10, min(50, int((audio_elapsed / max(1, est_audio_sec)) * 40) + 10))
                     
-                    # Ping every 1.5 seconds — SSE keepalive comment prevents QUIC/proxy timeout
+                    # Ping every 1.2 seconds
                     yield f": ping\n\n"
                     yield f"data: {json.dumps({'type': 'progress', 'step': '1/5', 'progress_percent': pct, 'time_estimate': cur_rem, 'message': f'🎧 1/5 لمّاح يستمع... {last_audio_msg}'}, ensure_ascii=False)}\n\n"
-                    await asyncio.sleep(1.5)
+                    await asyncio.sleep(1.2)
                     
                 transcript = transcription_task.result()
                 yield f"data: {json.dumps({'type': 'transcript', 'text': transcript}, ensure_ascii=False)}\n\n"
             
             # 2. Document Handling
+            pdf_pages = []
             pdf_context = []
             if pdf_path:
                 max_pages = 20 if is_free_trial else 150
@@ -1058,17 +1112,22 @@ async def process_lecture(
             llm = get_llm_for_user(profile["id"])
             anno_task = asyncio.create_task(orchestrator.generate_complete_annotations(llm, transcript, pdf_context))
             
+            num_slides = len(pdf_context) if pdf_context else 0
+            est_ai_sec = max(22, min(75, 16 + int(num_slides * 0.6)))
+            
             AI_TIMEOUT_SECONDS = 600  # 10 minutes deadline for large lectures
-            elapsed = 0
-            while not anno_task.done() and elapsed < AI_TIMEOUT_SECONDS:
-                ai_rem = max(3, est_ai_sec - elapsed)
+            ai_start = asyncio.get_event_loop().time()
+            while not anno_task.done():
+                elapsed = asyncio.get_event_loop().time() - ai_start
+                if elapsed >= AI_TIMEOUT_SECONDS:
+                    break
+                ai_rem = max(3, int(est_ai_sec - elapsed))
                 total_ai_rem = ai_rem + est_pdf_sec
-                pct = min(88, 58 + int((elapsed / max(1, est_ai_sec)) * 30))
-                # SSE keepalive comment + progress — prevents QUIC/proxy timeout during long AI processing
+                ratio = min(1.0, elapsed / max(1, est_ai_sec))
+                pct = min(88, 58 + int(ratio * 30))
                 yield f": ping\n\n"
-                yield f"data: {json.dumps({'type': 'progress', 'step': '4/5', 'progress_percent': pct, 'time_estimate': total_ai_rem, 'message': f'🧠 4/5 لمّاح يستنتج الأفكار والأسئلة المتوقعة بسرعة فائقة... ({elapsed}s)'}, ensure_ascii=False)}\n\n"
-                await asyncio.sleep(1.5)
-                elapsed += 1
+                yield f"data: {json.dumps({'type': 'progress', 'step': '4/5', 'progress_percent': pct, 'time_estimate': total_ai_rem, 'message': f'🧠 4/5 لمّاح يستنتج الأفكار والأسئلة المتوقعة بسرعة فائقة... ({int(elapsed)}s)'}, ensure_ascii=False)}\n\n"
+                await asyncio.sleep(1.2)
             
             if not anno_task.done():
                 anno_task.cancel()
@@ -1088,23 +1147,53 @@ async def process_lecture(
                     annotations["flashcards"] = annotations["flashcards"][:20]
             
 
-            # 4. Final PDF
+            # 4. Final PDF with live slide-by-slide progress
             download_url = None
             if pdf_path:
-                base_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
-                output_pdf_path = os.path.join(base_dir, "outputs", f"{job.job_id}.pdf")
+                output_pdf_path = os.path.join(base_dir_out, "outputs", f"{job.job_id}.pdf")
                 os.makedirs(os.path.dirname(output_pdf_path), exist_ok=True)
                 
+                import queue
+                pdf_progress_q = queue.Queue()
+                def on_pdf_progress(cur, total):
+                    pdf_progress_q.put((cur, total))
+
                 from app.services.pdf_annotator import annotate_pdf
-                annotate_task = asyncio.create_task(asyncio.to_thread(annotate_pdf, pdf_path, output_pdf_path, annotations, is_free_trial))
-                pdf_elapsed = 0
+                annotate_task = asyncio.create_task(asyncio.to_thread(
+                    annotate_pdf, pdf_path, output_pdf_path, annotations, is_free_trial, on_pdf_progress
+                ))
+
+                cur_slide = 1
+                total_slides = max(1, len(pdf_pages) if pdf_pages else 20)
+                pdf_start = asyncio.get_event_loop().time()
                 while not annotate_task.done():
-                    pdf_rem = max(1, est_pdf_sec - pdf_elapsed)
-                    pdf_pct = min(98, 89 + int((pdf_elapsed / max(1, est_pdf_sec)) * 9))
+                    try:
+                        while True:
+                            cur_slide, total_slides = pdf_progress_q.get_nowait()
+                    except queue.Empty:
+                        pass
+
+                    elapsed = asyncio.get_event_loop().time() - pdf_start
+                    slides_rem = max(0, total_slides - cur_slide)
+                    if cur_slide > 1:
+                        avg_per_slide = elapsed / cur_slide
+                        pdf_rem = max(1, int(slides_rem * avg_per_slide))
+                    else:
+                        pdf_rem = max(2, int(slides_rem * 0.45))
+
+                    slide_ratio = cur_slide / max(1, total_slides)
+                    pdf_pct = min(99, 89 + int(slide_ratio * 10))
+
                     yield f": ping\n\n"
-                    yield f"data: {json.dumps({'type': 'progress', 'step': '5/5', 'progress_percent': pdf_pct, 'time_estimate': pdf_rem, 'message': '🎨 5/5 اللمسات الأخيرة! تلوين الشرائح وإضافة الملاحظات الذكية...'}, ensure_ascii=False)}\n\n"
-                    await asyncio.sleep(1.5)
-                    pdf_elapsed += 1
+                    pdf_evt = json.dumps({
+                        'type': 'progress',
+                        'step': '5/5',
+                        'progress_percent': pdf_pct,
+                        'time_estimate': pdf_rem,
+                        'message': f'🎨 5/5 جاري رسم وتنسيق الملزمة: شريحة {cur_slide} من {total_slides}...'
+                    }, ensure_ascii=False)
+                    yield f"data: {pdf_evt}\n\n"
+                    await asyncio.sleep(1.2)
 
                 await annotate_task
                 download_url = f"/api/v1/summarize/download/{job.job_id}.pdf"
@@ -1130,7 +1219,7 @@ async def process_lecture(
             # Save sidecar metadata for downloads
             if pdf_path:
                 try:
-                    meta_path = os.path.join(base_dir, "outputs", f"{job.job_id}.meta.json")
+                    meta_path = os.path.join(base_dir_out, "outputs", f"{job.job_id}.meta.json")
                     with open(meta_path, "w", encoding="utf-8") as mf:
                         json.dump({
                             "title": ai_title,

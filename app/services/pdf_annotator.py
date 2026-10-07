@@ -152,13 +152,15 @@ def insert_text_auto(page, rect, lines, start_fs=10.0, min_fs=7.2, fontname="ami
 
 
 
-def annotate_pdf(input_path: str, output_path: str, annotations: dict, is_free_trial: bool = False) -> str:
+def annotate_pdf(input_path: str, output_path: str, annotations: dict, is_free_trial: bool = False, progress_callback: Any = None) -> str:
     """
     Applies highlights, pin badges, and modern Bento Grid companion slides to a PDF.
     """
     if not input_path or not input_path.lower().endswith(".pdf"):
         raise ValueError(f"annotate_pdf only accepts PDF files. Got: {input_path}")
 
+    doc = None
+    new_doc = None
     try:
         doc = fitz.open(input_path)
         if is_free_trial and len(doc) > 20:
@@ -369,7 +371,30 @@ def annotate_pdf(input_path: str, output_path: str, annotations: dict, is_free_t
             font_reg_candidate = AMIRI_REG_PATH or ARIAL_PATH
             font_bold_candidate = AMIRI_BOLD_PATH or AMIRI_REG_PATH or ARIAL_PATH
             
-            for i in range(len(doc)):
+            font_reg_bytes = None
+            if font_reg_candidate and os.path.exists(font_reg_candidate):
+                try:
+                    with open(font_reg_candidate, "rb") as f:
+                        font_reg_bytes = f.read()
+                except Exception:
+                    font_reg_bytes = None
+
+            font_bold_bytes = None
+            if font_bold_candidate and os.path.exists(font_bold_candidate):
+                try:
+                    with open(font_bold_candidate, "rb") as f:
+                        font_bold_bytes = f.read()
+                except Exception:
+                    font_bold_bytes = None
+
+            total_doc_pages = len(doc)
+            for i in range(total_doc_pages):
+                if progress_callback:
+                    try:
+                        progress_callback(i + 1, total_doc_pages)
+                    except Exception:
+                        pass
+
                 new_doc.insert_pdf(doc, from_page=i, to_page=i)
                 actual_slide_page = len(new_doc)
                 orig_page_num = i + 1
@@ -426,20 +451,32 @@ def annotate_pdf(input_path: str, output_path: str, annotations: dict, is_free_t
                     p = new_doc.new_page(width=pw, height=ph)
                     fn_r = "amiri_reg"
                     fn_b = "amiri_bold"
-                    if font_reg_candidate and os.path.exists(font_reg_candidate):
+                    if font_reg_bytes:
+                        try:
+                            p.insert_font(fontname=fn_r, fontbuffer=font_reg_bytes)
+                        except Exception:
+                            fn_r = "helv"
+                    elif font_reg_candidate and os.path.exists(font_reg_candidate):
                         try:
                             p.insert_font(fontname=fn_r, fontfile=font_reg_candidate)
                         except Exception:
                             fn_r = "helv"
                     else:
                         fn_r = "helv"
-                    if font_bold_candidate and os.path.exists(font_bold_candidate):
+
+                    if font_bold_bytes:
+                        try:
+                            p.insert_font(fontname=fn_b, fontbuffer=font_bold_bytes)
+                        except Exception:
+                            fn_b = fn_r
+                    elif font_bold_candidate and os.path.exists(font_bold_candidate):
                         try:
                             p.insert_font(fontname=fn_b, fontfile=font_bold_candidate)
                         except Exception:
                             fn_b = fn_r
                     else:
                         fn_b = fn_r
+
                     # Modern Luxury Stationery Background (#F8FAFC)
                     p.draw_rect(p.rect, color=(0.88, 0.90, 0.94), fill=(0.975, 0.982, 0.990), width=0.8)
                     return p, fn_r, fn_b
@@ -679,14 +716,14 @@ def annotate_pdf(input_path: str, output_path: str, annotations: dict, is_free_t
             if old_doc and not old_doc.is_closed:
                 old_doc.close()
 
-        doc.save(output_path, garbage=4, deflate=True)
+        doc.save(output_path, garbage=2, deflate=True)
         return output_path
         
     except Exception as e:
         logger.error(f"Error annotating PDF: {str(e)}")
         raise e
     finally:
-        if 'doc' in locals() and doc and not doc.is_closed:
+        if doc is not None and not doc.is_closed:
             doc.close()
-        if 'new_doc' in locals() and new_doc and not new_doc.is_closed:
+        if new_doc is not None and not new_doc.is_closed:
             new_doc.close()
