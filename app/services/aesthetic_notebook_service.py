@@ -1721,10 +1721,13 @@ def generate_preview_pdf(original_pdf_path, preview_pdf_path, max_pages=3):
         logger.error(f"[NOTEBOOK] Preview failed: {e}")
         return original_pdf_path
     finally:
-        if prev and not prev.is_closed:
-            prev.close()
-        if doc and not doc.is_closed:
-            doc.close()
+        for _d in (locals().get('prev'), locals().get('doc')):
+            if _d is not None:
+                try:
+                    if not _d.is_closed:
+                        _d.close()
+                except Exception:
+                    pass
 
 
 # ── Course & Podcast Notebook Generator ────────────────────────────────────────

@@ -713,8 +713,12 @@ def annotate_pdf(input_path: str, output_path: str, annotations: dict, is_free_t
             annotations["companion_page_map"] = companion_page_map
             old_doc = doc
             doc = new_doc
-            if old_doc and not old_doc.is_closed:
-                old_doc.close()
+            if old_doc is not None:
+                try:
+                    if not old_doc.is_closed:
+                        old_doc.close()
+                except Exception:
+                    pass
 
         doc.save(output_path, garbage=2, deflate=True)
         return output_path
@@ -723,7 +727,11 @@ def annotate_pdf(input_path: str, output_path: str, annotations: dict, is_free_t
         logger.error(f"Error annotating PDF: {str(e)}")
         raise e
     finally:
-        if doc is not None and not doc.is_closed:
-            doc.close()
-        if new_doc is not None and not new_doc.is_closed:
-            new_doc.close()
+        for _name in ('doc', 'new_doc', 'old_doc'):
+            _d = locals().get(_name)
+            if _d is not None:
+                try:
+                    if not _d.is_closed:
+                        _d.close()
+                except Exception:
+                    pass
