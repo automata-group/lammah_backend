@@ -63,21 +63,21 @@ class AIOrchestrator:
             "past_exams": []
         }
 
-        # Concurrency control (max 1 parallel call to avoid OpenRouter free-tier rate limits)
-        semaphore = asyncio.Semaphore(1)
+        # Concurrency control: parallel batches across OpenRouter / Gemini Flash
+        semaphore = asyncio.Semaphore(5)
 
         # LINK/AUDIO ONLY BYPASS: Skip Mapper and Tutor if no PDF is uploaded
         if not pdf_context:
             logger.info("[ORCHESTRATOR] PDF Context is empty. Skipping Mapper and Tutor (link/audio-only). Only running Examiner...")
-            logger.info("[ORCHESTRATOR] Starting Batch Assessment Processing...")
-            transcript_chunks = self._chunk_text(transcript, chunk_size=20000)
+            logger.info("[ORCHESTRATOR] Starting Fast Batch Assessment Processing...")
+            transcript_chunks = self._chunk_text(transcript, chunk_size=25000)
             
             assessment_tasks = []
             async def process_examiner_chunk_only(chunk, idx):
                 async with semaphore:
                     return await self.examiner.run_with_retry(llm, f"Transcript Chunk {idx+1}:\n{chunk}\n\nExisting Explanations: []")
 
-            for i, chunk in enumerate(transcript_chunks[:5]):
+            for i, chunk in enumerate(transcript_chunks[:2]):
                 assessment_tasks.append(process_examiner_chunk_only(chunk, i))
             
             batch_results = await asyncio.gather(*assessment_tasks)
@@ -119,10 +119,10 @@ class AIOrchestrator:
 
         # SMART DOCUMENT-ONLY / SELF-STUDY MODE: When no audio transcript is provided
         if not transcript or not transcript.strip():
-            logger.info(f"[ORCHESTRATOR] Transcript is empty. Activating Smart Self-Study & Document Annotation Mode for {len(slides)} slides...")
-            batch_size = 5
+            logger.info(f"[ORCHESTRATOR] Transcript is empty. Activating Fast Smart Self-Study & Document Annotation Mode for {len(slides)} slides...")
+            batch_size = 8
             study_tasks = []
-            doc_semaphore = asyncio.Semaphore(4)
+            doc_semaphore = asyncio.Semaphore(5)
 
             async def process_doc_study_batch(batch):
                 async with doc_semaphore:
@@ -285,10 +285,10 @@ class AIOrchestrator:
                 ]
 
         # 2. STEP: TUTOR (PARALLEL SLIDE BATCHING)
-        # We process slides in batches of 4 against the full context to ensure quality.
-        logger.info(f"[ORCHESTRATOR] Starting Parallel Tutor Batches for {len(slides)} slides...")
+        # We process slides in batches of 6 against the full context in parallel.
+        logger.info(f"[ORCHESTRATOR] Starting Fast Parallel Tutor Batches for {len(slides)} slides...")
 
-        batch_size = 4
+        batch_size = 6
         tutor_tasks = []
 
         async def process_tutor_batch(batch):
@@ -318,10 +318,10 @@ class AIOrchestrator:
         # Sort slide explanations by page number
         final_results["slide_explanations"].sort(key=lambda x: x.get("page_number", 0))
 
-        # 3. STEP: EXAMINER (BATCH ASSESSMENT)
-        logger.info("[ORCHESTRATOR] Starting Batch Assessment Processing...")
+        # 3. STEP: EXAMINER (FAST BATCH ASSESSMENT)
+        logger.info("[ORCHESTRATOR] Starting Fast Batch Assessment Processing...")
         source_text = transcript if transcript else "\n".join(pdf_context)
-        transcript_chunks = self._chunk_text(source_text, chunk_size=20000)
+        transcript_chunks = self._chunk_text(source_text, chunk_size=25000)
         
         assessment_tasks = []
         async def process_examiner_chunk(chunk, idx):
@@ -330,7 +330,7 @@ class AIOrchestrator:
                 context_exps = json.dumps(final_results["slide_explanations"][:5], ensure_ascii=False)
                 return await self.examiner.run_with_retry(llm, f"Transcript Chunk {idx+1}:\n{chunk}\n\nExisting Explanations:\n{context_exps}")
 
-        for i, chunk in enumerate(transcript_chunks[:5]):
+        for i, chunk in enumerate(transcript_chunks[:2]):
             assessment_tasks.append(process_examiner_chunk(chunk, i))
         
         batch_results = await asyncio.gather(*assessment_tasks)

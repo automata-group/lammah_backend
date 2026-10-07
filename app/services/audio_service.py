@@ -247,18 +247,25 @@ def _transcribe_large_audio(file_path: str, progress_callback=None) -> str:
     if not chunks:
         raise RuntimeError("لم يتم إنتاج أي مقاطع من عملية التقسيم.")
 
-    full_transcript: List[str] = []
+    import threading
+    from concurrent.futures import ThreadPoolExecutor
 
-    for idx, chunk_path in enumerate(chunks):
-        if progress_callback:
-            progress_callback(f"🎧 جاري تفريغ المقطع {idx+1} من {len(chunks)}...")
+    results: List[Optional[str]] = [None] * len(chunks)
+    completed_count = 0
+    lock = threading.Lock()
 
+    def process_chunk(idx: int, chunk_path: str):
+        nonlocal completed_count
         try:
             chunk_text = _transcribe_single_segment(chunk_path, "mp3")
             m_start = idx * 3
             m_end = (idx + 1) * 3
             timestamp_label = f"\n\n⏱️ [{m_start:02d}:00 - {m_end:02d}:00]\n"
-            full_transcript.append(timestamp_label + chunk_text)
+            results[idx] = timestamp_label + chunk_text
+            with lock:
+                completed_count += 1
+                if progress_callback:
+                    progress_callback(f"🎧 اكتمل تفريغ {completed_count} من {len(chunks)} مقاطع بسرعة قياسية...")
         except Exception as e:
             logger.error(f"❌ Chunk {idx+1} failed: {e}")
             raise RuntimeError(f"فشل تفريغ المقطع #{idx+1} بعد استنفاد كافة المحركات المتاحة: {e}")
@@ -269,10 +276,18 @@ def _transcribe_large_audio(file_path: str, progress_callback=None) -> str:
             except Exception:
                 pass
 
+    # Concurrently transcribe chunks (up to 4 at a time)
+    max_workers = min(4, len(chunks))
+    with ThreadPoolExecutor(max_workers=max_workers) as executor:
+        futures = [executor.submit(process_chunk, idx, chunk_path) for idx, chunk_path in enumerate(chunks)]
+        for future in futures:
+            future.result()
+
     try:
         if os.path.exists(chunk_dir):
             os.rmdir(chunk_dir)
     except Exception:
         pass
 
+    full_transcript = [r for r in results if r is not None]
     return " ".join(full_transcript).strip()

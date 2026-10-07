@@ -569,12 +569,17 @@ async def process_batch_lectures(
                 return
 
             # 5. Transcribe MULTIPLE sources sequentially
-            yield f"data: {json.dumps({'type': 'progress', 'step': '1/5', 'time_estimate': 180 * len(audio_paths), 'message': '🎧 1/5 جاري تفريغ الصوت آلياً... نعدك بدقة عالية!'}, ensure_ascii=False)}\n\n"
+            est_audio_per_file = 16
+            est_slides_sec = 6 if pdf_path else 0
+            est_ai_sec = 20
+            est_pdf_sec = 8 if pdf_path else 0
+            total_batch_sec = (len(audio_paths) * est_audio_per_file) + est_slides_sec + est_ai_sec + est_pdf_sec
+            
+            yield f"data: {json.dumps({'type': 'progress', 'step': '1/5', 'progress_percent': 5, 'time_estimate': total_batch_sec, 'message': '🎧 1/5 جاري تفريغ الصوت آلياً... نعدك بدقة عالية وسرعة فائقة!'}, ensure_ascii=False)}\n\n"
             
             transcripts = []
             for idx, path in enumerate(audio_paths):
-                yield f"data: {json.dumps({'type': 'progress', 'step': '1/5', 'message': f'🎧 1/5 جاري تفريغ ملف المحاضرة #{idx + 1} من {len(audio_paths)}...'}, ensure_ascii=False)}\n\n"
-                
+                files_remaining_after_this = len(audio_paths) - idx - 1
                 import queue
                 progress_q = queue.Queue()
                 def audio_progress_cb(msg):
@@ -582,17 +587,24 @@ async def process_batch_lectures(
                     
                 transcription_task = asyncio.create_task(asyncio.to_thread(transcribe_audio, path, audio_progress_cb))
                 
-                last_audio_msg = f'جاري تفريغ الجزء #{idx + 1}...'
+                last_audio_msg = f'جاري تفريغ المحاضرة #{idx + 1} من {len(audio_paths)}...'
+                file_elapsed = 0
                 while not transcription_task.done():
                     try:
                         while True:
                             last_audio_msg = progress_q.get_nowait()
-                            yield f"data: {json.dumps({'type': 'progress', 'step': '1/5', 'message': f'🎧 1/5 الجزء #{idx + 1}: {last_audio_msg}'}, ensure_ascii=False)}\n\n"
                     except queue.Empty:
                         pass
                     
-                    yield f"data: {json.dumps({'type': 'progress', 'step': '1/5', 'message': f'🎧 1/5 جاري التفريغ... {last_audio_msg}'}, ensure_ascii=False)}\n\n"
-                    await asyncio.sleep(3)
+                    file_elapsed += 1
+                    cur_file_rem = max(2, est_audio_per_file - file_elapsed)
+                    cur_total_rem = (files_remaining_after_this * est_audio_per_file) + cur_file_rem + est_slides_sec + est_ai_sec + est_pdf_sec
+                    completed_so_far = (idx * est_audio_per_file) + min(est_audio_per_file, file_elapsed)
+                    pct = max(6, min(65, int((completed_so_far / max(1, total_batch_sec)) * 65)))
+                    
+                    yield f": ping\n\n"
+                    yield f"data: {json.dumps({'type': 'progress', 'step': '1/5', 'progress_percent': pct, 'time_estimate': cur_total_rem, 'message': f'🎧 1/5 المحاضرة #{idx + 1} من {len(audio_paths)}: {last_audio_msg}'}, ensure_ascii=False)}\n\n"
+                    await asyncio.sleep(1.5)
                     
                 t = transcription_task.result()
                 if t:
@@ -612,16 +624,16 @@ async def process_batch_lectures(
             # 6. Document Handling
             pdf_context = []
             if pdf_path:
+                cur_rem = est_ai_sec + est_pdf_sec + 5
                 if pdf_path.lower().endswith((".pptx", ".ppt")):
-                    yield f"data: {json.dumps({'type': 'progress', 'step': '2/5', 'message': '📑 2/5 جاري تحويل ملف البوربوينت إلى PDF لضمان المطابقة 100%...'}, ensure_ascii=False)}\n\n"
+                    yield f"data: {json.dumps({'type': 'progress', 'step': '2/5', 'progress_percent': 67, 'time_estimate': cur_rem, 'message': '📑 2/5 جاري تحويل ملف البوربوينت إلى PDF لضمان المطابقة 100%...'}, ensure_ascii=False)}\n\n"
                     from app.services.pptx_converter import convert_pptx_to_pdf
                     pdf_path = await asyncio.to_thread(convert_pptx_to_pdf, pdf_path, os.path.dirname(pdf_path))
-                yield f"data: {json.dumps({'type': 'progress', 'step': '2/5', 'message': '🔍 2/5 جاري قراءة محتوى الشابتر المرفق بدقة هندسية...'}, ensure_ascii=False)}\n\n"
+                yield f"data: {json.dumps({'type': 'progress', 'step': '2/5', 'progress_percent': 70, 'time_estimate': cur_rem - 3, 'message': '🔍 2/5 جاري قراءة محتوى الشابتر المرفق بدقة هندسية...'}, ensure_ascii=False)}\n\n"
                 pdf_pages = await asyncio.to_thread(extract_pages_from_pdf, pdf_path)
                 pdf_context = [f"--- Page {p['page_number']} ---\n{p['text']}" for p in pdf_pages[:150]]
             
             # 7. AI Annotations
-            yield f"data: {json.dumps({'type': 'progress', 'step': '4/5', 'message': '🧠 4/5 لمّاح يطابق كلام المحاضرات الضخمة مع الشابتر...'}, ensure_ascii=False)}\n\n"
             orchestrator = AIOrchestrator()
             llm = get_llm_for_user(profile["id"])
             anno_task = asyncio.create_task(orchestrator.generate_complete_annotations(llm, transcript, pdf_context))
@@ -629,9 +641,13 @@ async def process_batch_lectures(
             AI_TIMEOUT_SECONDS = 900  # 15 minutes for massive batch processing
             elapsed = 0
             while not anno_task.done() and elapsed < AI_TIMEOUT_SECONDS:
-                yield f"data: {json.dumps({'type': 'progress', 'step': '4/5', 'message': f'🧠 4/5 جاري ربط المفاهيم... ({elapsed}s)'}, ensure_ascii=False)}\n\n"
-                await asyncio.sleep(4)
-                elapsed += 4
+                ai_rem = max(3, est_ai_sec - elapsed)
+                total_ai_rem = ai_rem + est_pdf_sec
+                pct = min(88, 73 + int((elapsed / max(1, est_ai_sec)) * 15))
+                yield f": ping\n\n"
+                yield f"data: {json.dumps({'type': 'progress', 'step': '4/5', 'progress_percent': pct, 'time_estimate': total_ai_rem, 'message': f'🧠 4/5 لمّاح يطابق المفاهيم والأسئلة المتوقعة... ({elapsed}s)'}, ensure_ascii=False)}\n\n"
+                await asyncio.sleep(1.5)
+                elapsed += 1
             
             if not anno_task.done():
                 anno_task.cancel()
@@ -665,14 +681,22 @@ async def process_batch_lectures(
             # 8. Generate Output PDF - using the SAME annotator as process_lecture
             download_url = None
             if pdf_path and annotations.get("slide_explanations"):
-                _msg5 = json.dumps({'type': 'progress', 'step': '5/5', 'message': '🎨 5/5 جاري رسم الملزمة المدمجة وتنسيقها...'}, ensure_ascii=False)
-                yield f"data: {_msg5}\n\n"
                 base_dir_out = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
                 output_pdf_path = os.path.join(base_dir_out, "outputs", f"{unique_id}.pdf")
                 os.makedirs(os.path.dirname(output_pdf_path), exist_ok=True)
 
                 from app.services.pdf_annotator import annotate_pdf
-                await asyncio.to_thread(annotate_pdf, pdf_path, output_pdf_path, annotations, is_free_trial)
+                annotate_task = asyncio.create_task(asyncio.to_thread(annotate_pdf, pdf_path, output_pdf_path, annotations, is_free_trial))
+                pdf_elapsed = 0
+                while not annotate_task.done():
+                    pdf_rem = max(2, est_pdf_sec - pdf_elapsed)
+                    pdf_pct = min(98, 89 + int((pdf_elapsed / est_pdf_sec) * 9))
+                    yield f": ping\n\n"
+                    yield f"data: {json.dumps({'type': 'progress', 'step': '5/5', 'progress_percent': pdf_pct, 'time_estimate': pdf_rem, 'message': '🎨 5/5 جاري رسم الملزمة المدمجة وتنسيقها...'}, ensure_ascii=False)}\n\n"
+                    await asyncio.sleep(2)
+                    pdf_elapsed += 2
+
+                await annotate_task
                 download_url = f"/api/v1/summarize/download/{unique_id}.pdf"
                 try:
                     meta_path = os.path.join(base_dir_out, "outputs", f"{unique_id}.meta.json")
@@ -687,6 +711,8 @@ async def process_batch_lectures(
                 except Exception as meta_e:
                     logger.warning(f"Failed to write sidecar meta for {unique_id}: {meta_e}")
 
+            # Final 100% progress event before metadata
+            yield f"data: {json.dumps({'type': 'progress', 'step': '5/5', 'progress_percent': 100, 'time_estimate': 0, 'message': '🎉 اكتملت المعالجة بنجاح! جاري تحضير دفترك...'}, ensure_ascii=False)}\n\n"
 
             # Emit events matching what the frontend stream reader expects (metadata + done)
             _meta_msg = json.dumps({'type': 'metadata', 'transcript': transcript, 'annotations': annotations}, ensure_ascii=False)
@@ -969,11 +995,17 @@ async def process_lecture(
                 return
 
             # 1. Transcribe (skip in document-only mode)
+            est_audio_sec = 18
+            est_slides_sec = 4 if pdf_path else 0
+            est_ai_sec = 16
+            est_pdf_sec = 6 if pdf_path else 0
+            total_single_sec = (0 if is_document_only else est_audio_sec) + est_slides_sec + est_ai_sec + est_pdf_sec
+
             if is_document_only:
                 transcript = ""
-                yield f"data: {json.dumps({'type': 'progress', 'step': '1/5', 'message': '📄 1/5 وضع الوثيقة فقط: سيتم توليد الملخص مباشرة من الملف...'}, ensure_ascii=False)}\n\n"
+                yield f"data: {json.dumps({'type': 'progress', 'step': '1/5', 'progress_percent': 15, 'time_estimate': total_single_sec, 'message': '📄 1/5 وضع الوثيقة فقط: سيتم توليد الملخص مباشرة من الملف...'}, ensure_ascii=False)}\n\n"
             else:
-                yield f"data: {json.dumps({'type': 'progress', 'step': '1/5', 'time_estimate': 180, 'message': '🎧 1/5 جاري تفريغ الصوت آلياً... نعدك بدقة عالية!'}, ensure_ascii=False)}\n\n"
+                yield f"data: {json.dumps({'type': 'progress', 'step': '1/5', 'progress_percent': 8, 'time_estimate': total_single_sec, 'message': '🎧 1/5 جاري تفريغ الصوت آلياً... نعدك بدقة عالية وسرعة فائقة!'}, ensure_ascii=False)}\n\n"
                 if not audio_path:
                     yield f"data: {json.dumps({'type': 'error', 'message': 'لم يتم العثور على مسار الملف الصوتي للتفريغ.'}, ensure_ascii=False)}\n\n"
                     return
@@ -986,18 +1018,23 @@ async def process_lecture(
                 transcription_task = asyncio.create_task(asyncio.to_thread(transcribe_audio, audio_path, audio_progress_cb))
                 
                 last_audio_msg = 'لمّاح يستمع بتركيز... جاري تحويل الكلام لنص بدقة عالية!'
+                audio_elapsed = 0
                 while not transcription_task.done():
                     try:
                         while True:
                             last_audio_msg = progress_q.get_nowait()
-                            yield f"data: {json.dumps({'type': 'progress', 'step': '1/5', 'message': f'🎧 1/5 لمّاح يستمع... {last_audio_msg}'}, ensure_ascii=False)}\n\n"
                     except queue.Empty:
                         pass
                     
-                    # Ping every 2 seconds — SSE keepalive comment prevents QUIC/proxy timeout
+                    audio_elapsed += 1
+                    rem_audio = max(3, est_audio_sec - audio_elapsed)
+                    cur_rem = rem_audio + est_slides_sec + est_ai_sec + est_pdf_sec
+                    pct = max(10, min(50, int((audio_elapsed / max(1, est_audio_sec)) * 45) + 8))
+                    
+                    # Ping every 1.5 seconds — SSE keepalive comment prevents QUIC/proxy timeout
                     yield f": ping\n\n"
-                    yield f"data: {json.dumps({'type': 'progress', 'step': '1/5', 'message': f'🎧 1/5 لمّاح يعمل... {last_audio_msg}'}, ensure_ascii=False)}\n\n"
-                    await asyncio.sleep(2)
+                    yield f"data: {json.dumps({'type': 'progress', 'step': '1/5', 'progress_percent': pct, 'time_estimate': cur_rem, 'message': f'🎧 1/5 لمّاح يستمع... {last_audio_msg}'}, ensure_ascii=False)}\n\n"
+                    await asyncio.sleep(1.5)
                     
                 transcript = transcription_task.result()
                 yield f"data: {json.dumps({'type': 'transcript', 'text': transcript}, ensure_ascii=False)}\n\n"
@@ -1006,7 +1043,8 @@ async def process_lecture(
             pdf_context = []
             if pdf_path:
                 max_pages = 20 if is_free_trial else 150
-                yield f"data: {json.dumps({'type': 'progress', 'step': '2/5', 'message': '🔍 2/5 جاري قراءة محتوى الشرائح بدقة هندسية...'}, ensure_ascii=False)}\n\n"
+                doc_rem = est_ai_sec + est_pdf_sec + 3
+                yield f"data: {json.dumps({'type': 'progress', 'step': '2/5', 'progress_percent': 54, 'time_estimate': doc_rem, 'message': '🔍 2/5 جاري قراءة محتوى الشرائح بدقة هندسية...'}, ensure_ascii=False)}\n\n"
                 pdf_pages = await asyncio.to_thread(extract_pages_from_pdf, pdf_path)
                 logger.info(f"[PROCESS_LECTURE] PDF extracted {len(pdf_pages)} pages from {pdf_path}")
                 pdf_context = [f"--- الشريحة {p['page_number']} ---\n{p['text']}" for p in pdf_pages[:max_pages]]
@@ -1016,8 +1054,6 @@ async def process_lecture(
 
             
             # 3. AI Annotations
-            yield f"data: {json.dumps({'type': 'progress', 'step': '4/5', 'time_estimate': 120, 'message': '🧠 4/5 لمّاح يعمل الآن! جاري استنتاج أهم النقاط والأسئلة المتوقعة...'}, ensure_ascii=False)}\n\n"
-            
             orchestrator = AIOrchestrator()
             llm = get_llm_for_user(profile["id"])
             anno_task = asyncio.create_task(orchestrator.generate_complete_annotations(llm, transcript, pdf_context))
@@ -1025,11 +1061,14 @@ async def process_lecture(
             AI_TIMEOUT_SECONDS = 600  # 10 minutes deadline for large lectures
             elapsed = 0
             while not anno_task.done() and elapsed < AI_TIMEOUT_SECONDS:
+                ai_rem = max(3, est_ai_sec - elapsed)
+                total_ai_rem = ai_rem + est_pdf_sec
+                pct = min(88, 58 + int((elapsed / max(1, est_ai_sec)) * 30))
                 # SSE keepalive comment + progress — prevents QUIC/proxy timeout during long AI processing
                 yield f": ping\n\n"
-                yield f"data: {json.dumps({'type': 'progress', 'step': '4/5', 'message': f'🧠 4/5 لمّاح يفكّر... ({elapsed}s)'}, ensure_ascii=False)}\n\n"
-                await asyncio.sleep(3)
-                elapsed += 3
+                yield f"data: {json.dumps({'type': 'progress', 'step': '4/5', 'progress_percent': pct, 'time_estimate': total_ai_rem, 'message': f'🧠 4/5 لمّاح يستنتج الأفكار والأسئلة المتوقعة بسرعة فائقة... ({elapsed}s)'}, ensure_ascii=False)}\n\n"
+                await asyncio.sleep(1.5)
+                elapsed += 1
             
             if not anno_task.done():
                 anno_task.cancel()
@@ -1052,15 +1091,26 @@ async def process_lecture(
             # 4. Final PDF
             download_url = None
             if pdf_path:
-                yield f"data: {json.dumps({'type': 'progress', 'step': '5/5', 'message': '🎨 5/5 اللمسات الأخيرة! جاري تلوين الشرائح وإضافة الملاحظات الذكية...'}, ensure_ascii=False)}\n\n"
-                
                 base_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
                 output_pdf_path = os.path.join(base_dir, "outputs", f"{job.job_id}.pdf")
                 os.makedirs(os.path.dirname(output_pdf_path), exist_ok=True)
                 
                 from app.services.pdf_annotator import annotate_pdf
-                await asyncio.to_thread(annotate_pdf, pdf_path, output_pdf_path, annotations, is_free_trial)
+                annotate_task = asyncio.create_task(asyncio.to_thread(annotate_pdf, pdf_path, output_pdf_path, annotations, is_free_trial))
+                pdf_elapsed = 0
+                while not annotate_task.done():
+                    pdf_rem = max(1, est_pdf_sec - pdf_elapsed)
+                    pdf_pct = min(98, 89 + int((pdf_elapsed / max(1, est_pdf_sec)) * 9))
+                    yield f": ping\n\n"
+                    yield f"data: {json.dumps({'type': 'progress', 'step': '5/5', 'progress_percent': pdf_pct, 'time_estimate': pdf_rem, 'message': '🎨 5/5 اللمسات الأخيرة! تلوين الشرائح وإضافة الملاحظات الذكية...'}, ensure_ascii=False)}\n\n"
+                    await asyncio.sleep(1.5)
+                    pdf_elapsed += 1
+
+                await annotate_task
                 download_url = f"/api/v1/summarize/download/{job.job_id}.pdf"
+
+            # Final 100% progress event before metadata
+            yield f"data: {json.dumps({'type': 'progress', 'step': '5/5', 'progress_percent': 100, 'time_estimate': 0, 'message': '🎉 اكتملت المعالجة بنجاح! جاري تحضير دفترك...'}, ensure_ascii=False)}\n\n"
  
             # 5. Save History & Finalize
             # Generate AI Title
