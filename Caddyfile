@@ -9,7 +9,7 @@
 localhost {
     # 1. Route large uploads to Go service
     handle /api/v1/summarize/upload-temp {
-        request_body_limit 200mb
+        request_body_limit 500mb
         reverse_proxy uploader:8080
     }
 
@@ -26,14 +26,14 @@ localhost {
 
 # إعدادات الدومين (للسيرفر)
 lammah.site, www.lammah.site {
-    request_body_limit 200mb
+    request_body_limit 500mb
     reverse_proxy frontend:3000
 }
 
 api.lammah.site {
     # 1. Route large uploads to Go service
     handle /api/v1/summarize/upload-temp {
-        request_body_limit 200mb
+        request_body_limit 500mb
         reverse_proxy uploader:8080
     }
 
