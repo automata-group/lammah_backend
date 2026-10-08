@@ -46,7 +46,7 @@ def trim_audio_to_limit(input_path: str, max_seconds: int = 1200) -> str:
         logger.warning(f"[TRIM] Failed to probe duration for {input_path}: {e}")
         # Proceed with trimming anyway to be safe
 
-    mins_label = int(max_seconds // 60)
+    mins_label = max_seconds // 60
     output_path = f"{os.path.splitext(input_path)[0]}_trimmed_{mins_label}m.mp3"
     try:
         logger.info(f"[TRIM] Trimming audio to {mins_label} minutes ({max_seconds}s): {input_path} -> {output_path}")

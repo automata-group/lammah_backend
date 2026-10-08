@@ -46,12 +46,12 @@ async def export_transcript_pdf(data: PDFRequest):
             pdf.set_font("Arial", size=16) # Fallback (might not show Arabic correctly)
 
         # Title
-        pdf.cell(200, 10, txt=bidi_title, ln=True, align='C')
+        pdf.cell(200, 10, text=bidi_title, align='C')
         pdf.ln(10)
         
         # Content
         pdf.set_font_size(12)
-        pdf.multi_cell(0, 10, txt=bidi_text, align='R')
+        pdf.multi_cell(0, 10, text=bidi_text, align='R')
         
         # Output to buffer
         pdf_output = io.BytesIO()
@@ -85,6 +85,7 @@ async def get_only_transcript(
             await msg_queue.put("🚀 بدأنا عملية معالجة لمّاح السريعة...")
 
             async def run_transcription():
+                path = None
                 try:
                     await msg_queue.put("📥 جاري استلام وحفظ الملف في خوادم لمّاح...")
                     upload_dir = "uploads/transcripts"
