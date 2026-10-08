@@ -285,18 +285,9 @@ def get_active_quota(user_id: str) -> dict:
         except Exception:
             pass
 
-    # Strictly 100-ILS plan subscribers only can generate academic notebooks
-    plan_name_lower = plan_name.lower()
-    plan_en_lower = str(sub_plan.get("name_en", "")).lower()
-    is_100_plan = bool(
-        active and (
-            plan_price >= 100.0 or
-            "الذهبية" in plan_name or
-            "النخبة" in plan_name or
-            "elite" in plan_name_lower or
-            "full term" in plan_en_lower
-        )
-    )
+    # Any user with an active subscription or remaining quota can generate academic notebooks
+    remaining_quota = info.get("quota_remaining", 0) or 0
+    can_generate = bool(active or remaining_quota > 0)
 
     return {
         "quota_remaining": info.get("quota_remaining", 0),
@@ -304,7 +295,7 @@ def get_active_quota(user_id: str) -> dict:
         "plan_id": profile.get("current_plan_id"),
         "plan_name": plan_name,
         "plan_price": plan_price,
-        "can_generate_notebook": is_100_plan,
+        "can_generate_notebook": can_generate,
         "full_name": profile.get("full_name"),
         "username": username
     }

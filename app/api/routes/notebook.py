@@ -127,10 +127,9 @@ async def process_notebook(
                 })
 
     # -------------------------------------------------------------
-    # STRICT 100-ILS PLAN ACCESS GATE:
-    # Only users subscribed to the 100-ILS plan ("باقة الفصل الدراسي (الذهبية)" / "باقة النخبة (Elite)")
+    # NOTEBOOK ACCESS GATE:
+    # Users with an active subscription or remaining quota
     # are permitted to generate university notebooks / ملازم!
-    # Free users, 25-ILS (Essential), and 60-ILS (Midterm) are strictly blocked.
     # -------------------------------------------------------------
     active_sub = None
     supabase = get_supabase()
@@ -148,13 +147,14 @@ async def process_notebook(
     except Exception as e:
         logger.error(f"Error fetching subscription in process_notebook: {e}")
 
-    if not isinstance(active_sub, dict):
-        logger.warning(f"🚫 [PROCESS_NOTEBOOK BLOCKED] User {user_id} has no active subscription.")
+    user_quota = profile.get("quota_remaining", 0) or 0
+    if not isinstance(active_sub, dict) and user_quota <= 0:
+        logger.warning(f"🚫 [PROCESS_NOTEBOOK BLOCKED] User {user_id} has no active subscription or quota.")
         raise HTTPException(
             status_code=403,
             detail={
-                "error_code": "ELITE_PLAN_REQUIRED",
-                "user_message": "🔒 ميزة إنشاء وتوليد الملازم والدفاتر الأكاديمية متاحة حصرياً لمشتركي باقة النخبة (100 شيكل). يرجى ترقية باقتك للوصول إلى الميزة! 👑🚀"
+                "error_code": "SUBSCRIPTION_REQUIRED",
+                "user_message": "🔒 ميزة إنشاء وتوليد الملازم والدفاتر الأكاديمية تتطلب اشتراكاً نشطاً أو رصيد دقائق في حسابك! 👑🚀"
             }
         )
 
@@ -162,34 +162,8 @@ async def process_notebook(
     if not isinstance(sub_plan, dict):
         sub_plan = {}
 
-    plan_name = str(sub_plan.get("name", "باقة النخبة"))
+    plan_name = str(sub_plan.get("name", "باقة نشطة"))
     plan_name_en = str(sub_plan.get("name_en", ""))
-    raw_price = sub_plan.get("price_ils", 0)
-    try:
-        plan_price = float(str(raw_price)) if raw_price is not None else 0.0
-    except Exception:
-        plan_price = 0.0
-
-    plan_name_lower = plan_name.lower()
-    plan_en_lower = plan_name_en.lower()
-
-    is_100_plan = (
-        plan_price >= 100.0 or
-        "الذهبية" in plan_name or
-        "النخبة" in plan_name or
-        "elite" in plan_name_lower or
-        "full term" in plan_en_lower
-    )
-
-    if not is_100_plan:
-        logger.warning(f"🚫 [PROCESS_NOTEBOOK BLOCKED] User {user_id} on plan '{plan_name}' ({plan_price} ILS) attempted notebook generation.")
-        raise HTTPException(
-            status_code=403,
-            detail={
-                "error_code": "ELITE_PLAN_REQUIRED",
-                "user_message": "🔒 ميزة إنشاء وتوليد الملازم والدفاتر الأكاديمية متاحة حصرياً لمشتركي باقة النخبة (100 شيكل). باقتك الحالية لا تشمل توليد الملازم، يرجى الترقية للوصول! 👑🚀"
-            }
-        )
 
     is_free_trial = False
     profile["active_subscription"] = active_sub
