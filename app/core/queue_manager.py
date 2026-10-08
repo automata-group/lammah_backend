@@ -25,7 +25,8 @@ class JobPriority(IntEnum):
     VIP = 1          # أسبوعي/شهري VIP
     ADVANCED = 2     # أسبوعي/شهري متقدم
     BASIC = 3        # أسبوعي/شهري أساسي/طالب
-    FREE_TRIAL = 5   # تجربة مجانية
+    STANDARD = 5     # افتراضي / بدون باقة
+    FREE_TRIAL = 5   # للتوافق العكسي البرمجي
 
 
 class JobStatus:
@@ -101,7 +102,7 @@ class QueueManager:
             return JobPriority.ADVANCED
         elif "طالب" in plan_name or "أساسي" in plan_name or "basic" in name_lower or "student" in name_lower:
             return JobPriority.BASIC
-        return JobPriority.FREE_TRIAL
+        return JobPriority.STANDARD
     
     async def enqueue(
         self, 

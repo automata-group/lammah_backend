@@ -93,7 +93,7 @@ export default function AdminPage() {
   };
 
   const handleCancelPlan = async (userId: string, userName: string) => {
-    if (!confirm(`هل أنت متأكد من إلغاء خطة المستخدم (${userName})؟ سيتم تصفير حصته وإعادته للتجربة المجانية.`)) return;
+    if (!confirm(`هل أنت متأكد من إلغاء خطة المستخدم (${userName})؟ سيتم تصفير حصته وإلغاء باقته.`)) return;
     setProcessing(userId);
     try {
       const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8500"}/api/v1/admin/users/${userId}/cancel-plan`, {
@@ -278,7 +278,7 @@ export default function AdminPage() {
                 <div className="mt-4 text-xs text-slate-500">منذ انطلاق المنصة</div>
               </div>
               <div className="bg-slate-800/80 rounded-2xl p-6 border border-slate-700 shadow-xl">
-                <h3 className="text-slate-400 text-sm mb-2 font-medium">مستخدمي التجربة المجانية</h3>
+                <h3 className="text-slate-400 text-sm mb-2 font-medium">المستخدمون بدون اشتراك نشط</h3>
                 <p className="text-3xl font-extrabold text-amber-400">{usageStats.free_users_count}</p>
                 <div className="mt-4 text-xs text-slate-500">حسابات لم تشترك بعد</div>
               </div>

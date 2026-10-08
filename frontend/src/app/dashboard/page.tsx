@@ -687,7 +687,7 @@ function DashboardContent() {
                   <AlertCircle className="w-8 h-8 text-amber-500 shrink-0" />
                   <div>
                     <h4 className="text-amber-400 font-bold text-lg mb-1">تنبيه: تم تحليل جزء من المحاضرة فقط</h4>
-                    <p className="text-amber-200/90 text-sm">أنت تستخدم التجربة المجانية، لذلك تم استخراج وتحليل أول 15 دقيقة فقط من المحاضرة بدلاً من كامل المحتوى. للوصول إلى تفريغ وتلخيص كامل لأي محاضرة مهما كان طولها، اشترك الآن.</p>
+                    <p className="text-amber-200/90 text-sm">تم استخراج وتحليل جزء من المحاضرة وفق الرصيد المتاح. للوصول إلى تفريغ وتلخيص كامل لأي محاضرة مهما كان طولها، اشترك الآن.</p>
                   </div>
                   <button onClick={() => router.push("/plans")} className="mr-auto bg-amber-500 hover:bg-amber-600 text-slate-900 px-4 py-2 rounded-xl font-bold text-sm shrink-0 transition-colors">
                     الترقية الآن

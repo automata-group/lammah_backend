@@ -41,11 +41,11 @@ async def get_admin_stats(admin=Depends(verify_admin)):
         users_res = supabase.table("profiles").select("id", count=CountMethod.exact).execute()
         total_users = users_res.count if users_res.count is not None else len(_as_dict_list(users_res.data))
         
-        # 2. Free Trial Users (No plan)
+        # 2. Users without active plan
         free_users_res = supabase.table("profiles").select("id", count=CountMethod.exact).is_("current_plan_id", "null").execute()
         free_users_count = free_users_res.count if free_users_res.count is not None else len(_as_dict_list(free_users_res.data))
         
-        # 3. Free Trial Usage (Total lectures processed by free users)
+        # 3. Total lecture usage across users
         free_usage_res = supabase.table("usage_logs") \
             .select("id", count=CountMethod.exact) \
             .eq("action_type", "lecture_process") \
@@ -96,7 +96,7 @@ async def get_admin_stats(admin=Depends(verify_admin)):
                     "user_id": p.get("id"),
                     "user_name": p.get("full_name") or p.get("phone_number") or "مجهول (رصيد يدوي)",
                     "phone": p.get("phone_number"),
-                    "plan": "⭐ رصيد يدوي / تجريبي",
+                    "plan": "⭐ رصيد يدوي مخصص",
                     "used": 0,
                     "remaining": p.get("quota_remaining", 0),
                     "quota": p.get("quota_remaining", 0),
@@ -147,7 +147,7 @@ async def cancel_user_plan(user_id: str, admin=Depends(verify_admin)):
             .execute()
             
         logger.info(f"✅ Admin {admin['id']} revoked plan for user {user_id}")
-        return {"status": "success", "message": "تم إلغاء الخطة بنجاح وإعادة المستخدم للتجربة المجانية."}
+        return {"status": "success", "message": "تم إلغاء الخطة بنجاح."}
         
     except Exception as e:
         logger.error(f"❌ Error revoking plan: {str(e)}")
@@ -557,7 +557,7 @@ async def bulk_cancel_user_plans(data: BulkCancelPlanModel, admin=Depends(verify
             .execute()
 
         logger.info(f"✅ Admin {admin['id']} bulk revoked plans for users: {data.user_ids}")
-        return {"status": "success", "message": f"تم إلغاء خطط {len(data.user_ids)} مستخدم بنجاح وإعادتهم للتجربة المجانية."}
+        return {"status": "success", "message": f"تم إلغاء خطط {len(data.user_ids)} مستخدم بنجاح."}
 
     except Exception as e:
         logger.error(f"❌ Error bulk revoking plans: {str(e)}")
@@ -746,7 +746,7 @@ async def export_users_excel(admin=Depends(verify_admin)):
                     academic = {}
 
             c_plan_id = prof.get("current_plan_id")
-            plan_name = subs_map.get(u_id) or (plans_map.get(c_plan_id) if c_plan_id else None) or "باقة مجانية / رصيد تجريبي"
+            plan_name = subs_map.get(u_id) or (plans_map.get(c_plan_id) if c_plan_id else None) or "بدون باقة"
             role_label = "مشرف (Admin)" if prof.get("role") == "admin" else "طالب"
             status_label = "محظور 🚫" if prof.get("is_blocked") else "نشط ✅"
             

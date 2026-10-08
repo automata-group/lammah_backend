@@ -284,10 +284,10 @@ async def batch_process(req: BatchRequest, bg_tasks: BackgroundTasks, profile=De
     if len(req.lectures) > quota:
         raise HTTPException(status_code=403, detail=f"رصيدك الحالي ({quota}) لا يكفي لمعالجة ({len(req.lectures)}) ملفات.")
 
-    plan_name = "مجاني"
+    plan_name = "بدون اشتراك"
     is_free_trial = False
     if sub_info.get("active_subscription"):
-        plan_name = sub_info["active_subscription"].get("subscription_plans", {}).get("name", "مجاني")
+        plan_name = sub_info["active_subscription"].get("subscription_plans", {}).get("name", "بدون اشتراك")
 
     results = []
     supabase = get_supabase()
@@ -492,12 +492,12 @@ async def process_batch_lectures(
             # 4. Queueing
             yield f"data: {json.dumps({'type': 'progress', 'step': '0/5', 'message': '🎟️ تم حجز مكان لك في طابور المعالجة...'}, ensure_ascii=False)}\n\n"
             
-            plan_name = "مجاني"
+            plan_name = "بدون اشتراك"
             _has_plan = profile.get("current_plan_id") and profile.get("current_plan_id") != "free"
             if _has_plan:
                 from app.services.subscription_service import get_plan_by_id
                 plan = get_plan_by_id(profile["current_plan_id"])
-                plan_name = plan.get("name", "مجاني") if plan else "مجاني"
+                plan_name = plan.get("name", "بدون اشتراك") if plan else "بدون اشتراك"
             
             representative_path = audio_paths[0] if audio_paths else None
             job = await queue_manager.enqueue(

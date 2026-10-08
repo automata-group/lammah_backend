@@ -46,9 +46,9 @@ async def chat_with_lecture(request: ChatRequest, user: dict = Depends(get_user_
         current_count = int(row_data.get("chat_count", 0) or 0)
 
         # 1. Plan Verification & Limits (Per-Lecture Limit)
-        plan_name: str = "الباقة المجانية"
+        plan_name: str = "بدون اشتراك"
         if is_demo_lecture:
-            plan_name = "محاضرة تجريبية"
+            plan_name = "محاضرة نموذجية"
             limit = 25
         else:
             from datetime import datetime, timezone
@@ -73,15 +73,15 @@ async def chat_with_lecture(request: ChatRequest, user: dict = Depends(get_user_
                 else:
                     limit = 15   # باقة إنقاذ الكويزات / الأساسية: 15 سؤال لكل محاضرة
             else:
-                # Free tier user: 5 trial questions per lecture to experience AI Chat
-                plan_name = "الباقة المجانية"
+                # User without active subscription: limited sample questions
+                plan_name = "بدون اشتراك"
                 limit = 5
                 
             # Check current lecture's chat count against plan limit
             if current_count >= limit:
                 if not sub_check.data:
                     raise HTTPException(status_code=403, detail={
-                        "user_message": f"لقد استهلكت رصيد التجربة في هذه المحاضرة ({limit} أسئلة). اشترك في إحدى باقات لمّاح لفتح حتى 100 سؤال لكل محاضرة!",
+                        "user_message": f"لقد استهلكت رصيد الأسئلة المتاح لهذه المحاضرة ({limit} أسئلة). اشترك في إحدى باقات لمّاح لفتح حتى 100 سؤال لكل محاضرة ومناقشة كافة التفاصيل!",
                         "type": "upgrade_required",
                         "limit": limit
                     })

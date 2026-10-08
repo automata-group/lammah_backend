@@ -119,7 +119,7 @@ def use_lecture_quota(user_id: str, metadata: dict = None, cost: int = 15):
         
         new_quota = quota_remaining - cost
         supabase.table("profiles").update({"quota_remaining": new_quota}).eq("id", user_id).execute()
-        logger.info(f"📉 خصم {cost} دقيقة من الحصة المجانية: المستخدم {user_id} - متبقي {new_quota}")
+        logger.info(f"📉 خصم {cost} دقيقة من الرصيد: المستخدم {user_id} - متبقي {new_quota}")
 
     # 3. Log usage
     try:
@@ -264,12 +264,12 @@ def get_active_quota(user_id: str) -> dict:
     """Quick check of remaining aggregate quota for a user."""
     info = get_user_subscription_info(user_id)
     active = info.get("active_subscription")
-    plan_name = "مجاني"
+    plan_name = "بدون اشتراك"
     plan_price = 0.0
     sub_plan = {}
     if active and "subscription_plans" in active:
         sub_plan = active["subscription_plans"] or {}
-        plan_name = sub_plan.get("name", "مجاني")
+        plan_name = sub_plan.get("name", "بدون اشتراك")
         try:
             plan_price = float(sub_plan.get("price_ils", 0) or 0)
         except Exception:

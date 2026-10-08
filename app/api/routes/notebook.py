@@ -104,7 +104,7 @@ async def process_notebook(
     profile=Depends(check_quota)
 ):
     """
-    Aesthetic ruled notebook generator endpoint for Premium and Free Trial users.
+    Aesthetic ruled notebook generator endpoint for subscribed users.
     Supports single or multiple audio files / URLs and outputs a premium watermarked PDF.
     """
     user_id = profile["id"]
