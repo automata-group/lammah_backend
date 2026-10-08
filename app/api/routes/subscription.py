@@ -92,38 +92,8 @@ async def get_quota(request: Request, profile=Depends(get_user_profile)):
     except Exception as e:
         logger.error(f"❌ Error checking subscription in quota route: {str(e)}")
 
-    device_abuse = False
-    device_abuse_message = None
-
-    if not active_sub and fingerprint:
-        try:
-            others = supabase.table("profiles") \
-                .select("id") \
-                .eq("device_fingerprint", fingerprint) \
-                .neq("id", profile["id"]) \
-                .execute()
-            others_list = _as_dict_list(others.data)
-            if others_list:
-                other_ids = [u.get("id") for u in others_list if u.get("id")]
-                # Smart check: only block if any of the other accounts sharing the fingerprint has successfully processed a lecture
-                usage_check = supabase.table("usage_logs") \
-                    .select("id") \
-                    .in_("user_id", other_ids) \
-                    .eq("action_type", "lecture_process") \
-                    .eq("status", "success") \
-                    .limit(1) \
-                    .execute()
-                
-                if usage_check.data:
-                    first_other_id = others_list[0].get("id", "unknown")
-                    logger.warning(f"🚫 Device abuse in quota endpoint: User {profile['id']} has fingerprint {fingerprint} already used by {first_other_id} who processed lectures")
-                    device_abuse = True
-                    device_abuse_message = "🚫 عذراً! التجربة المجانية غير متوفرة لأنها استُخدمت بالفعل على هذا الجهاز. يرجى الاشتراك للاستمرار. 🚀"
-        except Exception as e:
-            logger.error(f"Fingerprint check error in /quota route: {e}")
-
-    quota_info["device_abuse"] = device_abuse
-    quota_info["device_abuse_message"] = device_abuse_message
+    quota_info["device_abuse"] = False
+    quota_info["device_abuse_message"] = None
     return quota_info
 
 

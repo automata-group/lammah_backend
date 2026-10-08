@@ -162,40 +162,7 @@ async def check_quota(request: Request, profile=Depends(get_user_profile)):
     except Exception as e:
         logger.error(f"❌ Error checking subscription: {str(e)}")
 
-    # 3. DEVICE & PHONE TRIAL PROTECTION
-    # Paid users bypass these checks
-    if not active_sub:
-        # A) Fingerprint Check
-        if fingerprint:
-            try:
-                others = supabase.table("profiles") \
-                    .select("id") \
-                    .eq("device_fingerprint", fingerprint) \
-                    .neq("id", profile["id"]) \
-                    .execute()
-                
-                if others.data:
-                    other_ids = [u["id"] for u in others.data]
-                    # Smart check: only block if any of the other accounts sharing the fingerprint has successfully processed a lecture
-                    usage_check = supabase.table("usage_logs") \
-                        .select("id") \
-                        .in_("user_id", other_ids) \
-                        .eq("action_type", "lecture_process") \
-                        .eq("status", "success") \
-                        .limit(1) \
-                        .execute()
-                    
-                    if usage_check.data:
-                        logger.warning(f"🚫 Device abuse: User {profile['id']} using fingerprint {fingerprint} (already used by {others.data[0]['id']} who processed lectures)")
-                        raise HTTPException(status_code=403, detail={
-                            "user_message": "🚫 عذراً! التجربة المجانية غير متوفرة لأنها استُخدمت بالفعل على هذا الجهاز. يرجى الاشتراك للاستمرار. 🚀",
-                            "type": "device_abuse"
-                        })
-            except HTTPException: raise
-            except Exception as e: logger.error(f"Fingerprint check error: {e}")
-
-        # Phone verification check removed per user request - relying on fingerprint
-        pass
+    # 3. Device trial protection removed - site operates strictly on paid subscriptions
 
     # 4. Quota enforcement
     if quota <= 0:
