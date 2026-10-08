@@ -168,7 +168,7 @@ async def check_quota(request: Request, profile=Depends(get_user_profile)):
     if quota <= 0:
         if not active_sub:
             raise HTTPException(status_code=403, detail={
-                "user_message": "📦 لا يوجد لديك اشتراك نشط أو نفدت حصتك. يرجى شراء أو تجديد باقتك.",
+                "user_message": "يلزم وجود اشتراك نشط لمعالجة المحاضرات. يرجى الاشتراك وتفعيل حسابك.",
                 "type": "no_quota"
             })
         

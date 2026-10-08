@@ -1355,7 +1355,7 @@ async def youtube_to_mp3(
 @router.post("/upload-temp")
 async def upload_temp(
     file: UploadFile = File(...),
-    user=Depends(verify_token)
+    profile=Depends(check_quota)
 ):
     """
     Temporary file upload endpoint (Python fallback for Go Uploader).

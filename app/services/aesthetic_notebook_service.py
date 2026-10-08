@@ -969,7 +969,7 @@ def _cover(c, title, student_name, stats: Optional[dict] = None, language_mode: 
 
     # 4. Analytics 2x2 Metric Cards
     panel_y = hero_y - 128
-    panel_text = "خريطة المحاضرة والبيانات الأساسية (Lecture Blueprint & Key Metrics)" if not is_english else "Lecture Blueprint & Key Metrics"
+    panel_text = "مخطط المحاضرة والبيانات الأساسية (Lecture Blueprint & Key Metrics)" if not is_english else "Lecture Blueprint & Key Metrics"
     panel_lbl, _ = _bidi(panel_text)
     c.setFont(FONT_BOLD, 9)
     c.setFillColor(HexColor("#64748B"))
