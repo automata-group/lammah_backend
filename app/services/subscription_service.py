@@ -285,9 +285,11 @@ def get_active_quota(user_id: str) -> dict:
         except Exception:
             pass
 
-    # Any user with an active subscription or remaining quota can generate academic notebooks
-    remaining_quota = info.get("quota_remaining", 0) or 0
-    can_generate = bool(active or remaining_quota > 0)
+    # Elite plan check: Only users with the Elite plan (price >= 100 or Elite in name) can generate notebooks
+    can_generate = False
+    if active:
+        is_elite_plan = (plan_price >= 100) or any(k in (plan_name or "").lower() for k in ["نخبة", "elite", "ذهبية", "100", "full term"])
+        can_generate = is_elite_plan
 
     return {
         "quota_remaining": info.get("quota_remaining", 0),

@@ -147,14 +147,13 @@ async def process_notebook(
     except Exception as e:
         logger.error(f"Error fetching subscription in process_notebook: {e}")
 
-    user_quota = profile.get("quota_remaining", 0) or 0
-    if not isinstance(active_sub, dict) and user_quota <= 0:
-        logger.warning(f"🚫 [PROCESS_NOTEBOOK BLOCKED] User {user_id} has no active subscription or quota.")
+    if not isinstance(active_sub, dict):
+        logger.warning(f"🚫 [PROCESS_NOTEBOOK BLOCKED] User {user_id} has no active subscription.")
         raise HTTPException(
             status_code=403,
             detail={
                 "error_code": "SUBSCRIPTION_REQUIRED",
-                "user_message": "🔒 ميزة إنشاء وتوليد الملازم والدفاتر الأكاديمية تتطلب اشتراكاً نشطاً أو رصيد دقائق في حسابك! 👑🚀"
+                "user_message": "🔒 ميزة إنشاء وتوليد الملازم والدفاتر الأكاديمية متاحة حصرياً لمشتركي باقة النخبة (100 شيكل)! 👑🚀"
             }
         )
 
@@ -164,8 +163,18 @@ async def process_notebook(
 
     plan_name = str(sub_plan.get("name", "باقة نشطة"))
     plan_name_en = str(sub_plan.get("name_en", ""))
+    plan_price = float(sub_plan.get("price", 0) or 0)
 
-    is_free_trial = False
+    is_elite = plan_price >= 100 or any(k in plan_name.lower() for k in ["نخبة", "elite", "ذهبية", "100", "full term"])
+    if not is_elite:
+        logger.warning(f"🚫 [PROCESS_NOTEBOOK BLOCKED] User {user_id} is on plan '{plan_name}' (price: {plan_price}) - Elite required.")
+        raise HTTPException(
+            status_code=403,
+            detail={
+                "error_code": "ELITE_PLAN_REQUIRED",
+                "user_message": "🔒 ميزة إنشاء وتوليد الملازم والدفاتر الأكاديمية متاحة حصرياً لمشتركي باقة النخبة (100 شيكل)! 👑🚀"
+            }
+        )
     profile["active_subscription"] = active_sub
 
     student_major = profile.get("major") or "عام"
