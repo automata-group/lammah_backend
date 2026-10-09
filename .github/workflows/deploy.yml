@@ -56,11 +56,22 @@ jobs:
           key: ${{ secrets.SSH_PRIVATE_SERVER }}
           port: 2222
           script: |
-            # Cleanup
-            docker system prune -f
-            
+            # Stop and remove legacy containers occupying ports 8000 / 8001
+            docker stop lammah-backend-backend-1 lammah-backend-ytdl-service-1 lammah-backend-warp-1 2>/dev/null || true
+            docker rm lammah-backend-backend-1 lammah-backend-ytdl-service-1 lammah-backend-warp-1 2>/dev/null || true
+            if [ -d ~/lammah-backend ]; then
+              (cd ~/lammah-backend && docker compose down) 2>/dev/null || true
+            fi
+
+            # Cleanly stop current backend compose stack before recreating
             mkdir -p ~/lammah_backend
             cd ~/lammah_backend
+            if [ -f docker-compose.yml ]; then
+              docker compose down 2>/dev/null || true
+            fi
+
+            # Cleanup
+            docker system prune -f
 
             # Write YouTube cookies from secret (bypasses VPS IP block completely)
             if [ -n "${{ secrets.YOUTUBE_COOKIES }}" ]; then
