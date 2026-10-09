@@ -407,10 +407,13 @@ async def process_batch_lectures(
         nonlocal pdf_path
         audio_paths = []
         try:
-            # 0. Flush initial headers
-            yield ":" + " " * 1024 + "\n\n"
-            yield f"data: {json.dumps({'type': 'progress', 'step': '0/5', 'message': '🚀 جاري استقبال الملفات المتعددة وبدء الدمج...'}, ensure_ascii=False)}\n\n"
-            await asyncio.sleep(0.1)
+            # 0. Flush initial headers with 4KB padding to force reverse proxy immediate flush
+            num_inputs = max(1, len(urls_list) + len(temp_ids_list))
+            est_pre = max(100, num_inputs * 55 + (40 if pdf_path else 25))
+            padding = ":" + " " * 4096 + "\n\n"
+            yield padding
+            yield f"data: {json.dumps({'type': 'progress', 'step': '0/5', 'progress_percent': 5, 'time_estimate': est_pre, 'message': '🚀 جاري استقبال الملفات المتعددة وتجهيز المعالجة...'}, ensure_ascii=False)}\n\n"
+            await asyncio.sleep(0.05)
 
             # 1. Download URLs (if any) and append to audio_paths
             if urls_list:
@@ -455,7 +458,7 @@ async def process_batch_lectures(
             import subprocess
             import math
             
-            yield f"data: {json.dumps({'type': 'progress', 'step': '0/5', 'message': '📏 جاري حساب مدة المحاضرات وحصتك المتبقية...'}, ensure_ascii=False)}\n\n"
+            yield f"data: {json.dumps({'type': 'progress', 'step': '0/5', 'progress_percent': 7, 'time_estimate': est_pre, 'message': '📏 جاري حساب مدة المحاضرات وحصتك المتبقية...'}, ensure_ascii=False)}\n\n"
             
             audio_durations = []
             for path in audio_paths:
@@ -490,7 +493,7 @@ async def process_batch_lectures(
             is_audio_trimmed = False
 
             # 4. Queueing
-            yield f"data: {json.dumps({'type': 'progress', 'step': '0/5', 'message': '🎟️ تم حجز مكان لك في طابور المعالجة...'}, ensure_ascii=False)}\n\n"
+            yield f"data: {json.dumps({'type': 'progress', 'step': '0/5', 'progress_percent': 9, 'time_estimate': est_pre, 'message': '🎟️ تم حجز مكان لك في طابور المعالجة...'}, ensure_ascii=False)}\n\n"
             
             plan_name = "بدون اشتراك"
             _has_plan = profile.get("current_plan_id") and profile.get("current_plan_id") != "free"
@@ -525,7 +528,7 @@ async def process_batch_lectures(
                 status = queue_manager.get_job_status(job.job_id)
                 current_msg = queue_messages[msg_idx % len(queue_messages)]
                 pos = status['position'] if (status and 'position' in status) else 1
-                yield f"data: {json.dumps({'type': 'queued', 'position': pos, 'message': f'#{pos} | {current_msg}'}, ensure_ascii=False)}\n\n"
+                yield f"data: {json.dumps({'type': 'queued', 'position': pos, 'progress_percent': 10, 'time_estimate': est_pre, 'message': f'#{pos} | {current_msg}'}, ensure_ascii=False)}\n\n"
                 msg_idx += 1
                 await asyncio.sleep(4)
             
@@ -867,11 +870,11 @@ async def process_lecture(
         actual_pdf_path: Optional[str] = None
         base_dir_out = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
         try:
-            # 0. Flush initial headers & Padding
-            padding = ":" + " " * 1024 + "\n\n"
+            # 0. Flush initial headers & 4KB Padding to bypass proxy buffering
+            padding = ":" + " " * 4096 + "\n\n"
             yield padding
-            yield f"data: {json.dumps({'type': 'progress', 'step': '0/5', 'message': '🚀 بدأنا العمل! جاري تحضير المحرك...'}, ensure_ascii=False)}\n\n"
-            await asyncio.sleep(0.1)
+            yield f"data: {json.dumps({'type': 'progress', 'step': '0/5', 'progress_percent': 5, 'time_estimate': 85, 'message': '🚀 بدأنا العمل! جاري تحضير المحرك...'}, ensure_ascii=False)}\n\n"
+            await asyncio.sleep(0.05)
 
             # Detect if this is a document-only mode (no audio, no URL)
             is_document_only = (audio_path is None) and (not lecture_url)
