@@ -7,7 +7,7 @@ from app.core.auth_guard import get_user_profile
 from app.db.supabase_client import get_supabase
 from app.core.logger import logger
 from io import BytesIO
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
 import json
 import openpyxl  # type: ignore
 from openpyxl.styles import Font, PatternFill, Alignment, Border, Side  # type: ignore
@@ -343,6 +343,262 @@ async def grant_admin_by_query(data: GrantAdminQueryModel, admin=Depends(verify_
     except Exception as e:
         logger.error(f"❌ Error granting admin by query: {str(e)}")
         raise HTTPException(status_code=500, detail="حدث خطأ أثناء البحث وترقية المستخدم.")
+
+# =========================================================================
+# 👑 DIRECT CUSTOMER SUBSCRIPTION & SMART MINUTES ASSIGNMENT
+# =========================================================================
+
+class AssignSubscriptionModel(BaseModel):
+    email: str
+    plan_id: Optional[str] = None
+    custom_minutes: Optional[int] = 0
+    add_to_existing: bool = False
+    notes: Optional[str] = None
+
+@router.get("/subscriptions/plans")
+async def get_admin_subscription_plans(admin=Depends(verify_admin)):
+    """Fetch all active plans for the admin subscription assigner modal."""
+    try:
+        supabase = get_supabase()
+        res = supabase.table("subscription_plans").select("*").eq("is_active", True).order("price_ils").execute()
+        return res.data or []
+    except Exception as e:
+        logger.error(f"Error fetching admin plans: {e}")
+        raise HTTPException(status_code=500, detail="فشل جلب باقات الاشتراك")
+
+@router.get("/users/lookup-by-email")
+async def lookup_user_by_email(email: str, admin=Depends(verify_admin)):
+    """Look up user details, current quota, and current plan by Google email."""
+    clean_email = email.strip().lower()
+    if not clean_email or "@" not in clean_email:
+        raise HTTPException(status_code=400, detail="يرجى إدخال بريد إلكتروني صالح")
+        
+    supabase = get_supabase()
+    target_user_id = None
+    target_full_name = clean_email.split("@")[0]
+
+    try:
+        page = 1
+        while True:
+            auth_users = supabase.auth.admin.list_users(page=page, per_page=500)
+            if not auth_users:
+                break
+            for u in auth_users:
+                u_email = getattr(u, "email", "") or (u.get("email") if isinstance(u, dict) else "")
+                if u_email and u_email.strip().lower() == clean_email:
+                    target_user_id = str(getattr(u, "id", "") or (u.get("id") if isinstance(u, dict) else ""))
+                    meta = getattr(u, "user_metadata", {}) or {}
+                    if isinstance(meta, dict) and meta.get("full_name"):
+                        target_full_name = meta["full_name"]
+                    break
+            if target_user_id or len(auth_users) < 500:
+                break
+            page += 1
+    except Exception as ae:
+        logger.warning(f"Error listing auth users in lookup: {ae}")
+
+    if not target_user_id:
+        return {
+            "exists": False,
+            "email": clean_email,
+            "full_name": target_full_name,
+            "quota_remaining": 0,
+            "current_plan": "حساب جديد (سيتم إنشاؤه وتفعيل الرصيد له فوراً)",
+            "message": "هذا الحساب لم يسجل بعد، سيقوم النظام بتهيئته وشحن الرصيد له ليجده جاهزاً فور تسجيل دخوله بجوجل 🚀"
+        }
+
+    # Fetch profile
+    prof_res = supabase.table("profiles").select("*").eq("id", target_user_id).execute()
+    prof = prof_res.data[0] if prof_res.data else {}
+
+    plan_name = "بدون باقة (حساب مجاني)"
+    c_plan_id = prof.get("current_plan_id")
+    if c_plan_id:
+        p_res = supabase.table("subscription_plans").select("name").eq("id", c_plan_id).execute()
+        if p_res.data:
+            plan_name = p_res.data[0]["name"]
+
+    return {
+        "exists": True,
+        "id": target_user_id,
+        "email": clean_email,
+        "full_name": prof.get("full_name") or target_full_name,
+        "quota_remaining": prof.get("quota_remaining", 0),
+        "current_plan": plan_name,
+        "current_plan_id": c_plan_id,
+        "is_blocked": prof.get("is_blocked", False),
+        "phone_number": prof.get("phone_number", "")
+    }
+
+@router.post("/subscriptions/assign-by-email")
+async def assign_subscription_by_email(data: AssignSubscriptionModel, admin=Depends(verify_admin)):
+    """
+    Subscribe a customer to any plan and/or add smart minutes directly via their Google email.
+    """
+    clean_email = data.email.strip().lower()
+    if not clean_email or "@" not in clean_email:
+        raise HTTPException(status_code=400, detail="يرجى إدخال بريد إلكتروني صالح للعميل.")
+
+    supabase = get_supabase()
+    target_user_id = None
+    target_full_name = clean_email.split("@")[0]
+
+    # 1. Search for user in Auth
+    try:
+        page = 1
+        while True:
+            auth_users = supabase.auth.admin.list_users(page=page, per_page=500)
+            if not auth_users:
+                break
+            for u in auth_users:
+                u_email = getattr(u, "email", "") or (u.get("email") if isinstance(u, dict) else "")
+                if u_email and u_email.strip().lower() == clean_email:
+                    target_user_id = str(getattr(u, "id", "") or (u.get("id") if isinstance(u, dict) else ""))
+                    meta = getattr(u, "user_metadata", {}) or {}
+                    if isinstance(meta, dict) and meta.get("full_name"):
+                        target_full_name = meta["full_name"]
+                    break
+            if target_user_id or len(auth_users) < 500:
+                break
+            page += 1
+    except Exception as e:
+        logger.warning(f"Error listing users for assign: {e}")
+
+    # 2. If user does not exist in auth, create them in advance
+    if not target_user_id:
+        try:
+            created = supabase.auth.admin.create_user({
+                "email": clean_email,
+                "email_confirm": True,
+                "user_metadata": {"full_name": target_full_name}
+            })
+            if hasattr(created, "user") and created.user:
+                target_user_id = str(created.user.id)
+            elif isinstance(created, dict) and "id" in created:
+                target_user_id = str(created["id"])
+            logger.info(f"✨ Auto-created user account for {clean_email} -> {target_user_id}")
+        except Exception as ce:
+            logger.error(f"Failed to create auth user: {ce}")
+            raise HTTPException(status_code=400, detail=f"تعذر إنشاء أو ربط حساب العميل: {str(ce)}")
+
+    if not target_user_id:
+        raise HTTPException(status_code=404, detail="تعذر العثور على معرّف الحساب.")
+
+    # 3. Ensure profile in profiles table
+    prof_res = supabase.table("profiles").select("*").eq("id", target_user_id).execute()
+    profile = prof_res.data[0] if prof_res.data else None
+
+    if not profile:
+        new_prof = {
+            "id": target_user_id,
+            "full_name": target_full_name,
+            "quota_remaining": 0,
+            "role": "user"
+        }
+        ins_res = supabase.table("profiles").insert(new_prof).execute()
+        profile = ins_res.data[0] if ins_res.data else new_prof
+
+    current_quota = int(profile.get("quota_remaining") or 0)
+
+    # 4. Handle plan assignment
+    plan = None
+    plan_quota = 0
+    now = datetime.now(timezone.utc)
+    expires_at = now + timedelta(days=30)
+
+    if data.plan_id and data.plan_id != "custom_only":
+        p_res = supabase.table("subscription_plans").select("*").eq("id", data.plan_id).execute()
+        if not p_res.data:
+            raise HTTPException(status_code=404, detail="الباقة المختارة غير موجودة.")
+        plan = p_res.data[0]
+        plan_quota = int(plan.get("lecture_quota", 0))
+
+        # Calculate expiry duration
+        p_type = str(plan.get("period_type", "")).lower()
+        p_name = plan.get("name", "")
+        p_price = float(plan.get("price_ils", 0))
+
+        if p_type == "weekly":
+            expires_at = now + timedelta(days=7)
+        elif "semester" in p_type or "فصل" in p_name or "الذهبية" in p_name or p_price >= 100:
+            expires_at = now + timedelta(days=120)
+        else:
+            expires_at = now + timedelta(days=30)
+
+        # Cancel any previous active subscription
+        supabase.table("user_subscriptions") \
+            .update({"status": "cancelled"}) \
+            .eq("user_id", target_user_id) \
+            .eq("status", "active") \
+            .execute()
+
+        # Insert new active subscription
+        sub_record = {
+            "user_id": target_user_id,
+            "plan_id": plan["id"],
+            "status": "active",
+            "starts_at": now.isoformat(),
+            "expires_at": expires_at.isoformat(),
+            "lectures_used": 0
+        }
+        supabase.table("user_subscriptions").insert(sub_record).execute()
+
+        # Record completed transaction
+        try:
+            supabase.table("transactions").insert({
+                "user_id": target_user_id,
+                "plan_id": plan["id"],
+                "amount": p_price,
+                "status": "completed",
+                "short_order_id": f"ADM-{target_user_id[:6].upper()}"
+            }).execute()
+        except Exception as tx_err:
+            logger.warning(f"Failed to record admin transaction: {tx_err}")
+
+    # 5. Compute new quota
+    custom_add = int(data.custom_minutes or 0)
+    minutes_added = plan_quota + custom_add
+
+    if data.add_to_existing:
+        new_quota = current_quota + minutes_added
+    else:
+        new_quota = minutes_added if plan else (current_quota + custom_add)
+
+    # 6. Update user profile
+    update_dict: Dict[str, Any] = {
+        "quota_remaining": new_quota
+    }
+    if plan:
+        update_dict["current_plan_id"] = plan["id"]
+        update_dict["quota_reset_at"] = expires_at.isoformat()
+
+    supabase.table("profiles").update(update_dict).eq("id", target_user_id).execute()
+
+    # 7. Create notification for user
+    try:
+        plan_display = plan["name"] if plan else "رصيد دقائق إضافية"
+        supabase.table("notifications").insert({
+            "user_id": target_user_id,
+            "title": "تم تفعيل اشتراكك وإضافة الدقائق ⚡",
+            "message": f"تم تفعيل {plan_display} بنجاح. رصيدك الحالي الآن: {new_quota} دقيقة ذكية.",
+            "type": "subscription"
+        }).execute()
+    except Exception:
+        pass
+
+    logger.info(f"👑 Admin assigned plan '{plan_display}' to {clean_email}. Quota: {new_quota} mins.")
+
+    return {
+        "status": "success",
+        "message": f"تم بنجاح تفعيل {plan['name'] if plan else 'الرصيد'} للحساب ({clean_email}) وإضافة {minutes_added} دقيقة! الرصيد الإجمالي الحالي: {new_quota} دقيقة.",
+        "user_id": target_user_id,
+        "email": clean_email,
+        "plan_name": plan["name"] if plan else "رصيد يدوي مخصص",
+        "minutes_added": minutes_added,
+        "total_quota": new_quota,
+        "expires_at": expires_at.isoformat() if plan else None
+    }
+
 
 @router.get("/analytics/financial")
 async def get_financial_analytics(admin=Depends(verify_admin)):
