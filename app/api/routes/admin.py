@@ -513,17 +513,8 @@ async def assign_subscription_by_email(data: AssignSubscriptionModel, admin=Depe
         plan = p_res.data[0]
         plan_quota = int(plan.get("lecture_quota", 0))
 
-        # Calculate expiry duration
-        p_type = str(plan.get("period_type", "")).lower()
-        p_name = plan.get("name", "")
-        p_price = float(plan.get("price_ils", 0))
-
-        if p_type == "weekly" or "إنقاذ" in p_name or "essential" in p_name.lower() or p_price == 25:
-            expires_at = now + timedelta(days=7)
-        elif "semester" in p_type or "فصل" in p_name or "الذهبية" in p_name or "نخبة" in p_name or "elite" in p_name.lower() or p_price >= 100:
-            expires_at = now + timedelta(days=90)
-        else:
-            expires_at = now + timedelta(days=30)
+        # All plans have a validity duration of exactly 1 month (30 days) as requested
+        expires_at = now + timedelta(days=30)
 
         # Cancel any previous active subscription
         supabase.table("user_subscriptions") \
