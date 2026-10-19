@@ -165,7 +165,7 @@ async def list_projects(
 
     if search and search.strip():
         term = f"%{search.strip().replace(',', ' ')}%"
-        query = query.or_(f"title.ilike.{term},description.ilike.{term},owner_name.ilike.{term}")
+        query = query.or_(f"title.ilike.{term},description.ilike.{term},owner_name.ilike.{term},owner_faculty.ilike.{term}")
 
     # Sorting
     if sort_by == "newest":
