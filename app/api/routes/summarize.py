@@ -1212,7 +1212,7 @@ async def process_lecture(
         "X-Content-Type-Options": "nosniff",
     })
 
-@router.get("/download/{job_id}.pdf")
+@router.api_route("/download/{job_id}.pdf", methods=["GET", "HEAD"])
 async def download_annotated_pdf(
     job_id: str,
     title: Optional[str] = Query(None),

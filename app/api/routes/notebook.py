@@ -1018,7 +1018,7 @@ async def process_notebook(
         "X-Content-Type-Options": "nosniff",
     })
 
-@router.get("/download/{job_id}.pdf")
+@router.api_route("/download/{job_id}.pdf", methods=["GET", "HEAD"])
 async def download_notebook(
     job_id: str,
     download: bool = False,
@@ -1215,7 +1215,7 @@ async def download_notebook(
     )
 
 
-@router.get("/preview/{job_id}.pdf")
+@router.api_route("/preview/{job_id}.pdf", methods=["GET", "HEAD"])
 async def preview_notebook(
     job_id: str,
     token: Optional[str] = Query(None),
