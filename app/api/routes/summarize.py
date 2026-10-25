@@ -1267,12 +1267,15 @@ async def download_annotated_pdf(
             except Exception as meta_err:
                 logger.warning(f"Error reading sidecar {mp}: {meta_err}")
 
-    # 2. Check Supabase usage logs if title or mode still unresolved
+    # 2. Check Supabase usage logs if title or mode still unresolved (only if not already provided or if download requested)
     if not resolved_title or resolved_is_prep is None:
         try:
             from app.services.subscription_service import get_supabase
-            supabase = get_supabase()
-            res = supabase.table("usage_logs").select("metadata").eq("metadata->>job_id", job_id).execute()
+            def _lookup_sb():
+                supabase = get_supabase()
+                return supabase.table("usage_logs").select("metadata").eq("metadata->>job_id", job_id).limit(1).execute()
+
+            res = await asyncio.wait_for(asyncio.to_thread(_lookup_sb), timeout=1.2)
             if res.data and len(res.data) > 0 and isinstance(res.data[0], dict):
                 raw_meta = res.data[0].get("metadata")
                 sb_meta: dict = raw_meta if isinstance(raw_meta, dict) else {}
@@ -1287,7 +1290,7 @@ async def download_annotated_pdf(
                         tr = str(sb_meta.get("transcript", ""))
                         resolved_is_prep = len(tr.strip()) == 0
         except Exception as sb_err:
-            logger.warning(f"Supabase lookup failed for {job_id}: {sb_err}")
+            logger.warning(f"Fast Supabase lookup bypassed for {job_id}: {sb_err}")
 
     from app.services.filename_helper import format_arabic_download_filename
     arabic_filename = format_arabic_download_filename(
@@ -1297,11 +1300,16 @@ async def download_annotated_pdf(
     )
 
     disposition = "attachment" if download else "inline"
+    headers = {
+        "Cache-Control": "public, max-age=86400, stale-while-revalidate=604800",
+        "Accept-Ranges": "bytes",
+    }
     return FileResponse(
         resolved_path,
         media_type="application/pdf",
         filename=arabic_filename,
-        content_disposition_type=disposition
+        content_disposition_type=disposition,
+        headers=headers,
     )
 
 

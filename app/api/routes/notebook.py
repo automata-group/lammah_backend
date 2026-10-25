@@ -1202,11 +1202,16 @@ async def download_notebook(
     )
 
     disposition = "attachment" if download else "inline"
+    headers = {
+        "Cache-Control": "public, max-age=86400, stale-while-revalidate=604800",
+        "Accept-Ranges": "bytes",
+    }
     return FileResponse(
         resolved_path,
         media_type="application/pdf",
         filename=arabic_filename,
-        content_disposition_type=disposition
+        content_disposition_type=disposition,
+        headers=headers,
     )
 
 

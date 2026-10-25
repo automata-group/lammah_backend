@@ -717,7 +717,7 @@ def annotate_pdf(input_path: str, output_path: str, annotations: dict, is_free_t
                 except Exception:
                     pass
 
-        doc.save(output_path, garbage=2, deflate=True)
+        doc.save(output_path, garbage=4, deflate=True, clean=True)
         return output_path
         
     except Exception as e:
