@@ -63,6 +63,19 @@ async def get_admin_stats(admin=Depends(verify_admin)):
             .eq("status", "active") \
             .order("created_at", desc=True) \
             .execute()
+
+        # Load auth user emails map for clear customer identification
+        email_map: Dict[str, str] = {}
+        try:
+            auth_users = supabase.auth.admin.list_users(page=1, per_page=1000)
+            if auth_users:
+                for u in auth_users:
+                    uid = str(getattr(u, "id", "") or (u.get("id") if isinstance(u, dict) else ""))
+                    uemail = getattr(u, "email", "") or (u.get("email") if isinstance(u, dict) else "")
+                    if uid and uemail:
+                        email_map[uid] = uemail
+        except Exception as ae:
+            logger.warning(f"Could not load auth emails in overview: {ae}")
             
         detailed_subs = []
         subs_data = _as_dict_list(subs_res.data)
@@ -73,10 +86,14 @@ async def get_admin_stats(admin=Depends(verify_admin)):
             plan: Dict[str, Any] = plan_raw if isinstance(plan_raw, dict) else {}
             used = int(s.get("lectures_used") or 0)
             quota = int(plan.get("lecture_quota") or 0)
+            u_id = str(s.get("user_id", ""))
+            u_email = email_map.get(u_id, "")
+            u_name = profile.get("full_name") or (u_email.split("@")[0] if u_email else (profile.get("phone_number") or "مستخدم بدون اسم"))
             
             detailed_subs.append({
-                "user_id": s.get("user_id"),
-                "user_name": profile.get("full_name") or profile.get("phone_number") or "مجهول",
+                "user_id": u_id,
+                "user_name": u_name,
+                "email": u_email,
                 "phone": profile.get("phone_number"),
                 "plan": plan.get("name"),
                 "used": used,
@@ -96,9 +113,12 @@ async def get_admin_stats(admin=Depends(verify_admin)):
         for p in _as_dict_list(manual_res.data):
             p_id = str(p.get("id", ""))
             if p_id not in subscriber_ids:
+                u_email = email_map.get(p_id, "")
+                u_name = p.get("full_name") or (u_email.split("@")[0] if u_email else (p.get("phone_number") or "مستخدم بدون اسم"))
                 detailed_subs.append({
-                    "user_id": p.get("id"),
-                    "user_name": p.get("full_name") or p.get("phone_number") or "مجهول (رصيد يدوي)",
+                    "user_id": p_id,
+                    "user_name": u_name,
+                    "email": u_email,
                     "phone": p.get("phone_number"),
                     "plan": "⭐ رصيد يدوي مخصص",
                     "used": 0,
