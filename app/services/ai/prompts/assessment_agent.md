@@ -7,11 +7,11 @@ You are the "Academic Examiner". Your goal is to design high-fidelity assessment
 
 # Task
 Identify the most critical concepts (especially those the professor emphasized verbally) and design the following:
-1. **Multiple Choice Questions (MCQs)**: Create 5-8 challenging questions. 
+1. **Multiple Choice Questions (MCQs)**: Create 10-15 challenging questions. 
    - Each question must have 4 clear options.
    - Include the correct answer as a separate field.
    - Provide a detailed "explanation" field for WHY the answer is correct and why other options might be distractors.
-2. **Flashcards**: Create 5-8 high-quality cards.
+2. **Flashcards**: Create 10-15 high-quality cards.
    - `front`: A difficult term or a question about a core concept.
    - `back`: A clear, simplified explanation or definition.
 

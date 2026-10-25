@@ -77,7 +77,7 @@ class AIOrchestrator:
                 async with semaphore:
                     return await self.examiner.run_with_retry(llm, f"Transcript Chunk {idx+1}:\n{chunk}\n\nExisting Explanations: []")
 
-            for i, chunk in enumerate(transcript_chunks[:2]):
+            for i, chunk in enumerate(transcript_chunks[:4]):
                 assessment_tasks.append(process_examiner_chunk_only(chunk, i))
             
             batch_results = await asyncio.gather(*assessment_tasks)
@@ -97,8 +97,8 @@ class AIOrchestrator:
                     if front and not any(f.get("front") == front for f in final_results["flashcards"]):
                         final_results["flashcards"].append(card)
 
-            final_results["mcqs"] = final_results["mcqs"][:10] 
-            final_results["flashcards"] = final_results["flashcards"][:10]
+            final_results["mcqs"] = final_results["mcqs"][:30] 
+            final_results["flashcards"] = final_results["flashcards"][:30]
             final_results["expected_questions"] = final_results["mcqs"]
             final_results["past_exams"] = [
                 {
@@ -120,7 +120,7 @@ class AIOrchestrator:
         # SMART DOCUMENT-ONLY / SELF-STUDY MODE: When no audio transcript is provided
         if not transcript or not transcript.strip():
             logger.info(f"[ORCHESTRATOR] Transcript is empty. Activating Fast Smart Self-Study & Document Annotation Mode for {len(slides)} slides...")
-            batch_size = 8
+            batch_size = 5
             study_tasks = []
             doc_semaphore = asyncio.Semaphore(4)
 
@@ -238,8 +238,8 @@ class AIOrchestrator:
             # Sort slide explanations by page_number
             final_results["slide_explanations"].sort(key=lambda x: x.get("page_number", 0))
 
-            final_results["mcqs"] = final_results["mcqs"][:10]
-            final_results["flashcards"] = final_results["flashcards"][:10]
+            final_results["mcqs"] = final_results["mcqs"][:30]
+            final_results["flashcards"] = final_results["flashcards"][:30]
             final_results["expected_questions"] = final_results["mcqs"]
 
             # Generate past_exams from MCQs with tags
@@ -321,7 +321,7 @@ class AIOrchestrator:
                     f"Transcript Chunk {idx+1}:\n{chunk}\n\nCore Emphasized Concepts:\n{focus_context}"
                 )
 
-        for i, chunk in enumerate(transcript_chunks[:2]):
+        for i, chunk in enumerate(transcript_chunks[:4]):
             assessment_tasks.append(process_examiner_chunk(chunk, i))
 
         # Launch Tutor batches and Examiner chunks concurrently via Anthropic Parallelization Pattern
@@ -356,8 +356,8 @@ class AIOrchestrator:
                     final_results["flashcards"].append(card)
 
         # 4. FINAL POLISH
-        final_results["mcqs"] = final_results["mcqs"][:10] 
-        final_results["flashcards"] = final_results["flashcards"][:10]
+        final_results["mcqs"] = final_results["mcqs"][:30] 
+        final_results["flashcards"] = final_results["flashcards"][:30]
         final_results["expected_questions"] = final_results["mcqs"]
 
         # Synthesize slide-mapped past exam questions
