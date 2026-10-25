@@ -63,8 +63,8 @@ class AIOrchestrator:
             "past_exams": []
         }
 
-        # Concurrency control: parallel batches across OpenRouter / Gemini Flash (Anthropic Concurrency Best Practice)
-        semaphore = asyncio.Semaphore(8)
+        # Concurrency control: parallel batches across OpenRouter / Gemini Flash (Throttled to 4 to prevent upstream 429 Rate Limits)
+        semaphore = asyncio.Semaphore(4)
 
         # LINK/AUDIO ONLY BYPASS: Skip Mapper and Tutor if no PDF is uploaded
         if not pdf_context:
@@ -122,7 +122,7 @@ class AIOrchestrator:
             logger.info(f"[ORCHESTRATOR] Transcript is empty. Activating Fast Smart Self-Study & Document Annotation Mode for {len(slides)} slides...")
             batch_size = 8
             study_tasks = []
-            doc_semaphore = asyncio.Semaphore(8)
+            doc_semaphore = asyncio.Semaphore(4)
 
             async def process_doc_study_batch(batch):
                 async with doc_semaphore:
@@ -272,9 +272,9 @@ class AIOrchestrator:
             return final_results
 
         # 1. STEP: MAPPER (Sequential - High Precision context)
-        # Using the first 60k chars for mapping to ensure standard lectures are covered
+        # Using the first 45k chars for mapping to ensure standard lectures are covered
         logger.info("[ORCHESTRATOR] Starting Mapper Service...")
-        mapper_data = await self.mapper.run_with_retry(llm, f"PDF Context:\n{json.dumps(slides[:50], ensure_ascii=False)}\n\nTranscript:\n{transcript[:60000]}")
+        mapper_data = await self.mapper.run_with_retry(llm, f"PDF Context:\n{json.dumps(slides[:50], ensure_ascii=False)}\n\nTranscript:\n{transcript[:45000]}")
         if isinstance(mapper_data, dict):
             for key in ["highlights", "sticky_notes"]:
                 if key in mapper_data: final_results[key] = mapper_data[key]
@@ -302,7 +302,7 @@ class AIOrchestrator:
                     "highlights": [h for h in final_results["highlights"] if h.get("page_number") in batch_pages],
                     "focus_points": [fp for fp in final_results["focus_points"] if fp.get("page_number") in batch_pages]
                 }, ensure_ascii=False)
-                return await self.tutor.process(llm, transcript[:60000], batch, batch_mapping_context)
+                return await self.tutor.process(llm, transcript[:40000], batch, batch_mapping_context)
 
         for i in range(0, len(slides), batch_size):
             batch = slides[i : i + batch_size]

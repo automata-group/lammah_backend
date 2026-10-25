@@ -10,6 +10,7 @@ Priority Queue System with:
 """
 
 import asyncio
+import os
 import uuid
 import time
 from datetime import datetime, timezone
@@ -65,7 +66,7 @@ class QueueManager:
     """Enterprise-grade job queue manager."""
     
     # Processing config
-    MAX_CONCURRENT_JOBS = 2        # عدد المهام المتزامنة
+    MAX_CONCURRENT_JOBS = int(os.getenv("MAX_CONCURRENT_JOBS", "4"))  # عدد المهام المتزامنة (افتراضياً 4 بدلاً من 2)
     MAX_JOBS_PER_USER = 1          # حد المهام لكل مستخدم
     AVG_JOB_DURATION_SECONDS = 90  # متوسط مدة المعالجة
     MAX_RETRY_DELAY = 60           # أقصى تأخير لإعادة المحاولة

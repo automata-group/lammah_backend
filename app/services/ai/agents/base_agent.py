@@ -78,8 +78,14 @@ class BaseAgent:
                 await asyncio.sleep(1 * (attempt + 1))
             except Exception as e:
                 last_error = e
-                logger.error(f"Attempt {attempt+1}: LLM invocation failed: {type(e).__name__}: {e}")
-                await asyncio.sleep(1 * (attempt + 1))
+                err_str = str(e)
+                is_rate_limited = "429" in err_str or "rate" in err_str.lower()
+                sleep_time = (4 * (attempt + 1)) if is_rate_limited else (1 * (attempt + 1))
+                if is_rate_limited:
+                    logger.warning(f"⚠️ [RATE_LIMIT] 429 detected on attempt {attempt+1}. Backing off for {sleep_time}s...")
+                else:
+                    logger.error(f"Attempt {attempt+1}: LLM invocation failed: {type(e).__name__}: {e}")
+                await asyncio.sleep(sleep_time)
         
         logger.error(f"All {retries+1} attempts failed. Last error: {type(last_error).__name__ if last_error else 'None'}: {last_error}. Returning empty state.")
         return {}

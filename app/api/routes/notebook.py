@@ -222,14 +222,22 @@ async def process_notebook(
                 await asyncio.sleep(1)
                 waited += 1
                 
+            target_source = None
             if os.path.exists(processed_p):
                 logger.info(f"[NOTEBOOK] Found processed audio: {processed_p}")
-                audio_paths.append(processed_p)
+                target_source = processed_p
             elif os.path.exists(temp_path):
                 logger.info(f"[NOTEBOOK] Found original audio: {temp_path}")
-                audio_paths.append(temp_path)
+                target_source = temp_path
             else:
                 raise HTTPException(status_code=400, detail="temp_file_missing")
+
+            # Safely copy to backend upload_dir to isolate from Go uploader deletion & WinError 32
+            os.makedirs(upload_dir, exist_ok=True)
+            safe_audio_dst = os.path.join(upload_dir, f"{unique_id}_{os.path.basename(target_source)}")
+            from app.services.file_manager import safe_copy_file_async
+            await safe_copy_file_async(target_source, safe_audio_dst)
+            audio_paths.append(safe_audio_dst)
                 
     elif audio_file:
         os.makedirs(upload_dir, exist_ok=True)
@@ -255,6 +263,11 @@ async def process_notebook(
             pdf_waited += 1
         if os.path.exists(pdf_path):
             logger.info(f"[NOTEBOOK] Found PDF: {pdf_path} ({os.path.getsize(pdf_path)} bytes)")
+            os.makedirs(upload_dir, exist_ok=True)
+            safe_pdf_dst = os.path.join(upload_dir, f"{unique_id}_{pdf_temp_id}")
+            from app.services.file_manager import safe_copy_file_async
+            await safe_copy_file_async(pdf_path, safe_pdf_dst)
+            pdf_path = safe_pdf_dst
         else:
             logger.warning(f"[NOTEBOOK][WARN] PDF not found after {max_pdf_wait}s: {pdf_path} — continuing without slides.")
             pdf_path = None
@@ -266,6 +279,7 @@ async def process_notebook(
 
     async def event_stream():
         nonlocal audio_paths, pdf_path
+        is_free_trial = False
         try:
             # 0. Header padding
             yield ":" + " " * 1024 + "\n\n"

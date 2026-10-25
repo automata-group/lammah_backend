@@ -155,7 +155,8 @@ async def background_worker(row: LectureRow, user_id: str, plan_name: str, histo
                 else:
                     raise Exception("Audio file missing from temp.")
             audio_path = os.path.join(upload_dir, f"{unique_id}_{row.audio_temp_id}")
-            shutil.move(temp_p, audio_path)
+            from app.services.file_manager import safe_copy_file
+            safe_copy_file(temp_p, audio_path)
         elif row.lecture_url:
             update_progress("1/5", "🔗 جاري تحميل المحاضرة من الرابط...")
             audio_path = await asyncio.to_thread(download_audio_from_link, row.lecture_url.strip(), upload_dir, unique_id)
@@ -165,7 +166,8 @@ async def background_worker(row: LectureRow, user_id: str, plan_name: str, histo
             temp_p = os.path.join(temp_dir, row.pdf_temp_id)
             if os.path.exists(temp_p):
                 pdf_path = os.path.join(upload_dir, f"{unique_id}_{row.pdf_temp_id}")
-                shutil.move(temp_p, pdf_path)
+                from app.services.file_manager import safe_copy_file
+                safe_copy_file(temp_p, pdf_path)
                 
                 # If PPTX, immediately convert to PDF as the canonical single source of truth
                 if pdf_path.lower().endswith((".pptx", ".ppt")):
@@ -394,6 +396,10 @@ async def process_batch_lectures(
             pdf_waited += 1
         if os.path.exists(pdf_path):
             logger.info(f"[DEBUG] [BATCH] Found PDF: {pdf_path} ({os.path.getsize(pdf_path)} bytes)")
+            safe_pdf = os.path.join(upload_dir, f"{unique_id}_{pdf_temp_id}")
+            from app.services.file_manager import safe_copy_file
+            safe_copy_file(pdf_path, safe_pdf)
+            pdf_path = safe_pdf
         else:
             logger.warning(f"[WARN] [BATCH] PDF not found after {max_pdf_wait}s: {pdf_path} — continuing without.")
             pdf_path = None
@@ -441,13 +447,20 @@ async def process_batch_lectures(
                         await asyncio.sleep(1)
                         waited += 1
                         
+                    target_p = None
                     if os.path.exists(processed_p):
-                        audio_paths.append(processed_p)
+                        target_p = processed_p
                     elif os.path.exists(temp_path):
-                        audio_paths.append(temp_path)
+                        target_p = temp_path
                     else:
                         yield f"data: {json.dumps({'type': 'error', 'message': f'الملف المؤقت {temp_id} غير موجود.'}, ensure_ascii=False)}\n\n"
                         return
+
+                    os.makedirs(upload_dir, exist_ok=True)
+                    safe_audio = os.path.join(upload_dir, f"{unique_id}_{os.path.basename(target_p)}")
+                    from app.services.file_manager import safe_copy_file
+                    safe_copy_file(target_p, safe_audio)
+                    audio_paths.append(safe_audio)
 
             if not audio_paths:
                 yield f"data: {json.dumps({'type': 'error', 'message': 'لم يتم العثور على أي ملف صوتي أو فشل تحميل الروابط.'}, ensure_ascii=False)}\n\n"
