@@ -9,9 +9,13 @@ from app.core.logger import logger
 from io import BytesIO
 from datetime import datetime, timedelta, timezone
 import json
-import openpyxl  # type: ignore
-from openpyxl.styles import Font, PatternFill, Alignment, Border, Side  # type: ignore
-from openpyxl.utils import get_column_letter  # type: ignore
+try:
+    import openpyxl  # type: ignore
+    from openpyxl.styles import Font, PatternFill, Alignment, Border, Side  # type: ignore
+    from openpyxl.utils import get_column_letter  # type: ignore
+except ImportError:
+    openpyxl = None  # type: ignore
+    Font = PatternFill = Alignment = Border = Side = get_column_letter = None  # type: ignore
 
 router = APIRouter()
 
