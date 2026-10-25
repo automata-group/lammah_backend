@@ -17,12 +17,28 @@ async def create_checkout_transaction(
     profile: dict = Depends(get_user_profile)
 ):
     plan_id = payload.get("plan_id")
+    phone_number = payload.get("phone_number")
+    full_name = payload.get("full_name")
+    
     if not plan_id:
         raise HTTPException(status_code=400, detail={"user_message": "يرجى تحديد الباقة"})
         
     supabase = get_supabase()
     
     try:
+        # Update user profile with phone number and full name if provided
+        profile_update = {}
+        if full_name and isinstance(full_name, str) and full_name.strip():
+            profile_update["full_name"] = full_name.strip()
+        if phone_number and isinstance(phone_number, str) and phone_number.strip():
+            profile_update["phone_number"] = phone_number.strip()
+            
+        if profile_update:
+            try:
+                supabase.table("profiles").update(profile_update).eq("id", profile["id"]).execute()
+            except Exception as pe:
+                logger.warning(f"Failed to update profile phone/name: {pe}")
+
         plan_result = supabase.table("subscription_plans").select("*").eq("id", plan_id).execute()
         if not plan_result.data:
             raise HTTPException(status_code=404, detail={"user_message": "الباقة غير موجودة"})
@@ -42,14 +58,18 @@ async def create_checkout_transaction(
             from datetime import datetime, timezone
             # Bump the transaction to the top of the admin dashboard by updating created_at
             supabase.table("transactions").update({
-                "created_at": datetime.now(timezone.utc).isoformat()
+                "created_at": datetime.now(timezone.utc).isoformat(),
+                "payment_method": "whatsapp"
             }).eq("id", tx["id"]).execute()
             
             return {
                 "order_id": tx["short_order_id"], 
                 "amount": plan["price_ils"],
                 "plan_name": plan["name"],
-                "payment_number": "0598298930" # Configured Reflect number
+                "payment_number": "0598298930",
+                "phone_number": phone_number or profile.get("phone_number"),
+                "admin_whatsapp": "972598298930",
+                "message": "تم استلام طلبك بنجاح! سيتواصل معك فريق لمّاح عبر واتساب لتفعيل باقتك فوراً."
             }
             
         short_id = generate_short_id()
@@ -60,7 +80,7 @@ async def create_checkout_transaction(
             "plan_id": plan_id,
             "amount": str(plan["price_ils"]),
             "status": "pending",
-            "payment_method": "reflect"
+            "payment_method": "whatsapp"
         }
         
         result = supabase.table("transactions").insert(new_tx).execute()
@@ -69,7 +89,10 @@ async def create_checkout_transaction(
             "order_id": short_id, 
             "amount": plan["price_ils"],
             "plan_name": plan["name"],
-            "payment_number": "0598298930" # Configured Reflect number
+            "payment_number": "0598298930",
+            "phone_number": phone_number or profile.get("phone_number"),
+            "admin_whatsapp": "972598298930",
+            "message": "تم استلام طلبك بنجاح! سيتواصل معك فريق لمّاح عبر واتساب لتفعيل باقتك فوراً."
         }
     except Exception as e:
         logger.error(f"Failed to create transaction: {str(e)}")
