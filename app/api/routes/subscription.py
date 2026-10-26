@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi import APIRouter, Depends, HTTPException, Request, Query
 from app.core.auth_guard import verify_token, get_user_profile
 from app.core.logger import logger
 from pydantic import BaseModel
@@ -113,11 +113,15 @@ async def get_chat_usage(profile=Depends(get_user_profile)):
 
 
 @router.get("/history")
-async def get_history(profile=Depends(get_user_profile)):
-    """Get usage history for the user."""
+async def get_history(
+    limit: Optional[int] = Query(default=50, ge=1, le=100),
+    full: bool = Query(default=False),
+    profile=Depends(get_user_profile)
+):
+    """Get usage history for the user with high-performance lightweight payload."""
     try:
         from app.services.subscription_service import get_usage_logs
-        logs = get_usage_logs(profile["id"])
+        logs = get_usage_logs(profile["id"], limit=limit or 50, include_full_metadata=full)
         return {"logs": logs}
     except Exception as e:
         logger.warning(f"⚠️ خطأ في جلب السجل: {str(e)}")
