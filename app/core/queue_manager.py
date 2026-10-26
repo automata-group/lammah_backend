@@ -66,7 +66,7 @@ class QueueManager:
     """Enterprise-grade job queue manager."""
     
     # Processing config
-    MAX_CONCURRENT_JOBS = int(os.getenv("MAX_CONCURRENT_JOBS", "4"))  # عدد المهام المتزامنة (افتراضياً 4 بدلاً من 2)
+    MAX_CONCURRENT_JOBS = int(os.getenv("MAX_CONCURRENT_JOBS", "3"))  # 3 مهام متزامنة كحد أقصى على مستوى الخادم لضمان عدم تجاوز سقف الـ Rate Limits
     MAX_JOBS_PER_USER = 1          # حد المهام لكل مستخدم
     AVG_JOB_DURATION_SECONDS = 90  # متوسط مدة المعالجة
     MAX_RETRY_DELAY = 60           # أقصى تأخير لإعادة المحاولة

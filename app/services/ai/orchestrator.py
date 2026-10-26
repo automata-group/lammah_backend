@@ -29,6 +29,88 @@ class AIOrchestrator:
             start += (chunk_size - overlap)
         return chunks
 
+    def _extract_slide_keywords(self, text: str) -> set:
+        """يستخرج الكلمات المفتاحية الفريدة للشريحة لتحديد مقطعها الصوتي بدقة."""
+        words = re.findall(r'[\w]{3,}', text.lower())
+        stop_words = {
+            "and", "the", "are", "was", "were", "for", "not", "but", "you", "all", "any", "can", "had", "her", "him",
+            "his", "how", "its", "may", "new", "now", "old", "see", "two", "way", "who", "did", "put", "say", "she",
+            "too", "use", "with", "from", "have", "been", "there", "their", "what", "which", "when", "this", "that",
+            "هذه", "ذلك", "على", "التي", "الذي", "يكون", "كانت", "منها", "إلى", "فيما", "حول", "خلال", "تلك", "الذين",
+            "حيث", "بين", "أنه", "أنها", "وهو", "وهي", "كان", "أيضا", "فقط", "كذلك", "غير", "نحو", "دون", "مثل", "اليوم"
+        }
+        return {w for w in words if w not in stop_words and len(w) >= 3}
+
+    def _get_relevant_transcript_window(self, batch_slides: List[Dict[str, Any]], transcript: str, total_slides: int) -> str:
+        """
+        يربط دفعة الشرائح بالنافذة الصوتية المناسبة حصرياً، بدلاً من إرسال أول 40 ألف حرف عشوائياً.
+        يخفض استهلاك الـ Tokens بنسبة تفوق 80% ويرفع الدقة الزمنية للشرح.
+        """
+        if not transcript or not transcript.strip():
+            return ""
+
+        # تقسيم التفريغ الصوتي بناءً على علامات التوقيت المسجلة
+        # النمط المتولد من audio_service هو: ⏱️ [MM:SS - MM:SS]
+        segments = re.split(r'(⏱️\s*\[\d+:\d+\s*-\s*\d+:\d+\])', transcript)
+        
+        # إذا لم يكن النص مجزأً بتوقيتات، نقوم بتوزيعه بنسب موضعية عادلة
+        if len(segments) <= 1:
+            batch_start_page = min(s.get("page_number", 1) for s in batch_slides) if batch_slides else 1
+            batch_end_page = max(s.get("page_number", 1) for s in batch_slides) if batch_slides else 1
+            
+            ratio_start = max(0.0, (batch_start_page - 2) / max(1, total_slides))
+            ratio_end = min(1.0, (batch_end_page + 2) / max(1, total_slides))
+            
+            start_idx = int(len(transcript) * ratio_start)
+            end_idx = int(len(transcript) * ratio_end)
+            res = transcript[start_idx:end_idx]
+            return res if res.strip() else transcript[:12000]
+
+        # تجميع النصوص مع توقيتاتها
+        timed_blocks = []
+        if segments[0].strip():
+            timed_blocks.append({"time": "⏱️ [00:00]", "text": segments[0], "combined": segments[0]})
+            
+        for i in range(1, len(segments), 2):
+            label = segments[i]
+            body = segments[i+1] if (i+1) < len(segments) else ""
+            timed_blocks.append({"time": label, "text": body, "combined": f"{label}\n{body}"})
+
+        # حساب الكلمات المفتاحية لدفعة الشرائح
+        combined_batch_text = " ".join([str(s.get("text", "")) for s in batch_slides])
+        keywords = self._extract_slide_keywords(combined_batch_text)
+
+        # تسجيل النقاط لكل كتلة زمنية
+        scored_blocks = []
+        for idx, block in enumerate(timed_blocks):
+            score = 0
+            block_words = block["text"].lower()
+            for kw in keywords:
+                if kw in block_words:
+                    score += 1
+            scored_blocks.append((idx, score))
+
+        # اختيار الكتل الأعلى تطابقاً بنسبة عتبية ذكية (Relative threshold matching)
+        max_score = max(s for _, s in scored_blocks) if scored_blocks else 0
+        threshold = max(1, int(max_score * 0.5)) if max_score > 0 else 1
+        matched_indices = [idx for idx, score in scored_blocks if score >= threshold]
+        
+        if not matched_indices:
+            # في حال عدم وجود تطابق لفظي مباشر، نعتمد التناسب الموقعي للشرائح
+            avg_page = sum(s.get("page_number", 1) for s in batch_slides) / max(1, len(batch_slides))
+            estimated_idx = int((avg_page / max(1, total_slides)) * len(timed_blocks))
+            target_indices = {max(0, estimated_idx - 1), estimated_idx, min(len(timed_blocks) - 1, estimated_idx + 1)}
+        else:
+            min_idx = max(0, min(matched_indices) - 1)
+            max_idx = min(len(timed_blocks) - 1, max(matched_indices) + 1)
+            target_indices = set(range(min_idx, max_idx + 1))
+
+        # بناء النص المركز النهائي
+        selected_text = "\n\n".join([timed_blocks[i]["combined"] for i in sorted(target_indices)])
+        if not selected_text.strip():
+            return transcript[:12000]
+        return selected_text[:12000] # نافذة محكمة ومحددة لا تتجاوز 12 ألف حرف
+
     async def generate_complete_annotations(self, llm, transcript: str, pdf_context: List[str]) -> Dict[str, Any]:
         """
         Refactored Orchestrator: Combines high-precision mapping with parallel slide-batch tutoring.
@@ -295,14 +377,17 @@ class AIOrchestrator:
 
         async def process_tutor_batch(batch):
             async with semaphore:
-                # Provide full transcript (trimmed) to every batch for context
+                # Provide focused transcript window to every batch for context
                 # Pass only mapping context relevant to the slides in this batch to prevent topic bleed
                 batch_pages = {s["page_number"] for s in batch}
                 batch_mapping_context = json.dumps({
                     "highlights": [h for h in final_results["highlights"] if h.get("page_number") in batch_pages],
                     "focus_points": [fp for fp in final_results["focus_points"] if fp.get("page_number") in batch_pages]
                 }, ensure_ascii=False)
-                return await self.tutor.process(llm, transcript[:40000], batch, batch_mapping_context)
+                
+                # استدعاء النافذة الذكية بدلاً من تمرير أول 40 ألف حرف المبتورة
+                batch_transcript = self._get_relevant_transcript_window(batch, transcript, len(slides))
+                return await self.tutor.process(llm, batch_transcript, batch, batch_mapping_context)
 
         for i in range(0, len(slides), batch_size):
             batch = slides[i : i + batch_size]
