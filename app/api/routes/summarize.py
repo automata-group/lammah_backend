@@ -194,24 +194,24 @@ async def background_worker(row: LectureRow, user_id: str, plan_name: str, histo
         while job.status == JobStatus.QUEUED:
             await asyncio.sleep(4)
         
-        # 5. Transcription (skip if document-only)
-        if is_document_only:
-            transcript = ""
-        else:
-            update_progress("3/5", "🎧 جاري تحويل الكلام إلى نص بدقة عالية...")
-            if not audio_path:
-                raise ValueError("لم يتم توفير ملف صوتي للمعالجة")
-            transcript = await asyncio.to_thread(transcribe_audio, audio_path)
-        
-        # 6. PDF and AI
-        pdf_context = []
-        if pdf_path:
-            update_progress("3/5", "🔍 جاري تحليل محتوى الشرائح بدقة...")
+        # 5. Transcription & PDF Extraction (Executed concurrently)
+        update_progress("3/5", "🎧 جاري تفريغ الصوت وتحليل محتوى الشرائح بالتوازي...")
+
+        async def _do_transcribe():
+            if is_document_only or not audio_path:
+                return ""
+            return await asyncio.to_thread(transcribe_audio, audio_path)
+
+        async def _do_extract_pdf():
+            if not pdf_path:
+                return []
             pages = await asyncio.to_thread(extract_pages_from_pdf, pdf_path)
             logger.info(f"[BG_WORKER] PDF extracted {len(pages)} pages from {pdf_path}")
-            pdf_context = [f"--- الشريحة {p['page_number']} ---\n{p['text']}" for p in pages]
+            return [f"--- الشريحة {p['page_number']} ---\n{p['text']}" for p in pages]
 
+        transcript, pdf_context = await asyncio.gather(_do_transcribe(), _do_extract_pdf())
 
+        # 6. AI Orchestration
         if is_document_only:
             update_progress("4/5", "🧠 لمّاح يخطط الشرائح ويشرحها بالعامية ويترجم المصطلحات...")
         else:
@@ -220,21 +220,24 @@ async def background_worker(row: LectureRow, user_id: str, plan_name: str, histo
         llm = get_llm_for_user(user_id)
         annotations = await orchestrator.generate_complete_annotations(llm, transcript, pdf_context)
 
-        # 7. Annotation and Finalize
+        # 7. Annotation and Finalize (Concurrent Title Generation and PDF Annotation)
         download_url = None
-        if pdf_path:
-            update_progress("5/5", "🎨 اللمسات الأخيرة! جاري تلوين الشرائح...")
-            base_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
+        base_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
+
+        async def _do_annotate_pdf():
+            if not pdf_path:
+                return None
             output_pdf_path = os.path.join(base_dir, "outputs", f"{job.job_id}.pdf")
             os.makedirs(os.path.dirname(output_pdf_path), exist_ok=True)
-            
             from app.services.pdf_annotator import annotate_pdf
             await asyncio.to_thread(annotate_pdf, pdf_path, output_pdf_path, annotations, False)
-            download_url = f"/api/v1/summarize/download/{job.job_id}.pdf"
+            return f"/api/v1/summarize/download/{job.job_id}.pdf"
 
-
-        # Generate AI Title
-        ai_title = await generate_ai_title(llm, transcript, pdf_context)
+        update_progress("5/5", "🎨 اللمسات الأخيرة! جاري تلوين الشرائح وصياغة العنوان...")
+        ai_title, download_url = await asyncio.gather(
+            generate_ai_title(llm, transcript, pdf_context),
+            _do_annotate_pdf()
+        )
 
         # Save sidecar metadata for downloads
         if pdf_path:

@@ -36,29 +36,48 @@ async def early_security_middleware(request: Request, call_next):
         
         token = auth_header.split(" ")[1]
         try:
-            from app.db.supabase_client import get_supabase, get_auth_client
-            auth_client = get_auth_client()
-            user_response = auth_client.auth.get_user(token)
-            
-            if not user_response or not user_response.user:
-                return JSONResponse(status_code=401, content={"detail": {"user_message": "🔒 الجلسة منتهية."}})
-            
-            user_id = user_response.user.id
-            supabase = get_supabase()
-            profile_res = supabase.table("profiles").select("is_blocked, phone_verified").eq("id", user_id).execute()
-            
-            if not profile_res.data:
-                return JSONResponse(status_code=403, content={"detail": {"user_message": "🚫 لم يتم العثور على ملف شخصي."}})
-            
-            profile = profile_res.data[0]
-            if profile.get("is_blocked"):
-                return JSONResponse(status_code=403, content={"detail": {"user_message": "🚫 حسابك محظور."}})
-                
-        except Exception as e:
+            from app.core.auth_guard import _TOKEN_CACHE, _PROFILE_CACHE
+            import hashlib, time
 
+            now = time.time()
+            user_id = None
+            token_hash = hashlib.sha256(token.encode("utf-8")).hexdigest()
+            cached_token = _TOKEN_CACHE.get(token_hash)
+            
+            if cached_token and now < cached_token[0]:
+                user_id = cached_token[1].id
+            else:
+                from app.db.supabase_client import get_auth_client
+                auth_client = get_auth_client()
+                user_response = auth_client.auth.get_user(token)
+                
+                if not user_response or not user_response.user:
+                    return JSONResponse(status_code=401, content={"detail": {"user_message": "🔒 الجلسة منتهية."}})
+                
+                user = user_response.user
+                user_id = user.id
+                _TOKEN_CACHE[token_hash] = (now + 300.0, user)
+            
+            # Check profile cache
+            cached_profile = _PROFILE_CACHE.get(user_id)
+            if cached_profile and (now - cached_profile[0] < 60.0):
+                if cached_profile[1].get("is_blocked"):
+                    return JSONResponse(status_code=403, content={"detail": {"user_message": "🚫 حسابك محظور."}})
+            else:
+                from app.db.supabase_client import get_supabase
+                supabase = get_supabase()
+                profile_res = supabase.table("profiles").select("is_blocked, phone_verified").eq("id", user_id).execute()
+                
+                if not profile_res.data:
+                    return JSONResponse(status_code=403, content={"detail": {"user_message": "🚫 لم يتم العثور على ملف شخصي."}})
+                
+                profile = profile_res.data[0]
+                _PROFILE_CACHE[user_id] = (now, profile)
+                if profile.get("is_blocked"):
+                    return JSONResponse(status_code=403, content={"detail": {"user_message": "🚫 حسابك محظور."}})
+                    
+        except Exception as e:
             logger.error(f"Early security check failed: {e}")
-            # We let it pass to the normal dependency handler if there's a technical error here
-            # to avoid false positives, but usually this will catch invalid users.
             pass
 
     return await call_next(request)

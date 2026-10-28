@@ -146,7 +146,7 @@ async def approve_transaction(tx_id: str, profile: dict = Depends(verify_admin))
         sub, error = create_subscription(user_id=tx["user_id"], plan_id=tx["plan_id"])
         if error:
             logger.error(f"Failed to create subscription during approval: {error}")
-            # we could potentially rollback tx here, but it's a manual process MVP
+            supabase.table("transactions").update({"status": "pending"}).eq("id", tx_id).execute()
             raise HTTPException(status_code=500, detail={"user_message": error})
             
         return {"status": "success", "message": "تم تأكيد الدفع وتفعيل الاشتراك بنجاح"}
@@ -154,7 +154,7 @@ async def approve_transaction(tx_id: str, profile: dict = Depends(verify_admin))
         raise he
     except Exception as e:
         logger.error(f"Failed to approve transaction: {str(e)}")
-        raise HTTPException(status_code=500, detail={"user_message": "فشل في تأكيد الطلب. تحقق من السجلات."})
+        raise HTTPException(status_code=500, detail={"user_message": f"فشل في تأكيد الطلب: {str(e)}"})
 
 @router.post("/admin/{tx_id}/reject")
 async def reject_transaction(tx_id: str, profile: dict = Depends(verify_admin)):

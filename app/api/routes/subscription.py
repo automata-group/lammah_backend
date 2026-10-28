@@ -99,16 +99,31 @@ async def get_quota(request: Request, profile=Depends(get_user_profile)):
     return quota_info
 
 
+_CHAT_USAGE_CACHE = {}  # {user_id: (timestamp, count)}
+_CHAT_USAGE_CACHE_TTL = 60.0  # 60s cache to prevent repeated table scans
+
+def _get_cached_total_chats(user_id: str, supabase) -> int:
+    now = time.time()
+    if user_id in _CHAT_USAGE_CACHE:
+        ts, count = _CHAT_USAGE_CACHE[user_id]
+        if now - ts < _CHAT_USAGE_CACHE_TTL:
+            return count
+    try:
+        total_chats = supabase.table("usage_logs").select("chat_count").eq("user_id", user_id).execute()
+        total_chats_list = _as_dict_list(total_chats.data)
+        count = sum(item.get("chat_count", 0) or 0 for item in total_chats_list)
+        _CHAT_USAGE_CACHE[user_id] = (now, count)
+        return count
+    except Exception:
+        return 0
+
 @router.get("/chat-usage")
 async def get_chat_usage(profile=Depends(get_user_profile)):
     """Get total chat messages used by the user across all lectures."""
     try:
         from app.db.supabase_client import get_supabase
         supabase = get_supabase()
-        total_chats = supabase.table("usage_logs").select("chat_count").eq("user_id", profile["id"]).execute()
-        total_chats_list = _as_dict_list(total_chats.data)
-        total_chat_count = sum(item.get("chat_count", 0) or 0 for item in total_chats_list)
-        return {"total_chat_count": total_chat_count}
+        return {"total_chat_count": _get_cached_total_chats(profile["id"], supabase)}
     except Exception as e:
         logger.warning(f"⚠️ Error fetching chat usage: {str(e)}")
         return {"total_chat_count": 0}
@@ -147,12 +162,7 @@ async def get_history_item(log_id: str, profile=Depends(get_user_profile)):
         if not data_dict:
             raise HTTPException(status_code=404, detail="السجل غير موجود")
         
-        # Calculate total chat count across all user's lectures
-        total_chats = supabase.table("usage_logs").select("chat_count").eq("user_id", profile["id"]).execute()
-        total_chats_list = _as_dict_list(total_chats.data)
-        total_chat_count = sum(item.get("chat_count", 0) or 0 for item in total_chats_list)
-        
-        data_dict["total_chat_count"] = total_chat_count
+        data_dict["total_chat_count"] = _get_cached_total_chats(profile["id"], supabase)
         return data_dict
     except Exception as e:
         logger.warning(f"⚠️ خطأ في جلب تفاصيل السجل: {str(e)}")

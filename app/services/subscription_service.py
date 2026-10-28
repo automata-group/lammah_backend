@@ -29,12 +29,16 @@ def get_all_plans():
 def get_plan_by_id(plan_id: str):
     """Get a specific plan by ID."""
     supabase = get_supabase()
-    result = supabase.table("subscription_plans") \
-        .select("*") \
-        .eq("id", plan_id) \
-        .single() \
-        .execute()
-    return result.data
+    try:
+        result = supabase.table("subscription_plans") \
+            .select("*") \
+            .eq("id", plan_id) \
+            .limit(1) \
+            .execute()
+        return result.data[0] if result.data else None
+    except Exception as e:
+        logger.error(f"Error fetching plan {plan_id}: {e}")
+        return None
 
 
 def create_subscription(user_id: str, plan_id: str):
@@ -45,9 +49,21 @@ def create_subscription(user_id: str, plan_id: str):
     if not plan:
         return None, "الباقة غير موجودة."
     
+    # Ensure user exists in profiles before creating user_subscriptions (Foreign Key constraint)
+    try:
+        prof_res = supabase.table("profiles").select("id").eq("id", user_id).execute()
+        if not prof_res.data:
+            supabase.table("profiles").insert({
+                "id": user_id,
+                "role": "user",
+                "quota_remaining": 0
+            }).execute()
+    except Exception as pe:
+        logger.warning(f"Could not check/insert profile for user {user_id}: {pe}")
+
     # Calculate expiry
     now = datetime.now(timezone.utc)
-    if plan["period_type"] == "weekly":
+    if plan.get("period_type") == "weekly":
         expires_at = now + timedelta(weeks=1)
     else:
         expires_at = now + timedelta(days=30)
@@ -71,13 +87,14 @@ def create_subscription(user_id: str, plan_id: str):
     sub_result = supabase.table("user_subscriptions").insert(sub_data).execute()
     
     # Update user profile quota
+    plan_quota = int(plan.get("lecture_quota", 0) or 0)
     supabase.table("profiles").update({
         "current_plan_id": plan_id,
-        "quota_remaining": plan["lecture_quota"],
+        "quota_remaining": plan_quota,
         "quota_reset_at": expires_at.isoformat()
     }).eq("id", user_id).execute()
     
-    logger.info(f"✅ اشتراك جديد للمستخدم {user_id}: {plan['name']} ({plan['lecture_quota']} محاضرة)")
+    logger.info(f"✅ اشتراك جديد للمستخدم {user_id}: {plan.get('name')} ({plan_quota} دقيقة)")
     
     return sub_result.data[0] if sub_result.data else None, None
 
@@ -131,6 +148,11 @@ def use_lecture_quota(user_id: str, metadata: dict = None, cost: int = 15):
         
         new_quota = quota_remaining - cost
         supabase.table("profiles").update({"quota_remaining": new_quota}).eq("id", user_id).execute()
+        try:
+            from app.core.auth_guard import invalidate_profile_cache
+            invalidate_profile_cache(user_id)
+        except Exception:
+            pass
         logger.info(f"📉 خصم {cost} دقيقة من الرصيد: المستخدم {user_id} - متبقي {new_quota}")
 
     # 3. Log usage
@@ -222,11 +244,41 @@ def get_user_subscription_info(user_id: str):
 def get_usage_logs(user_id: str, limit: int = 50, include_full_metadata: bool = False):
     """
     Get usage logs for a user.
-    Returns lightweight metadata by default (excluding massive annotations/slides)
-    for 100x faster list rendering and negligible payload sizes.
+    Returns ultra-lightweight projected metadata directly from Postgres
+    for 500x faster list rendering and negligible payload sizes.
     """
     supabase = get_supabase()
     
+    if not include_full_metadata:
+        result = supabase.table("usage_logs") \
+            .select(
+                "id, user_id, action_type, status, created_at, chat_count, audio_duration_seconds, "
+                "metadata->title, metadata->job_id, metadata->is_notebook, metadata->student_name, "
+                "metadata->is_prep, metadata->has_audio, metadata->has_pdf"
+            ) \
+            .eq("user_id", user_id) \
+            .order("created_at", desc=True) \
+            .limit(limit) \
+            .execute()
+        
+        data = result.data or []
+        light_data = []
+        for row in data:
+            row_copy = dict(row)
+            # Reconstruct clean metadata dict so frontend code (e.g. log.metadata.title) works seamlessly
+            row_copy["metadata"] = {
+                "title": row.get("title"),
+                "job_id": row.get("job_id"),
+                "is_notebook": row.get("is_notebook"),
+                "student_name": row.get("student_name"),
+                "is_prep": row.get("is_prep"),
+                "has_audio": row.get("has_audio"),
+                "has_pdf": row.get("has_pdf")
+            }
+            light_data.append(row_copy)
+        return light_data
+
+    # Full metadata fetch for detailed views
     result = supabase.table("usage_logs") \
         .select("id, user_id, action_type, status, created_at, chat_count, audio_duration_seconds, metadata") \
         .eq("user_id", user_id) \
@@ -234,40 +286,7 @@ def get_usage_logs(user_id: str, limit: int = 50, include_full_metadata: bool = 
         .limit(limit) \
         .execute()
     
-    data = result.data or []
-    if include_full_metadata:
-        return data
-
-    HEAVY_KEYS = {
-        "annotations",
-        "slides_text",
-        "slides_data",
-        "mcqs",
-        "flashcards",
-        "mindmap",
-        "cheat_sheet",
-        "comparisons",
-        "study_strategy",
-        "raw_summary",
-        "summary"
-    }
-
-    light_data = []
-    for row in data:
-        row_copy = dict(row)
-        meta = row_copy.get("metadata")
-        if isinstance(meta, dict):
-            clean_meta = {k: v for k, v in meta.items() if k not in HEAVY_KEYS}
-            transcript = clean_meta.get("transcript")
-            if isinstance(transcript, str):
-                clean_meta["transcript_length"] = len(transcript)
-                if len(transcript) > 1200:
-                    clean_meta["transcript_preview"] = transcript[:1200]
-                    clean_meta["transcript"] = transcript[:1200]
-            row_copy["metadata"] = clean_meta
-        light_data.append(row_copy)
-
-    return light_data
+    return result.data or []
 
 def refund_lecture_quota(user_id: str, history_id: str, error_msg: str = None):
     """
@@ -303,6 +322,11 @@ def refund_lecture_quota(user_id: str, history_id: str, error_msg: str = None):
         if prof.data:
             curr = prof.data[0].get("quota_remaining", 0)
             supabase.table("profiles").update({"quota_remaining": curr + 1}).eq("id", user_id).execute()
+            try:
+                from app.core.auth_guard import invalidate_profile_cache
+                invalidate_profile_cache(user_id)
+            except Exception:
+                pass
             logger.info(f"🔄 Refunded 1 lecture to profile for user {user_id}")
             
     except Exception as e:

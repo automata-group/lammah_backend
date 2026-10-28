@@ -502,11 +502,33 @@ async def assign_subscription_by_email(data: AssignSubscriptionModel, admin=Depe
                 target_user_id = str(created["id"])
             logger.info(f"✨ Auto-created user account for {clean_email} -> {target_user_id}")
         except Exception as ce:
-            logger.error(f"Failed to create auth user: {ce}")
-            raise HTTPException(status_code=400, detail=f"تعذر إنشاء أو ربط حساب العميل: {str(ce)}")
+            logger.warning(f"Initial create_user returned: {ce}. Searching auth users again...")
+            # If user already registered, perform an exhaustive search across pages
+            try:
+                page = 1
+                while True:
+                    auth_users = supabase.auth.admin.list_users(page=page, per_page=500)
+                    if not auth_users:
+                        break
+                    for u in auth_users:
+                        u_email = getattr(u, "email", "") or (u.get("email") if isinstance(u, dict) else "")
+                        if u_email and u_email.strip().lower() == clean_email:
+                            target_user_id = str(getattr(u, "id", "") or (u.get("id") if isinstance(u, dict) else ""))
+                            meta = getattr(u, "user_metadata", {}) or {}
+                            if isinstance(meta, dict) and meta.get("full_name"):
+                                target_full_name = meta["full_name"]
+                            break
+                    if target_user_id or len(auth_users) < 500:
+                        break
+                    page += 1
+            except Exception as se:
+                logger.error(f"Exhaustive search failed: {se}")
+
+            if not target_user_id:
+                raise HTTPException(status_code=400, detail={"user_message": f"تعذر إنشاء أو ربط حساب العميل: {str(ce)}"})
 
     if not target_user_id:
-        raise HTTPException(status_code=404, detail="تعذر العثور على معرّف الحساب.")
+        raise HTTPException(status_code=404, detail={"user_message": "تعذر العثور على معرّف الحساب."})
 
     # 3. Ensure profile in profiles table
     prof_res = supabase.table("profiles").select("*").eq("id", target_user_id).execute()
@@ -533,9 +555,10 @@ async def assign_subscription_by_email(data: AssignSubscriptionModel, admin=Depe
     if data.plan_id and data.plan_id != "custom_only":
         p_res = supabase.table("subscription_plans").select("*").eq("id", data.plan_id).execute()
         if not p_res.data:
-            raise HTTPException(status_code=404, detail="الباقة المختارة غير موجودة.")
+            raise HTTPException(status_code=404, detail={"user_message": "الباقة المختارة غير موجودة."})
         plan = p_res.data[0]
-        plan_quota = int(plan.get("lecture_quota", 0))
+        plan_quota = int(plan.get("lecture_quota", 0) or 0)
+        p_price = float(plan.get("price_ils", 0.0) or 0.0)
 
         # All plans have a validity duration of exactly 1 month (30 days) as requested
         expires_at = now + timedelta(days=30)
@@ -564,6 +587,7 @@ async def assign_subscription_by_email(data: AssignSubscriptionModel, admin=Depe
                 "user_id": target_user_id,
                 "plan_id": plan["id"],
                 "amount": p_price,
+                "payment_method": "admin_direct",
                 "status": "completed",
                 "short_order_id": f"ADM-{target_user_id[:6].upper()}"
             }).execute()
@@ -588,10 +612,15 @@ async def assign_subscription_by_email(data: AssignSubscriptionModel, admin=Depe
         update_dict["quota_reset_at"] = expires_at.isoformat()
 
     supabase.table("profiles").update(update_dict).eq("id", target_user_id).execute()
+    try:
+        from app.core.auth_guard import invalidate_profile_cache
+        invalidate_profile_cache(target_user_id)
+    except Exception:
+        pass
 
     # 7. Create notification for user
+    plan_display = plan["name"] if plan else "رصيد دقائق إضافية"
     try:
-        plan_display = plan["name"] if plan else "رصيد دقائق إضافية"
         supabase.table("notifications").insert({
             "user_id": target_user_id,
             "title": "تم تفعيل اشتراكك وإضافة الدقائق ⚡",
