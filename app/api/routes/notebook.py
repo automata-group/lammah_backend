@@ -101,6 +101,8 @@ async def process_notebook(
     student_name: Optional[str] = Form(None),
     notebook_type: Optional[str] = Form("university"),
     language_mode: Optional[str] = Form("bilingual"),
+    start_page: Optional[int] = Form(None),
+    end_page: Optional[int] = Form(None),
     profile=Depends(check_quota)
 ):
     """
@@ -310,6 +312,15 @@ async def process_notebook(
                 from app.services.pptx_converter import convert_pptx_to_pdf
                 pdf_path = await asyncio.to_thread(convert_pptx_to_pdf, pdf_path, upload_dir)
                 logger.info(f"[NOTEBOOK] PPTX converted immediately to PDF: {pdf_path}")
+
+            if pdf_path and (start_page or end_page):
+                from app.services.pdf_service import slice_pdf_pages
+                sliced_pdf_output = os.path.join(upload_dir, f"sliced_notebook_{unique_id}.pdf")
+                sliced_pdf = await asyncio.to_thread(slice_pdf_pages, pdf_path, sliced_pdf_output, start_page, end_page)
+                if sliced_pdf and os.path.exists(sliced_pdf):
+                    pdf_path = sliced_pdf
+                    msg_range = f"✂️ تم تحديد نطاق الصفحات: من {start_page or 1} إلى {end_page or 'النهاية'}..."
+                    yield f"data: {json.dumps({'type': 'progress', 'step': '1/5', 'message': msg_range}, ensure_ascii=False)}\n\n" 
 
             # calculate cost in minutes
             import subprocess

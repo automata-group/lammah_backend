@@ -347,6 +347,8 @@ async def process_batch_lectures(
     pdf_temp_id: Optional[str] = Form(None),
     lecture_urls: Optional[str] = Form(None),   # Comma separated
     audio_temp_ids: Optional[str] = Form(None), # Comma separated
+    start_page: Optional[int] = Form(None),
+    end_page: Optional[int] = Form(None),
     profile=Depends(check_quota)
 ):
     """
@@ -625,6 +627,12 @@ async def process_batch_lectures(
                     yield f"data: {json.dumps({'type': 'progress', 'step': '2/5', 'progress_percent': 64, 'time_estimate': cur_rem, 'message': '📑 2/5 جاري تحويل ملف البوربوينت إلى PDF لضمان المطابقة 100%...'}, ensure_ascii=False)}\n\n"
                     from app.services.pptx_converter import convert_pptx_to_pdf
                     pdf_path = await asyncio.to_thread(convert_pptx_to_pdf, pdf_path, os.path.dirname(pdf_path))
+                if pdf_path and (start_page or end_page):
+                    from app.services.pdf_service import slice_pdf_pages
+                    sliced_output = os.path.join(os.path.dirname(pdf_path), f"sliced_batch_{unique_id}.pdf")
+                    sliced_path = await asyncio.to_thread(slice_pdf_pages, pdf_path, sliced_output, start_page, end_page)
+                    if sliced_path and os.path.exists(sliced_path):
+                        pdf_path = sliced_path
                 yield f"data: {json.dumps({'type': 'progress', 'step': '2/5', 'progress_percent': 68, 'time_estimate': cur_rem - 3, 'message': '🔍 2/5 جاري قراءة محتوى الشابتر المرفق بدقة هندسية...'}, ensure_ascii=False)}\n\n"
                 pdf_pages = await asyncio.to_thread(extract_pages_from_pdf, pdf_path)
                 pdf_context = [f"--- Page {p['page_number']} ---\n{p['text']}" for p in pdf_pages[:150]]
@@ -787,6 +795,8 @@ async def process_lecture(
     pdf_temp_id: Optional[str] = Form(None),
     lecture_url: Optional[str] = Form(None),
     metadata: Optional[str] = Form(None),
+    start_page: Optional[int] = Form(None),
+    end_page: Optional[int] = Form(None),
     profile=Depends(check_quota)
 ):
     """
@@ -922,6 +932,15 @@ async def process_lecture(
                 temp_pdf_dir = os.path.dirname(pdf_path)
                 pdf_path = await asyncio.to_thread(convert_pptx_to_pdf, pdf_path, temp_pdf_dir)
                 logger.info(f"[PROCESS_LECTURE] PPTX converted immediately to PDF: {pdf_path}")
+
+            if pdf_path and (start_page or end_page):
+                from app.services.pdf_service import slice_pdf_pages
+                sliced_pdf_output = os.path.join(os.path.dirname(pdf_path), f"sliced_{unique_id}.pdf")
+                sliced_pdf = await asyncio.to_thread(slice_pdf_pages, pdf_path, sliced_pdf_output, start_page, end_page)
+                if sliced_pdf and os.path.exists(sliced_pdf):
+                    pdf_path = sliced_pdf
+                    msg_range = f"✂️ تم تحديد نطاق الصفحات: من {start_page or 1} إلى {end_page or 'النهاية'}..."
+                    yield f"data: {json.dumps({'type': 'progress', 'step': '0/5', 'message': msg_range}, ensure_ascii=False)}\n\n" 
 
             if is_document_only:
                 # Calculate cost based on PDF page count
