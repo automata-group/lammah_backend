@@ -1,3 +1,4 @@
+from starlette.concurrency import run_in_threadpool
 from fastapi import APIRouter, Request, BackgroundTasks, Depends, HTTPException
 from pydantic import BaseModel
 from typing import Dict, Any, List, Optional
@@ -50,7 +51,7 @@ async def collect_telemetry(payload: TelemetryPayload, request: Request, backgro
                 country_mapped = analytics_service.translate_geo(cf_country)
                 if country_mapped != cf_country:
                     geo["country"] = country_mapped
-            analytics_service.record_telemetry(payload.dict(), client_ip, geo)
+            await run_in_threadpool(analytics_service.record_telemetry, payload.dict(), client_ip, geo)
         except Exception as e:
             logger.error(f"Error processing telemetry: {e}")
             

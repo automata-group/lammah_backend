@@ -621,14 +621,22 @@ async def get_financial_analytics(admin=Depends(verify_admin)):
     try:
         supabase = get_supabase()
         
-        # 1. Student Subscription Transactions
+        # 1. Student Subscription Transactions (Fixed query to use valid joined tables)
         tx_res = supabase.table("transactions")\
-            .select("id, user_id, amount, plan_name, sender_name, sender_phone, payment_method, status, created_at, profiles:user_id(full_name, phone_number)")\
-            .eq("status", "approved")\
+            .select("id, short_order_id, user_id, amount, status, payment_method, created_at, subscription_plans(name, name_en, price_ils), profiles:user_id(full_name, phone_number)")\
+            .in_("status", ["completed", "approved"])\
             .order("created_at", desc=True)\
             .execute()
         
-        student_txs = _as_dict_list(tx_res.data)
+        student_txs_raw = _as_dict_list(tx_res.data)
+        student_txs = []
+        for tx in student_txs_raw:
+            plan_obj = tx.get("subscription_plans") or {}
+            prof_obj = tx.get("profiles") or {}
+            tx["plan_name"] = plan_obj.get("name") or plan_obj.get("name_en") or "اشتراك لمّاح"
+            tx["sender_name"] = prof_obj.get("full_name") or "طالب"
+            tx["sender_phone"] = prof_obj.get("phone_number") or ""
+            student_txs.append(tx)
         student_revenue = sum(float(tx.get("amount", 0) or 0) for tx in student_txs)
         
         from datetime import datetime, timedelta, timezone

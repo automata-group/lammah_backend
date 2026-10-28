@@ -121,35 +121,48 @@ def insert_text_auto(page, rect, lines, start_fs=10.0, min_fs=7.2, fontname="ami
     """
     Inserts multi-line text with auto font-scaling down to min_fs and line-trimming
     fallback so that a box is NEVER completely blank in the PDF.
+    Guarded against invalid or zero-area rectangles to avoid PyMuPDF crashes.
     """
     if not lines:
         return 0
+    if not rect or not getattr(rect, "is_valid", False) or getattr(rect, "is_empty", True) or rect.width < 10 or rect.height < 5:
+        logger.warning(f"[PDF_ANNOTATOR] Skipped text block due to invalid or too small rect: {rect}")
+        return 0
+
     valid_lines = [l for l in lines if l is not None]
     if not valid_lines:
         return 0
         
     cur_lines = list(valid_lines)
-    avail_h = rect.height
+    avail_h = max(1.0, rect.height)
     calc_fs = avail_h / (max(len(cur_lines), 1) * 1.55)
     fs = min(start_fs, max(min_fs, calc_fs))
     
     text_content = "\n".join(cur_lines)
-    rc = page.insert_textbox(rect, text_content, fontsize=fs, fontname=fontname, color=color, align=align)
+    try:
+        rc = page.insert_textbox(rect, text_content, fontsize=fs, fontname=fontname, color=color, align=align)
+    except Exception as e:
+        logger.warning(f"[PDF_ANNOTATOR] insert_textbox failed on {rect}: {e}")
+        return 0
     
     # Scale down font size if text overflows
     while rc < 0 and fs > min_fs:
         fs -= 0.3
-        rc = page.insert_textbox(rect, text_content, fontsize=fs, fontname=fontname, color=color, align=align)
+        try:
+            rc = page.insert_textbox(rect, text_content, fontsize=fs, fontname=fontname, color=color, align=align)
+        except Exception:
+            break
         
     # If still overflowing at min_fs, trim bottom lines until it fits cleanly
     while rc < 0 and len(cur_lines) > 2:
         cur_lines.pop()
         text_content = "\n".join(cur_lines)
-        rc = page.insert_textbox(rect, text_content, fontsize=fs, fontname=fontname, color=color, align=align)
+        try:
+            rc = page.insert_textbox(rect, text_content, fontsize=fs, fontname=fontname, color=color, align=align)
+        except Exception:
+            break
         
     return rc
-
-
 
 
 def annotate_pdf(input_path: str, output_path: str, annotations: dict, is_free_trial: bool = False, progress_callback: Any = None) -> str:

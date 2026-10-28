@@ -3,15 +3,27 @@ from app.core.logger import logger
 from datetime import datetime, timezone, timedelta
 
 
+import time
+
+_PLANS_CACHE = {"data": None, "timestamp": 0}
+_PLANS_CACHE_TTL = 600.0  # 10 minutes TTL to prevent blocking event loop
+
 def get_all_plans():
-    """Return all active subscription plans."""
+    """Return all active subscription plans with in-memory caching."""
+    now = time.time()
+    if _PLANS_CACHE["data"] is not None and (now - _PLANS_CACHE["timestamp"]) < _PLANS_CACHE_TTL:
+        return _PLANS_CACHE["data"]
+
     supabase = get_supabase()
     result = supabase.table("subscription_plans") \
         .select("*") \
         .eq("is_active", True) \
         .order("price_ils") \
         .execute()
-    return result.data or []
+    data = result.data or []
+    _PLANS_CACHE["data"] = data
+    _PLANS_CACHE["timestamp"] = now
+    return data
 
 
 def get_plan_by_id(plan_id: str):

@@ -1,3 +1,7 @@
+import time
+
+_PROFILE_CACHE = {}  # {user_id: (timestamp, profile_data)}
+_PROFILE_CACHE_TTL = 45.0  # Cache profile for 45s to avoid double Supabase HTTP calls on every API request
 from fastapi import Request, HTTPException, Depends
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from app.db.supabase_client import get_supabase, get_auth_client
@@ -31,6 +35,11 @@ async def verify_token(credentials: HTTPAuthorizationCredentials = Depends(secur
 
 async def get_user_profile(request: Request, user=Depends(verify_token)):
     """Get user profile. Auto-create if missing. Capture device metadata."""
+    now = time.time()
+    if user.id in _PROFILE_CACHE:
+        cached_time, cached_profile = _PROFILE_CACHE[user.id]
+        if now - cached_time < _PROFILE_CACHE_TTL:
+            return cached_profile
     supabase = get_supabase()
     
     # Step 1: Try to get existing profile

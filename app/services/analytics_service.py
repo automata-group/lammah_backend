@@ -122,7 +122,8 @@ def init_analytics_db():
 init_analytics_db()
 
 def get_db():
-    conn = sqlite3.connect(DB_PATH)
+    conn = sqlite3.connect(DB_PATH, timeout=10.0)
+    conn.execute("PRAGMA busy_timeout = 5000;")
     conn.row_factory = sqlite3.Row
     return conn
 
@@ -136,7 +137,7 @@ async def resolve_ip_geo(ip: str) -> Dict[str, str]:
     
     # Try fast IP-API (free, no token needed, returns JSON)
     try:
-        async with httpx.AsyncClient(timeout=2.0) as client:
+        async with httpx.AsyncClient(timeout=0.6) as client:
             resp = await client.get(f"http://ip-api.com/json/{ip}?fields=status,country,city")
             if resp.status_code == 200:
                 data = resp.json()

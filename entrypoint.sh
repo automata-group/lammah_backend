@@ -10,7 +10,7 @@ check_health() {
 echo "Starting Backend Application..."
 
 # Try to run the application
-uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8000}
+uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8000} --workers 2
 
 # If the command above fails (exits with non-zero), we don't want the container to die
 if [ $? -ne 0 ]; then

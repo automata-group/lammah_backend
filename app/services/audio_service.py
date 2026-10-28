@@ -205,6 +205,25 @@ def transcribe_audio(file_path: str, progress_callback=None) -> str:
     if not os.path.exists(file_path):
         raise FileNotFoundError(f"Audio file not found: {file_path}")
 
+    # Auto-convert video to MP3 if passed directly
+    video_exts = (".mp4", ".mov", ".mkv", ".webm", ".avi", ".m4v")
+    if file_path.lower().endswith(video_exts):
+        extracted_mp3 = f"{file_path}_converted.mp3"
+        if not os.path.exists(extracted_mp3):
+            if progress_callback:
+                progress_callback("🎬 جاري استخراج الصوت النقي من ملف الفيديو عبر المحرك المسرّع...")
+            try:
+                subprocess.run([
+                    "ffmpeg", "-y", "-i", file_path,
+                    "-vn", "-acodec", "libmp3lame", "-b:a", "64k", "-ac", "1",
+                    extracted_mp3
+                ], check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                file_path = extracted_mp3
+            except Exception as vid_e:
+                logger.error(f"Failed to extract audio from video {file_path}: {vid_e}")
+        else:
+            file_path = extracted_mp3
+
     file_size_mb = os.path.getsize(file_path) / (1024 * 1024)
     duration_sec = get_audio_duration_seconds(file_path)
 

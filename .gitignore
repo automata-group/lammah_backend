@@ -61,3 +61,5 @@ legacy_backup/
 uploader-go/uploads/
 uploader-go/uploader
 *.exe
+*.db
+analytics.db

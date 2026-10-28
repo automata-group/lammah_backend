@@ -95,11 +95,11 @@ async def global_exception_handler(request: Request, exc: Exception):
     })
 
 @app.get("/")
-def root():
+async def root():
     return {"message": "Welcome to Lammah API - لمّاح", "version": settings.VERSION}
 
 @app.get("/api/v1/health")
-def health():
+async def health():
     return {"status": "ok", "queue": "active"}
 
 # 4. CORSMiddleware (Outer-most layer)

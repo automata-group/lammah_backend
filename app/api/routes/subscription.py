@@ -25,12 +25,14 @@ class SubscribeRequest(BaseModel):
     plan_id: str
 
 
+from starlette.concurrency import run_in_threadpool
+
 @router.get("/plans")
 async def list_plans():
-    """List all available subscription plans (public endpoint)."""
+    """List all available subscription plans (non-blocking)."""
     try:
         from app.services.subscription_service import get_all_plans
-        plans = get_all_plans()
+        plans = await run_in_threadpool(get_all_plans)
         
         weekly = [p for p in plans if p.get("period_type") == "weekly"]
         monthly = [p for p in plans if p.get("period_type") == "monthly"]
