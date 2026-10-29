@@ -1328,6 +1328,10 @@ async def download_annotated_pdf(
                 "Content-Length": str(file_size),
                 "Accept-Ranges": "bytes",
                 "Cache-Control": "public, max-age=86400",
+                "Access-Control-Allow-Origin": "*",
+                "Access-Control-Allow-Methods": "GET, HEAD, OPTIONS",
+                "Access-Control-Allow-Headers": "*",
+                "Cross-Origin-Resource-Policy": "cross-origin",
             }
         )
 
@@ -1389,6 +1393,10 @@ async def download_annotated_pdf(
     headers = {
         "Cache-Control": "public, max-age=86400, stale-while-revalidate=604800",
         "Accept-Ranges": "bytes",
+        "Access-Control-Allow-Origin": "*",
+        "Access-Control-Allow-Methods": "GET, HEAD, OPTIONS",
+        "Access-Control-Allow-Headers": "*",
+        "Cross-Origin-Resource-Policy": "cross-origin",
     }
     return FileResponse(
         resolved_path,
