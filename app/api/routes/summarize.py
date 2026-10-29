@@ -344,6 +344,8 @@ async def get_job_status(history_id: str):
     }
 
 @router.post("/process-batch-lectures")
+@router.post("/batch-lecture")
+@router.post("/batch-lectures")
 async def process_batch_lectures(
     request: Request,
     pdf_file: Optional[UploadFile] = File(None),
