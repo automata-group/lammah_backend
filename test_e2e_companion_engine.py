@@ -67,11 +67,11 @@ def test_full_pipeline():
     print(f"companion_page_map: {annotations.get('companion_page_map')}")
     
     # Slide 1 had no explanation -> 1 page
-    # Slide 2 had doctor audio, core AI breakdown, example, and vocab/exam -> 1 slide + 4 companion pages = 5 pages total for slide 2!
-    # Total doc length should be 1 + 5 = 6 pages!
-    assert len(out_doc) == 6, f"Expected 6 pages, got {len(out_doc)}"
+    # Slide 2 had doctor audio, core AI breakdown, example, and vocab/exam -> 1 slide + 2 companion pages (Part 1 & Part 2) = 3 pages for slide 2!
+    # Total doc length should be 1 + 3 = 4 pages!
+    assert len(out_doc) == 4, f"Expected 4 pages, got {len(out_doc)}"
     comp_pages = annotations["companion_page_map"][2]
-    assert len(comp_pages) == 4, f"Expected 4 companion pages for slide 2, got {len(comp_pages)}"
+    assert len(comp_pages) == 2, f"Expected 2 companion pages for slide 2, got {len(comp_pages)}"
     print(f"All assertions PASSED! Companion pages: {comp_pages}")
     
     # Clean up

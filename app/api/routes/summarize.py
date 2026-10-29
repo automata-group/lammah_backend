@@ -1,5 +1,5 @@
 from fastapi import APIRouter, File, UploadFile, HTTPException, Depends, Request, Form, BackgroundTasks, Query
-from fastapi.responses import StreamingResponse, FileResponse
+from fastapi.responses import StreamingResponse, FileResponse, Response
 import shutil
 import os
 import uuid
@@ -757,7 +757,7 @@ async def process_batch_lectures(
                     logger.warning(f"Failed to write sidecar meta for {unique_id}: {meta_e}")
 
             # Final 100% progress event before metadata
-            yield f"data: {json.dumps({'type': 'progress', 'step': '5/5', 'progress_percent': 100, 'time_estimate': 0, 'message': '🎉 اكتملت المعالجة بنجاح! جاري تحضير دفترك...'}, ensure_ascii=False)}\n\n"
+            yield f"data: {json.dumps({'type': 'progress', 'step': '5/5', 'progress_percent': 100, 'time_estimate': 0, 'message': '🎉 اكتملت المعالجة بنجاح! جاري تحضير ملفك المخطط والمظلل...'}, ensure_ascii=False)}\n\n"
 
             # Emit events matching what the frontend stream reader expects (metadata + done)
             _done_history_id = log_id if (log_id and isinstance(log_id, str)) else unique_id
@@ -950,8 +950,10 @@ async def process_lecture(
                 yield f"data: {json.dumps({'type': 'progress', 'step': '0/5', 'message': '📏 جاري حساب حجم الوثيقة وتكلفة المعالجة...'}, ensure_ascii=False)}\n\n"
                 try:
                     if pdf_path:
-                        pages_cost = await asyncio.to_thread(extract_pages_from_pdf, pdf_path)
-                        num_pages = len(pages_cost)
+                        import fitz
+                        doc_tmp = fitz.open(pdf_path)
+                        num_pages = len(doc_tmp)
+                        doc_tmp.close()
                     else:
                         num_pages = 10
 
@@ -1177,7 +1179,7 @@ async def process_lecture(
                 download_url = f"/api/v1/summarize/download/{job.job_id}.pdf"
 
             # Final 100% progress event before metadata
-            yield f"data: {json.dumps({'type': 'progress', 'step': '5/5', 'progress_percent': 100, 'time_estimate': 0, 'message': '🎉 اكتملت المعالجة بنجاح! جاري تحضير دفترك...'}, ensure_ascii=False)}\n\n"
+            yield f"data: {json.dumps({'type': 'progress', 'step': '5/5', 'progress_percent': 100, 'time_estimate': 0, 'message': '🎉 اكتملت المعالجة بنجاح! جاري تحضير ملفك المخطط والمظلل...'}, ensure_ascii=False)}\n\n"
  
             # 5. Save History & Finalize
             # Generate AI Title
@@ -1237,35 +1239,72 @@ async def process_lecture(
 @router.api_route("/download/{job_id}.pdf", methods=["GET", "HEAD"])
 async def download_annotated_pdf(
     job_id: str,
+    request: Request,
     title: Optional[str] = Query(None),
     mode: Optional[str] = Query(None),
     is_prep: Optional[bool] = Query(None),
     download: bool = Query(False)
 ):
-    """Secure PDF download checking both backend and project root outputs.
+    """Secure PDF download checking backend, outputs env, and project root outputs.
     Includes Path Traversal protection and accurate Arabic filename metadata:
     - [اسم المادة] - تحضير سلايدات - لمّاح.pdf (عند رفع الملف فقط بدون فويسات)
     - [اسم المادة] - مخططة فويسات - لمّاح.pdf (عند دمج الفويسات مع الملف)
     """
-    if not re.match(r'^[a-zA-Z0-9_\-]+$', job_id) or os.path.basename(job_id) != job_id:
+    clean_id = job_id[:-4] if job_id.endswith(".pdf") else job_id
+    if not re.match(r'^[a-zA-Z0-9_\-]+$', clean_id) or os.path.basename(clean_id) != clean_id:
         raise HTTPException(status_code=400, detail="Invalid job ID format")
 
     routes_dir = os.path.dirname(os.path.abspath(__file__))
     backend_dir = os.path.dirname(os.path.dirname(os.path.dirname(routes_dir)))
     base_dir = os.path.dirname(backend_dir)
     
-    path_1 = os.path.join(backend_dir, "outputs", f"{job_id}.pdf")
-    path_2 = os.path.join(base_dir, "outputs", f"{job_id}.pdf")
-    
+    candidate_dirs = [
+        os.path.join(backend_dir, "outputs"),
+        os.path.join(base_dir, "outputs"),
+    ]
+    outputs_env = os.getenv("OUTPUTS_DIR")
+    if outputs_env:
+        candidate_dirs.insert(0, outputs_env if os.path.isabs(outputs_env) else os.path.normpath(os.path.join(base_dir, outputs_env)))
+    temp_dir_env = os.getenv("TEMP_DIR")
+    if temp_dir_env:
+        candidate_dirs.append(temp_dir_env if os.path.isabs(temp_dir_env) else os.path.normpath(os.path.join(base_dir, temp_dir_env)))
+
     resolved_path = None
-    if os.path.exists(path_1):
-        resolved_path = path_1
-    elif os.path.exists(path_2):
-        resolved_path = path_2
+    for c_dir in candidate_dirs:
+        target = os.path.join(c_dir, f"{clean_id}.pdf")
+        if os.path.exists(target):
+            resolved_path = target
+            break
+
+    if not resolved_path:
+        for c_dir in candidate_dirs:
+            if os.path.exists(c_dir):
+                try:
+                    for f in os.listdir(c_dir):
+                        if (f.startswith(clean_id) or clean_id in f) and f.endswith(".pdf"):
+                            resolved_path = os.path.join(c_dir, f)
+                            break
+                except Exception:
+                    pass
+            if resolved_path:
+                break
         
     if not resolved_path:
-        logger.error(f"[DOWNLOAD] File not found for job_id={job_id}. Checked paths: {path_1} and {path_2}")
+        logger.error(f"[DOWNLOAD] File not found for job_id={job_id}. Checked paths in candidate dirs: {candidate_dirs}")
         raise HTTPException(status_code=404, detail="File not found")
+
+    # Fast Instant Response on HEAD checks without triggering expensive metadata queries
+    if request.method == "HEAD":
+        file_size = os.path.getsize(resolved_path)
+        return Response(
+            status_code=200,
+            media_type="application/pdf",
+            headers={
+                "Content-Length": str(file_size),
+                "Accept-Ranges": "bytes",
+                "Cache-Control": "public, max-age=86400",
+            }
+        )
 
     # Determine title and prep status
     resolved_title = title

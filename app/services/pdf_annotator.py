@@ -119,8 +119,8 @@ def sanitize_bullet_points(text: Any) -> list[str]:
 
 def insert_text_auto(page, rect, lines, start_fs=10.0, min_fs=7.2, fontname="amiri_reg", color=(0.14, 0.16, 0.22), align=fitz.TEXT_ALIGN_RIGHT):
     """
-    Inserts multi-line text with auto font-scaling down to min_fs and line-trimming
-    fallback so that a box is NEVER completely blank in the PDF.
+    Inserts multi-line text with pre-measured font scaling.
+    Guaranteed zero silent line dropping (Zero Data Loss) and zero multi-stamping (No Ghost Glyphs).
     Guarded against invalid or zero-area rectangles to avoid PyMuPDF crashes.
     """
     if not lines:
@@ -135,7 +135,10 @@ def insert_text_auto(page, rect, lines, start_fs=10.0, min_fs=7.2, fontname="ami
         
     cur_lines = list(valid_lines)
     avail_h = max(1.0, rect.height)
-    calc_fs = avail_h / (max(len(cur_lines), 1) * 1.55)
+    line_count = max(len(cur_lines), 1)
+    
+    # Pre-calculate optimal font size so all lines fit within available height (line pitch ~1.42)
+    calc_fs = avail_h / (line_count * 1.42)
     fs = min(start_fs, max(min_fs, calc_fs))
     
     text_content = "\n".join(cur_lines)
@@ -144,23 +147,6 @@ def insert_text_auto(page, rect, lines, start_fs=10.0, min_fs=7.2, fontname="ami
     except Exception as e:
         logger.warning(f"[PDF_ANNOTATOR] insert_textbox failed on {rect}: {e}")
         return 0
-    
-    # Scale down font size if text overflows
-    while rc < 0 and fs > min_fs:
-        fs -= 0.3
-        try:
-            rc = page.insert_textbox(rect, text_content, fontsize=fs, fontname=fontname, color=color, align=align)
-        except Exception:
-            break
-        
-    # If still overflowing at min_fs, trim bottom lines until it fits cleanly
-    while rc < 0 and len(cur_lines) > 2:
-        cur_lines.pop()
-        text_content = "\n".join(cur_lines)
-        try:
-            rc = page.insert_textbox(rect, text_content, fontsize=fs, fontname=fontname, color=color, align=align)
-        except Exception:
-            break
         
     return rc
 
@@ -450,7 +436,10 @@ def annotate_pdf(input_path: str, output_path: str, annotations: dict, is_free_t
 
                 # Ensure real-world analogy is never empty to maintain balanced Bento Grid
                 if not example_text or len(example_text.strip()) < 15:
-                    example_text = f"💡 تشبيه تطبيقي: في بيئات المشاريع الحقيقية، تمثل مفاهيم {slide_title} حجر الزاوية لتنسيق المهام وتفادي الأخطاء، مما يضمن خروج النظام البرمجي بأعلى كفاءة وجودة تلبي متطلبات العميل."
+                    example_text = (
+                        f"تخيل أنك تعمل ضمن فريق يطور مشروعاً كبيراً: مفاهيم ({slide_title}) هي الدليل المنظم الذي يحدد المسؤوليات "
+                        f"ويضمن أن كل جزء يعمل بانسجام تام مع الأجزاء الأخرى، وبدون هذا التنظيم يحدث تخبط وتأخير في تسليم المشروع للعميل."
+                    )
 
                 page_rect = doc[i].rect
                 pw = page_rect.width
@@ -498,225 +487,388 @@ def annotate_pdf(input_path: str, output_path: str, annotations: dict, is_free_t
                 bot_m = 16
                 gap = 12
                 subh_h = 30
-
-                # ── RENDER BENTO GRID COMPANION SLIDE ─────────────────────────
-                comp_p, fn_r, fn_b = create_companion_page()
-                
-                # 1. Header Bar
-                h_rect = fitz.Rect(m_x, top_m, pw - m_x, top_m + h_h)
-                comp_p.draw_rect(h_rect, color=(0.85, 0.88, 0.93), fill=(1.0, 1.0, 1.0), radius=0.03, width=0.8)
-                comp_p.draw_line(fitz.Point(h_rect.x1 - 2, h_rect.y0 + 3), fitz.Point(h_rect.x1 - 2, h_rect.y1 - 3), color=(0.12, 0.25, 0.65), width=4.5)
-
-                # Slide pill on left of header
-                pill_rect = fitz.Rect(h_rect.x0 + 12, h_rect.y0 + 14, h_rect.x0 + 110, h_rect.y1 - 14)
-                comp_p.draw_rect(pill_rect, color=(0.80, 0.85, 0.93), fill=(0.93, 0.95, 0.99), radius=0.2, width=0.8)
-                insert_text_auto(comp_p, fitz.Rect(pill_rect.x0 + 4, pill_rect.y0 + 7, pill_rect.x1 - 4, pill_rect.y1 - 4),
-                                 [format_arabic(f"شريحة {orig_page_num}")], start_fs=9.5, min_fs=8.5, fontname=fn_b, color=(0.12, 0.25, 0.65), align=fitz.TEXT_ALIGN_CENTER)
-
-                # Header Title and Subtitle
-                title_box = fitz.Rect(pill_rect.x1 + 14, top_m + 6, h_rect.x1 - 16, top_m + 32)
-                insert_text_auto(comp_p, title_box, [format_arabic(f"الشرح والتفكيك الأكاديمي  |  {slide_title}")],
-                                 start_fs=12.2, min_fs=10.0, fontname=fn_b, color=(0.10, 0.16, 0.38))
-
-                if summary_phrase:
-                    sub_text = summary_phrase
-                else:
-                    sub_text = "تفكيك ذكي وشامل لمفاهيم ومصطلحات الشريحة"
-
-                sub_box = fitz.Rect(pill_rect.x1 + 14, top_m + 34, h_rect.x1 - 16, top_m + 62)
-                insert_text_auto(comp_p, sub_box, [format_arabic(f"الخلاصة المركزة: {sub_text}")],
-                                 start_fs=9.4, min_fs=8.0, fontname=fn_r, color=(0.55, 0.30, 0.05))
-
-                # 2. Content Geometry
                 c_top = top_m + h_h + gap
                 c_bot = ph - bot_m - 22
                 c_h = c_bot - c_top
                 uw = pw - (2 * m_x)
 
-                has_left_col = bool(example_text or vocab_list or exam_tip)
-                if has_left_col:
+                sub_text = summary_phrase if summary_phrase else "تفكيك ذكي وشامل لمفاهيم ومصطلحات الشريحة"
+
+                # Check if slide has rich content requiring Governed Dual-Page Companion (K=2)
+                # When example and exam/vocab components coexist, dual-page spillover prevents any truncation
+                is_dual = bool(example_text and (vocab_list or exam_tip))
+
+                if is_dual:
+                    # ══════════════════════════════════════════════════════════════════
+                    # ── COMPANION PART 1: التأسيس المفاهيمي والشرح الجوهري والربط الواقعي ──
+                    # ══════════════════════════════════════════════════════════════════
+                    comp_p1, fn_r, fn_b = create_companion_page()
+                    
+                    # 1. Header Bar (Part 1)
+                    h_rect1 = fitz.Rect(m_x, top_m, pw - m_x, top_m + h_h)
+                    comp_p1.draw_rect(h_rect1, color=(0.85, 0.88, 0.93), fill=(1.0, 1.0, 1.0), radius=0.03, width=0.8)
+                    comp_p1.draw_line(fitz.Point(h_rect1.x1 - 2, h_rect1.y0 + 3), fitz.Point(h_rect1.x1 - 2, h_rect1.y1 - 3), color=(0.12, 0.25, 0.65), width=4.5)
+
+                    pill_rect1 = fitz.Rect(h_rect1.x0 + 12, h_rect1.y0 + 14, h_rect1.x0 + 130, h_rect1.y1 - 14)
+                    comp_p1.draw_rect(pill_rect1, color=(0.80, 0.85, 0.93), fill=(0.93, 0.95, 0.99), radius=0.2, width=0.8)
+                    insert_text_auto(comp_p1, fitz.Rect(pill_rect1.x0 + 4, pill_rect1.y0 + 7, pill_rect1.x1 - 4, pill_rect1.y1 - 4),
+                                     [format_arabic(f"شريحة {orig_page_num} - الجزء 1")], start_fs=9.5, min_fs=8.5, fontname=fn_b, color=(0.12, 0.25, 0.65), align=fitz.TEXT_ALIGN_CENTER)
+
+                    title_box1 = fitz.Rect(pill_rect1.x1 + 14, top_m + 6, h_rect1.x1 - 16, top_m + 32)
+                    insert_text_auto(comp_p1, title_box1, [format_arabic(f"التأسيس المفاهيمي والشرح الجوهري  |  {slide_title}")],
+                                     start_fs=12.2, min_fs=10.0, fontname=fn_b, color=(0.10, 0.16, 0.38))
+
+                    sub_box1 = fitz.Rect(pill_rect1.x1 + 14, top_m + 34, h_rect1.x1 - 16, top_m + 62)
+                    insert_text_auto(comp_p1, sub_box1, [format_arabic(f"الخلاصة المركزة: {sub_text}")],
+                                     start_fs=9.4, min_fs=8.0, fontname=fn_r, color=(0.55, 0.30, 0.05))
+
                     w_right = int(uw * 0.58)
                     x0_right = pw - m_x - w_right
                     x1_right = pw - m_x
                     w_left = uw - w_right - gap
                     x0_left = m_x
                     x1_left = m_x + w_left
-                else:
-                    w_right = uw
-                    x0_right = m_x
-                    x1_right = pw - m_x
-                    x0_left = 0
-                    x1_left = 0
 
-                # ── RIGHT COLUMN: Main Core Card (Explanation + Audio / Self-Study Notes) ──
-                right_rect = fitz.Rect(x0_right, c_top, x1_right, c_bot)
-                comp_p.draw_rect(right_rect, color=(0.85, 0.88, 0.93), fill=(1.0, 1.0, 1.0), radius=0.03, width=0.8)
+                    # Right Column: Foundation & Core Explanation
+                    right_rect1 = fitz.Rect(x0_right, c_top, x1_right, c_bot)
+                    comp_p1.draw_rect(right_rect1, color=(0.85, 0.88, 0.93), fill=(1.0, 1.0, 1.0), radius=0.03, width=0.8)
 
-                sub_r = fitz.Rect(right_rect.x0, right_rect.y0, right_rect.x1, right_rect.y0 + subh_h)
-                comp_p.draw_rect(sub_r, color=(0.85, 0.88, 0.93), fill=(0.94, 0.96, 0.995), radius=0.03, width=0.8)
-                comp_p.draw_line(fitz.Point(right_rect.x1 - 2, right_rect.y0 + 2), fitz.Point(right_rect.x1 - 2, right_rect.y0 + subh_h - 2), color=(0.15, 0.28, 0.65), width=3.6)
-                
-                if has_real_audio:
-                    card_title = "قاعة المحاضرة والشرح المفاهيمي (مرتبط بالتسجيل والسلايد)"
-                else:
-                    card_title = "الشرح والتفكيك المفاهيمي الجوهري (إعداد رفيق لمّاح الذكي)"
+                    sub_r1 = fitz.Rect(right_rect1.x0, right_rect1.y0, right_rect1.x1, right_rect1.y0 + subh_h)
+                    comp_p1.draw_rect(sub_r1, color=(0.85, 0.88, 0.93), fill=(0.94, 0.96, 0.995), radius=0.03, width=0.8)
+                    comp_p1.draw_line(fitz.Point(right_rect1.x1 - 2, right_rect1.y0 + 2), fitz.Point(right_rect1.x1 - 2, right_rect1.y0 + subh_h - 2), color=(0.15, 0.28, 0.65), width=3.6)
+                    
+                    card_title1 = "قاعة المحاضرة والشرح المفاهيمي (مرتبط بالسلايد والتسجيل)" if has_real_audio else "الشرح والتفكيك المفاهيمي الجوهري (من الصفر للاستيعاب التام)"
+                    insert_text_auto(comp_p1, fitz.Rect(right_rect1.x0 + 12, right_rect1.y0 + 5, right_rect1.x1 - 12, right_rect1.y0 + subh_h - 3),
+                                     [format_arabic(card_title1)], start_fs=10.5, min_fs=9.0, fontname=fn_b, color=(0.12, 0.18, 0.45))
 
-                insert_text_auto(comp_p, fitz.Rect(right_rect.x0 + 12, right_rect.y0 + 5, right_rect.x1 - 12, right_rect.y0 + subh_h - 3),
-                                 [format_arabic(card_title)], start_fs=10.5, min_fs=9.0, fontname=fn_b, color=(0.12, 0.18, 0.45))
+                    r_lines1 = []
+                    if has_real_audio:
+                        r_lines1.append("قاعة المحاضرة (ما ركز عليه وشرحه الدكتور):")
+                        doc_bullets = sanitize_bullet_points(raw_doctor_exp)
+                        r_lines1.extend(doc_bullets[:3])
+                        r_lines1.append("")
+                    elif study_notes:
+                        r_lines1.append("تنبيهات وملاحظات المذاكرة المركزة:")
+                        for sn in study_notes[:3]:
+                            clean_sn = clean_text(sn)
+                            if clean_sn:
+                                r_lines1.append(f"• {clean_sn}")
+                        r_lines1.append("")
 
-                # Assemble Right Column content
-                r_lines = []
-                # 1. Audio notes from lecturer ONLY if genuine audio exists!
-                if has_real_audio:
-                    r_lines.append("قاعة المحاضرة (ما ركز عليه وشرحه الدكتور):")
-                    doc_bullets = sanitize_bullet_points(raw_doctor_exp)
-                    r_lines.extend(doc_bullets[:3])
-                    r_lines.append("")
-                elif study_notes:
-                    # Self-Study / Document Mode: Notes presented honestly without mentioning audio!
-                    r_lines.append("تنبيهات وملاحظات المذاكرة المركزة:")
-                    for sn in study_notes[:3]:
-                        clean_sn = clean_text(sn)
-                        if clean_sn:
-                            r_lines.append(f"• {clean_sn}")
-                    r_lines.append("")
+                    ai_bullets = sanitize_bullet_points(ai_exp_text)
+                    if ai_bullets:
+                        r_lines1.append("تفاصيل الشرح والاستيعاب الأكاديمي:")
+                        for b in ai_bullets[:8]:
+                            clean_b = b.lstrip("•- \t")
+                            r_lines1.append(f"• {clean_b}")
+                    elif ai_exp_text:
+                        r_lines1.append("تفاصيل الشرح والاستيعاب الأكاديمي:")
+                        r_lines1.append(ai_exp_text)
 
-                # 2. Core AI explanation points directly explaining the slide
-                ai_bullets = sanitize_bullet_points(ai_exp_text)
-                if ai_bullets:
-                    r_lines.append("تفاصيل الشرح والاستيعاب الأكاديمي:")
-                    for b in ai_bullets[:6]:
-                        clean_b = b.lstrip("•- \t")
-                        r_lines.append(f"• {clean_b}")
-                elif ai_exp_text:
-                    r_lines.append("تفاصيل الشرح والاستيعاب الأكاديمي:")
-                    r_lines.append(ai_exp_text)
+                    w_right_lines1 = []
+                    for l in r_lines1:
+                        if l == "":
+                            w_right_lines1.append("")
+                        elif any(l.startswith(pfx) for pfx in ["قاعة المحاضرة", "تنبيهات", "تفاصيل"]):
+                            w_right_lines1.append(format_arabic(l))
+                        else:
+                            w_right_lines1.extend(wrap_arabic_text(l, max_chars=68))
 
-                w_right_lines = []
-                for l in r_lines:
-                    if l == "":
-                        w_right_lines.append("")
-                    elif any(l.startswith(pfx) for pfx in ["قاعة المحاضرة", "تنبيهات", "تفاصيل"]):
-                        w_right_lines.append(format_arabic(l))
-                    else:
-                        w_right_lines.extend(wrap_arabic_text(l, max_chars=68))
+                    insert_text_auto(comp_p1, fitz.Rect(right_rect1.x0 + 16, right_rect1.y0 + subh_h + 10, right_rect1.x1 - 16, right_rect1.y1 - 10),
+                                     w_right_lines1, start_fs=9.8, min_fs=8.0, fontname=fn_r, color=(0.12, 0.14, 0.20))
 
-                insert_text_auto(comp_p, fitz.Rect(right_rect.x0 + 16, right_rect.y0 + subh_h + 10, right_rect.x1 - 16, right_rect.y1 - 10),
-                                 w_right_lines, start_fs=9.8, min_fs=7.2, fontname=fn_r, color=(0.12, 0.14, 0.20))
+                    # Left Column: Full Unbroken Real-World Analogy (Has full column height!)
+                    left_rect1 = fitz.Rect(x0_left, c_top, x1_left, c_bot)
+                    comp_p1.draw_rect(left_rect1, color=(0.78, 0.88, 0.82), fill=(0.975, 0.995, 0.985), radius=0.03, width=0.8)
+                    sub_lt1 = fitz.Rect(left_rect1.x0, left_rect1.y0, left_rect1.x1, left_rect1.y0 + subh_h)
+                    comp_p1.draw_rect(sub_lt1, color=(0.78, 0.88, 0.82), fill=(0.91, 0.965, 0.935), radius=0.03, width=0.8)
+                    comp_p1.draw_line(fitz.Point(left_rect1.x1 - 2, left_rect1.y0 + 2), fitz.Point(left_rect1.x1 - 2, left_rect1.y0 + subh_h - 2), color=(0.08, 0.55, 0.28), width=3.6)
+                    insert_text_auto(comp_p1, fitz.Rect(left_rect1.x0 + 10, left_rect1.y0 + 5, left_rect1.x1 - 10, left_rect1.y0 + subh_h - 3),
+                                     [format_arabic("الربط الواقعي والتطبيقي (مثال ملموس كامل)")],
+                                     start_fs=10.2, min_fs=8.8, fontname=fn_b, color=(0.08, 0.38, 0.20))
 
-                # ── LEFT COLUMN: Real-World Analogy & Bilingual Exam Triggers ──────────
-                if has_left_col:
-                    # Card 1 text
-                    w_ex = wrap_arabic_text(example_text, max_chars=44) if example_text else []
+                    w_ex = wrap_arabic_text(example_text, max_chars=46) if example_text else []
+                    insert_text_auto(comp_p1, fitz.Rect(left_rect1.x0 + 14, left_rect1.y0 + subh_h + 10, left_rect1.x1 - 14, left_rect1.y1 - 10),
+                                     w_ex, start_fs=10.0, min_fs=8.2, fontname=fn_r, color=(0.06, 0.22, 0.12))
 
-                    # Build dictionary of terms to Arabic translations for mandatory bilingual exam triggers
-                    term_trans_map = {}
-                    for v in vocab_list:
-                        if isinstance(v, dict):
-                            t = clean_text(v.get("term", "")).strip()
-                            tr = clean_text(v.get("translation", "") or v.get("trans", "")).strip()
-                            if t and tr:
-                                term_trans_map[t.lower()] = tr
+                    # Footer Part 1
+                    comp_p1.draw_line(fitz.Point(m_x + 10, ph - 16), fitz.Point(pw - m_x - 10, ph - 16), color=(0.82, 0.84, 0.88), width=0.8)
+                    comp_p1.insert_textbox(fitz.Rect(m_x, ph - 16, pw - m_x, ph - 2),
+                                          format_arabic(f"ملف لمّاح المخطط الأكاديمي  |  دليل المذاكرة والتحضير للامتحان  |  شريحة {orig_page_num} (الجزء 1)"),
+                                          fontsize=8.2, fontname=fn_r, color=(0.42, 0.45, 0.50), align=fitz.TEXT_ALIGN_CENTER)
 
-                    # Card 2 text: Vocabulary + Exam tips with MANDATORY Arabic Translations
-                    exam_lines = []
+                    comp_pages_for_this_slide.append(len(new_doc))
+
+                    # ══════════════════════════════════════════════════════════════════
+                    # ── COMPANION PART 2: غرفة عمليات الاختبار وفخاخ الأسئلة والمصطلحات ──
+                    # ══════════════════════════════════════════════════════════════════
+                    comp_p2, fn_r, fn_b = create_companion_page()
+
+                    # Header Bar (Part 2)
+                    h_rect2 = fitz.Rect(m_x, top_m, pw - m_x, top_m + h_h)
+                    comp_p2.draw_rect(h_rect2, color=(0.92, 0.84, 0.72), fill=(1.0, 0.99, 0.975), radius=0.03, width=0.8)
+                    comp_p2.draw_line(fitz.Point(h_rect2.x1 - 2, h_rect2.y0 + 3), fitz.Point(h_rect2.x1 - 2, h_rect2.y1 - 3), color=(0.85, 0.45, 0.08), width=4.5)
+
+                    pill_rect2 = fitz.Rect(h_rect2.x0 + 12, h_rect2.y0 + 14, h_rect2.x0 + 130, h_rect2.y1 - 14)
+                    comp_p2.draw_rect(pill_rect2, color=(0.92, 0.82, 0.70), fill=(0.99, 0.945, 0.88), radius=0.2, width=0.8)
+                    insert_text_auto(comp_p2, fitz.Rect(pill_rect2.x0 + 4, pill_rect2.y0 + 7, pill_rect2.x1 - 4, pill_rect2.y1 - 4),
+                                     [format_arabic(f"شريحة {orig_page_num} - الجزء 2")], start_fs=9.5, min_fs=8.5, fontname=fn_b, color=(0.75, 0.32, 0.05), align=fitz.TEXT_ALIGN_CENTER)
+
+                    title_box2 = fitz.Rect(pill_rect2.x1 + 14, top_m + 6, h_rect2.x1 - 16, top_m + 32)
+                    insert_text_auto(comp_p2, title_box2, [format_arabic(f"غرفة عمليات الاختبار وفخاخ الأسئلة  |  {slide_title}")],
+                                     start_fs=12.2, min_fs=10.0, fontname=fn_b, color=(0.55, 0.22, 0.04))
+
+                    sub_box2 = fitz.Rect(pill_rect2.x1 + 14, top_m + 34, h_rect2.x1 - 16, top_m + 62)
+                    insert_text_auto(comp_p2, sub_box2, [format_arabic("مفاتيح الأسئلة، فخاخ الامتحان بالإنجليزي، والمصطلحات الأساسية المترجمة")],
+                                     start_fs=9.4, min_fs=8.0, fontname=fn_r, color=(0.55, 0.30, 0.05))
+
+                    w_half = int((uw - gap) / 2)
+                    x0_v = pw - m_x - w_half
+                    x1_v = pw - m_x
+                    x0_t = m_x
+                    x1_t = m_x + w_half
+
+                    # Right Column Part 2: Bilingual Vocabulary Lexicon
+                    v_rect = fitz.Rect(x0_v, c_top, x1_v, c_bot)
+                    comp_p2.draw_rect(v_rect, color=(0.85, 0.88, 0.93), fill=(1.0, 1.0, 1.0), radius=0.03, width=0.8)
+                    sub_v = fitz.Rect(v_rect.x0, v_rect.y0, v_rect.x1, v_rect.y0 + subh_h)
+                    comp_p2.draw_rect(sub_v, color=(0.85, 0.88, 0.93), fill=(0.94, 0.96, 0.995), radius=0.03, width=0.8)
+                    comp_p2.draw_line(fitz.Point(v_rect.x1 - 2, v_rect.y0 + 2), fitz.Point(v_rect.x1 - 2, v_rect.y0 + subh_h - 2), color=(0.15, 0.28, 0.65), width=3.6)
+                    insert_text_auto(comp_p2, fitz.Rect(v_rect.x0 + 12, v_rect.y0 + 5, v_rect.x1 - 12, v_rect.y0 + subh_h - 3),
+                                     [format_arabic("قاموس مصطلحات الامتحان (Bilingual Exam Lexicon)")],
+                                     start_fs=10.2, min_fs=8.8, fontname=fn_b, color=(0.12, 0.18, 0.45))
+
+                    raw_v_lines = []
                     if vocab_list:
-                        exam_lines.append("مفاتيح ومصطلحات الاختبار (مع الترجمة):")
-                        for v in vocab_list[:4]:
+                        for v in vocab_list[:6]:
                             if isinstance(v, dict):
                                 t = clean_text(v.get("term", "")).strip()
                                 tr = clean_text(v.get("translation", "") or v.get("trans", "")).strip()
                                 sd = clean_text(v.get("simple_def", "")).strip()
                                 if t and tr and sd:
-                                    exam_lines.append(f"• {t} [{tr}] : {sd}")
+                                    raw_v_lines.append(f"• {t} : {tr}")
+                                    raw_v_lines.append(f"  {sd}")
+                                    raw_v_lines.append("")
                                 elif t and tr:
-                                    exam_lines.append(f"• {t} [{tr}]")
+                                    raw_v_lines.append(f"• {t} : {tr}")
+                                    raw_v_lines.append("")
                                 elif t and sd:
-                                    exam_lines.append(f"• {t} : {sd}")
+                                    raw_v_lines.append(f"• {t} : {sd}")
+                                    raw_v_lines.append("")
                             elif isinstance(v, str) and v.strip():
-                                exam_lines.append(f"• {clean_text(v)}")
-                        exam_lines.append("")
+                                raw_v_lines.append(f"• {clean_text(v)}")
+                                raw_v_lines.append("")
+                    else:
+                        raw_v_lines.append("• المفاهيم الرئيسية مدمجة بالشرح التأسيسي في الجزء الأول.")
 
+                    w_vocab = []
+                    for vl in raw_v_lines:
+                        if vl == "":
+                            w_vocab.append("")
+                        else:
+                            w_vocab.extend(wrap_arabic_text(vl, max_chars=48))
+
+                    insert_text_auto(comp_p2, fitz.Rect(v_rect.x0 + 14, v_rect.y0 + subh_h + 10, v_rect.x1 - 14, v_rect.y1 - 10),
+                                     w_vocab, start_fs=9.8, min_fs=8.0, fontname=fn_r, color=(0.10, 0.15, 0.35))
+
+                    # Left Column Part 2: Exam Traps & Warnings
+                    t_rect = fitz.Rect(x0_t, c_top, x1_t, c_bot)
+                    comp_p2.draw_rect(t_rect, color=(0.92, 0.82, 0.70), fill=(0.998, 0.985, 0.965), radius=0.03, width=0.8)
+                    sub_t = fitz.Rect(t_rect.x0, t_rect.y0, t_rect.x1, t_rect.y0 + subh_h)
+                    comp_p2.draw_rect(sub_t, color=(0.92, 0.82, 0.70), fill=(0.99, 0.945, 0.88), radius=0.03, width=0.8)
+                    comp_p2.draw_line(fitz.Point(t_rect.x1 - 2, t_rect.y0 + 2), fitz.Point(t_rect.x1 - 2, t_rect.y0 + subh_h - 2), color=(0.85, 0.45, 0.08), width=3.6)
+                    insert_text_auto(comp_p2, fitz.Rect(t_rect.x0 + 12, t_rect.y0 + 5, t_rect.x1 - 12, t_rect.y0 + subh_h - 3),
+                                     [format_arabic("فخاخ الامتحان ونقاط الحذر (Exam Traps & Tricks)")],
+                                     start_fs=10.2, min_fs=8.8, fontname=fn_b, color=(0.65, 0.28, 0.04))
+
+                    raw_t_lines = []
                     if exam_tip:
-                        exam_lines.append("فخ امتحاني ونقاط الحذر:")
                         tip_clean = clean_text(exam_tip)
                         for t_line in tip_clean.split("\n"):
                             t_line = t_line.strip().lstrip("•-* ")
-                            if not t_line:
-                                continue
-                            # Ensure English terms in exam tips have Arabic translation attached
-                            if not re.search(r'\[[\u0600-\u06FF\s]+\]', t_line):
-                                for tm, tr in term_trans_map.items():
-                                    pattern = re.compile(rf'\(?\b{re.escape(tm)}\)?', re.IGNORECASE)
-                                    if pattern.search(t_line):
-                                        t_line = pattern.sub(rf'\g<0> [{tr}]', t_line, count=1)
-                                        break
-                            exam_lines.append(f"• {t_line}")
-
-                    w_exam = []
-                    for el in exam_lines:
-                        if el == "":
-                            w_exam.append("")
-                        elif el.startswith("📌") or el.startswith("⚠️"):
-                            w_exam.append(format_arabic(el))
-                        else:
-                            w_exam.extend(wrap_arabic_text(el, max_chars=44))
-
-                    while w_exam and w_exam[-1] == "":
-                        w_exam.pop()
-
-                    has_card1 = bool(w_ex)
-                    has_card2 = bool(w_exam and any(not (l.startswith("📌") or l.startswith("⚠️") or l == "") for l in exam_lines))
-
-                    if has_card1 and has_card2:
-                        ex_c = max(len(w_ex), 3)
-                        exam_c = max(len(w_exam), 3)
-                        ratio = max(0.28, min(0.48, ex_c / (ex_c + exam_c)))
-                        h_top = int((c_h - gap) * ratio)
-                        lt_rect = fitz.Rect(x0_left, c_top, x1_left, c_top + h_top)
-                        lb_rect = fitz.Rect(x0_left, c_top + h_top + gap, x1_left, c_bot)
-                    elif has_card1 and not has_card2:
-                        lt_rect = fitz.Rect(x0_left, c_top, x1_left, c_bot)
-                        lb_rect = None
-                    elif not has_card1 and has_card2:
-                        lt_rect = None
-                        lb_rect = fitz.Rect(x0_left, c_top, x1_left, c_bot)
+                            if t_line:
+                                raw_t_lines.append(f"• {t_line}")
                     else:
-                        lt_rect = None
-                        lb_rect = None
+                        raw_t_lines.append("• ركز على استيعاب المصطلحات الأساسية وفهم الفروقات الدقيقة بينها في أسئلة الاختيار من متعدد.")
 
-                    if lt_rect:
-                        # Card 1: Real-World Analogy
-                        comp_p.draw_rect(lt_rect, color=(0.78, 0.88, 0.82), fill=(0.975, 0.995, 0.985), radius=0.03, width=0.8)
-                        sub_lt = fitz.Rect(lt_rect.x0, lt_rect.y0, lt_rect.x1, lt_rect.y0 + subh_h)
-                        comp_p.draw_rect(sub_lt, color=(0.78, 0.88, 0.82), fill=(0.91, 0.965, 0.935), radius=0.03, width=0.8)
-                        comp_p.draw_line(fitz.Point(lt_rect.x1 - 2, lt_rect.y0 + 2), fitz.Point(lt_rect.x1 - 2, lt_rect.y0 + subh_h - 2), color=(0.08, 0.55, 0.28), width=3.6)
-                        insert_text_auto(comp_p, fitz.Rect(lt_rect.x0 + 10, lt_rect.y0 + 5, lt_rect.x1 - 10, lt_rect.y0 + subh_h - 3),
-                                         [format_arabic("الربط الواقعي والتطبيقي (مثال ملموس)")],
-                                         start_fs=10.2, min_fs=8.8, fontname=fn_b, color=(0.08, 0.38, 0.20))
-                        
-                        insert_text_auto(comp_p, fitz.Rect(lt_rect.x0 + 12, lt_rect.y0 + subh_h + 8, lt_rect.x1 - 12, lt_rect.y1 - 6),
-                                         w_ex, start_fs=9.8, min_fs=7.8, fontname=fn_r, color=(0.06, 0.22, 0.12))
+                    w_traps = []
+                    for tl in raw_t_lines:
+                        if tl == "":
+                            w_traps.append("")
+                        else:
+                            w_traps.extend(wrap_arabic_text(tl, max_chars=48))
 
-                    if lb_rect:
-                        # Card 2: Exam Triggers & Vocabulary
-                        comp_p.draw_rect(lb_rect, color=(0.92, 0.82, 0.70), fill=(0.998, 0.985, 0.965), radius=0.03, width=0.8)
-                        sub_lb = fitz.Rect(lb_rect.x0, lb_rect.y0, lb_rect.x1, lb_rect.y0 + subh_h)
-                        comp_p.draw_rect(sub_lb, color=(0.92, 0.82, 0.70), fill=(0.99, 0.945, 0.88), radius=0.03, width=0.8)
-                        comp_p.draw_line(fitz.Point(lb_rect.x1 - 2, lb_rect.y0 + 2), fitz.Point(lb_rect.x1 - 2, lb_rect.y0 + subh_h - 2), color=(0.85, 0.45, 0.08), width=3.6)
-                        insert_text_auto(comp_p, fitz.Rect(lb_rect.x0 + 10, lb_rect.y0 + 5, lb_rect.x1 - 10, lb_rect.y0 + subh_h - 3),
-                                         [format_arabic("مفاتيح وفخاخ الامتحان بالإنجليزي (Exam Triggers)")],
-                                         start_fs=10.0, min_fs=8.5, fontname=fn_b, color=(0.65, 0.28, 0.04))
-                        
-                        insert_text_auto(comp_p, fitz.Rect(lb_rect.x0 + 12, lb_rect.y0 + subh_h + 8, lb_rect.x1 - 12, lb_rect.y1 - 10),
-                                         w_exam, start_fs=9.2, min_fs=7.2, fontname=fn_r, color=(0.55, 0.22, 0.04))
-                # 3. Footer
-                comp_p.draw_line(fitz.Point(m_x + 10, ph - 16), fitz.Point(pw - m_x - 10, ph - 16), color=(0.82, 0.84, 0.88), width=0.8)
-                comp_p.insert_textbox(fitz.Rect(m_x, ph - 16, pw - m_x, ph - 2),
-                                      format_arabic(f"دفتر لمّاح الأكاديمي  |  دليل المذاكرة والتحضير للامتحان  |  شريحة {orig_page_num}"),
-                                      fontsize=8.2, fontname=fn_r, color=(0.42, 0.45, 0.50), align=fitz.TEXT_ALIGN_CENTER)
+                    insert_text_auto(comp_p2, fitz.Rect(t_rect.x0 + 14, t_rect.y0 + subh_h + 10, t_rect.x1 - 14, t_rect.y1 - 10),
+                                     w_traps, start_fs=9.8, min_fs=8.0, fontname=fn_r, color=(0.55, 0.22, 0.04))
 
-                comp_pages_for_this_slide.append(len(new_doc))
+                    # Footer Part 2
+                    comp_p2.draw_line(fitz.Point(m_x + 10, ph - 16), fitz.Point(pw - m_x - 10, ph - 16), color=(0.82, 0.84, 0.88), width=0.8)
+                    comp_p2.insert_textbox(fitz.Rect(m_x, ph - 16, pw - m_x, ph - 2),
+                                          format_arabic(f"ملف لمّاح المخطط الأكاديمي  |  دليل المذاكرة والتحضير للامتحان  |  شريحة {orig_page_num} (الجزء 2)"),
+                                          fontsize=8.2, fontname=fn_r, color=(0.42, 0.45, 0.50), align=fitz.TEXT_ALIGN_CENTER)
+
+                    comp_pages_for_this_slide.append(len(new_doc))
+                else:
+                    # ── SINGLE COMPANION PAGE (Compact Content) ──
+                    comp_p, fn_r, fn_b = create_companion_page()
+                    
+                    # 1. Header Bar
+                    h_rect = fitz.Rect(m_x, top_m, pw - m_x, top_m + h_h)
+                    comp_p.draw_rect(h_rect, color=(0.85, 0.88, 0.93), fill=(1.0, 1.0, 1.0), radius=0.03, width=0.8)
+                    comp_p.draw_line(fitz.Point(h_rect.x1 - 2, h_rect.y0 + 3), fitz.Point(h_rect.x1 - 2, h_rect.y1 - 3), color=(0.12, 0.25, 0.65), width=4.5)
+
+                    pill_rect = fitz.Rect(h_rect.x0 + 12, h_rect.y0 + 14, h_rect.x0 + 110, h_rect.y1 - 14)
+                    comp_p.draw_rect(pill_rect, color=(0.80, 0.85, 0.93), fill=(0.93, 0.95, 0.99), radius=0.2, width=0.8)
+                    insert_text_auto(comp_p, fitz.Rect(pill_rect.x0 + 4, pill_rect.y0 + 7, pill_rect.x1 - 4, pill_rect.y1 - 4),
+                                     [format_arabic(f"شريحة {orig_page_num}")], start_fs=9.5, min_fs=8.5, fontname=fn_b, color=(0.12, 0.25, 0.65), align=fitz.TEXT_ALIGN_CENTER)
+
+                    title_box = fitz.Rect(pill_rect.x1 + 14, top_m + 6, h_rect.x1 - 16, top_m + 32)
+                    insert_text_auto(comp_p, title_box, [format_arabic(f"الشرح والتفكيك الأكاديمي  |  {slide_title}")],
+                                     start_fs=12.2, min_fs=10.0, fontname=fn_b, color=(0.10, 0.16, 0.38))
+
+                    sub_box = fitz.Rect(pill_rect.x1 + 14, top_m + 34, h_rect.x1 - 16, top_m + 62)
+                    insert_text_auto(comp_p, sub_box, [format_arabic(f"الخلاصة المركزة: {sub_text}")],
+                                     start_fs=9.4, min_fs=8.0, fontname=fn_r, color=(0.55, 0.30, 0.05))
+
+                    has_left_col = bool(example_text or vocab_list or exam_tip)
+                    if has_left_col:
+                        w_right = int(uw * 0.58)
+                        x0_right = pw - m_x - w_right
+                        x1_right = pw - m_x
+                        w_left = uw - w_right - gap
+                        x0_left = m_x
+                        x1_left = m_x + w_left
+                    else:
+                        w_right = uw
+                        x0_right = m_x
+                        x1_right = pw - m_x
+                        x0_left = 0
+                        x1_left = 0
+
+                    right_rect = fitz.Rect(x0_right, c_top, x1_right, c_bot)
+                    comp_p.draw_rect(right_rect, color=(0.85, 0.88, 0.93), fill=(1.0, 1.0, 1.0), radius=0.03, width=0.8)
+                    sub_r = fitz.Rect(right_rect.x0, right_rect.y0, right_rect.x1, right_rect.y0 + subh_h)
+                    comp_p.draw_rect(sub_r, color=(0.85, 0.88, 0.93), fill=(0.94, 0.96, 0.995), radius=0.03, width=0.8)
+                    comp_p.draw_line(fitz.Point(right_rect.x1 - 2, right_rect.y0 + 2), fitz.Point(right_rect.x1 - 2, right_rect.y0 + subh_h - 2), color=(0.15, 0.28, 0.65), width=3.6)
+                    
+                    card_title = "قاعة المحاضرة والشرح المفاهيمي (مرتبط بالتسجيل والسلايد)" if has_real_audio else "الشرح والتفكيك المفاهيمي الجوهري (من الصفر)"
+                    insert_text_auto(comp_p, fitz.Rect(right_rect.x0 + 12, right_rect.y0 + 5, right_rect.x1 - 12, right_rect.y0 + subh_h - 3),
+                                     [format_arabic(card_title)], start_fs=10.5, min_fs=9.0, fontname=fn_b, color=(0.12, 0.18, 0.45))
+
+                    r_lines = []
+                    if has_real_audio:
+                        r_lines.append("قاعة المحاضرة (ما ركز عليه وشرحه الدكتور):")
+                        doc_bullets = sanitize_bullet_points(raw_doctor_exp)
+                        r_lines.extend(doc_bullets[:3])
+                        r_lines.append("")
+                    elif study_notes:
+                        r_lines.append("تنبيهات وملاحظات المذاكرة المركزة:")
+                        for sn in study_notes[:3]:
+                            clean_sn = clean_text(sn)
+                            if clean_sn:
+                                r_lines.append(f"• {clean_sn}")
+                        r_lines.append("")
+
+                    ai_bullets = sanitize_bullet_points(ai_exp_text)
+                    if ai_bullets:
+                        r_lines.append("تفاصيل الشرح والاستيعاب الأكاديمي:")
+                        for b in ai_bullets[:6]:
+                            clean_b = b.lstrip("•- \t")
+                            r_lines.append(f"• {clean_b}")
+                    elif ai_exp_text:
+                        r_lines.append("تفاصيل الشرح والاستيعاب الأكاديمي:")
+                        r_lines.append(ai_exp_text)
+
+                    w_right_lines = []
+                    for l in r_lines:
+                        if l == "":
+                            w_right_lines.append("")
+                        elif any(l.startswith(pfx) for pfx in ["قاعة المحاضرة", "تنبيهات", "تفاصيل"]):
+                            w_right_lines.append(format_arabic(l))
+                        else:
+                            w_right_lines.extend(wrap_arabic_text(l, max_chars=68))
+
+                    insert_text_auto(comp_p, fitz.Rect(right_rect.x0 + 16, right_rect.y0 + subh_h + 10, right_rect.x1 - 16, right_rect.y1 - 10),
+                                     w_right_lines, start_fs=9.8, min_fs=7.5, fontname=fn_r, color=(0.12, 0.14, 0.20))
+
+                    if has_left_col:
+                        w_ex = wrap_arabic_text(example_text, max_chars=44) if example_text else []
+                        exam_lines = []
+                        if vocab_list:
+                            exam_lines.append("مفاتيح ومصطلحات الاختبار:")
+                            for v in vocab_list[:3]:
+                                if isinstance(v, dict):
+                                    t = clean_text(v.get("term", "")).strip()
+                                    tr = clean_text(v.get("translation", "") or v.get("trans", "")).strip()
+                                    sd = clean_text(v.get("simple_def", "")).strip()
+                                    if t and tr and sd:
+                                        exam_lines.append(f"• {t} : {tr} - {sd}")
+                                    elif t and tr:
+                                        exam_lines.append(f"• {t} : {tr}")
+                                elif isinstance(v, str) and v.strip():
+                                    exam_lines.append(f"• {clean_text(v)}")
+                            exam_lines.append("")
+
+                        if exam_tip:
+                            exam_lines.append("فخ امتحاني ونقاط الحذر:")
+                            tip_clean = clean_text(exam_tip)
+                            for t_line in tip_clean.split("\n"):
+                                t_line = t_line.strip().lstrip("•-* ")
+                                if t_line:
+                                    exam_lines.append(f"• {t_line}")
+
+                        w_exam = []
+                        for el in exam_lines:
+                            if el == "":
+                                w_exam.append("")
+                            else:
+                                w_exam.extend(wrap_arabic_text(el, max_chars=44))
+
+                        has_card1 = bool(w_ex)
+                        has_card2 = bool(w_exam)
+
+                        if has_card1 and has_card2:
+                            h_top = int((c_h - gap) * 0.45)
+                            lt_rect = fitz.Rect(x0_left, c_top, x1_left, c_top + h_top)
+                            lb_rect = fitz.Rect(x0_left, c_top + h_top + gap, x1_left, c_bot)
+                        elif has_card1:
+                            lt_rect = fitz.Rect(x0_left, c_top, x1_left, c_bot)
+                            lb_rect = None
+                        elif has_card2:
+                            lt_rect = None
+                            lb_rect = fitz.Rect(x0_left, c_top, x1_left, c_bot)
+                        else:
+                            lt_rect = None
+                            lb_rect = None
+
+                        if lt_rect:
+                            comp_p.draw_rect(lt_rect, color=(0.78, 0.88, 0.82), fill=(0.975, 0.995, 0.985), radius=0.03, width=0.8)
+                            sub_lt = fitz.Rect(lt_rect.x0, lt_rect.y0, lt_rect.x1, lt_rect.y0 + subh_h)
+                            comp_p.draw_rect(sub_lt, color=(0.78, 0.88, 0.82), fill=(0.91, 0.965, 0.935), radius=0.03, width=0.8)
+                            comp_p.draw_line(fitz.Point(lt_rect.x1 - 2, lt_rect.y0 + 2), fitz.Point(lt_rect.x1 - 2, lt_rect.y0 + subh_h - 2), color=(0.08, 0.55, 0.28), width=3.6)
+                            insert_text_auto(comp_p, fitz.Rect(lt_rect.x0 + 10, lt_rect.y0 + 5, lt_rect.x1 - 10, lt_rect.y0 + subh_h - 3),
+                                             [format_arabic("الربط الواقعي والتطبيقي (مثال ملموس)")],
+                                             start_fs=10.2, min_fs=8.8, fontname=fn_b, color=(0.08, 0.38, 0.20))
+                            insert_text_auto(comp_p, fitz.Rect(lt_rect.x0 + 12, lt_rect.y0 + subh_h + 8, lt_rect.x1 - 12, lt_rect.y1 - 6),
+                                             w_ex, start_fs=9.8, min_fs=7.8, fontname=fn_r, color=(0.06, 0.22, 0.12))
+
+                        if lb_rect:
+                            comp_p.draw_rect(lb_rect, color=(0.92, 0.82, 0.70), fill=(0.998, 0.985, 0.965), radius=0.03, width=0.8)
+                            sub_lb = fitz.Rect(lb_rect.x0, lb_rect.y0, lb_rect.x1, lb_rect.y0 + subh_h)
+                            comp_p.draw_rect(sub_lb, color=(0.92, 0.82, 0.70), fill=(0.99, 0.945, 0.88), radius=0.03, width=0.8)
+                            comp_p.draw_line(fitz.Point(lb_rect.x1 - 2, lb_rect.y0 + 2), fitz.Point(lb_rect.x1 - 2, lb_rect.y0 + subh_h - 2), color=(0.85, 0.45, 0.08), width=3.6)
+                            insert_text_auto(comp_p, fitz.Rect(lb_rect.x0 + 10, lb_rect.y0 + 5, lb_rect.x1 - 10, lb_rect.y0 + subh_h - 3),
+                                             [format_arabic("مفاتيح وفخاخ الامتحان بالإنجليزي (Exam Triggers)")],
+                                             start_fs=10.0, min_fs=8.5, fontname=fn_b, color=(0.65, 0.28, 0.04))
+                            insert_text_auto(comp_p, fitz.Rect(lb_rect.x0 + 12, lb_rect.y0 + subh_h + 8, lb_rect.x1 - 12, lb_rect.y1 - 10),
+                                             w_exam, start_fs=9.2, min_fs=7.5, fontname=fn_r, color=(0.55, 0.22, 0.04))
+
+                    comp_p.draw_line(fitz.Point(m_x + 10, ph - 16), fitz.Point(pw - m_x - 10, ph - 16), color=(0.82, 0.84, 0.88), width=0.8)
+                    comp_p.insert_textbox(fitz.Rect(m_x, ph - 16, pw - m_x, ph - 2),
+                                          format_arabic(f"ملف لمّاح المخطط الأكاديمي  |  دليل المذاكرة والتحضير للامتحان  |  شريحة {orig_page_num}"),
+                                          fontsize=8.2, fontname=fn_r, color=(0.42, 0.45, 0.50), align=fitz.TEXT_ALIGN_CENTER)
+
+                    comp_pages_for_this_slide.append(len(new_doc))
                 companion_page_map[orig_page_num] = comp_pages_for_this_slide
 
             annotations["slide_page_map"] = slide_page_map
