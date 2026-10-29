@@ -658,14 +658,61 @@ async def get_financial_analytics(admin=Depends(verify_admin)):
             .order("created_at", desc=True)\
             .execute()
         
+        # Build user usage & token consumption map from usage_logs
+        user_usage_map: Dict[str, Any] = {}
+        try:
+            logs_res = supabase.table("usage_logs")\
+                .select("user_id, metadata, api_cost_usd")\
+                .execute()
+            for l in _as_dict_list(logs_res.data):
+                uid = l.get("user_id")
+                if not uid:
+                    continue
+                if uid not in user_usage_map:
+                    user_usage_map[uid] = {
+                        "tokens": 0,
+                        "cost_usd": 0.0,
+                        "cost_ils": 0.0,
+                        "lectures_count": 0
+                    }
+                user_usage_map[uid]["lectures_count"] += 1
+                meta = l.get("metadata") or {}
+                transcript = meta.get("transcript") or ""
+                annotations = meta.get("annotations") or {}
+                inp_chars = len(transcript) if isinstance(transcript, str) else 0
+                out_chars = len(str(annotations))
+                inp_tokens = int(inp_chars / 3.5)
+                out_tokens = int(out_chars / 3.5)
+                total_tokens = inp_tokens + out_tokens
+                cost = (inp_tokens * 0.000000075) + (out_tokens * 0.00000030)
+                user_usage_map[uid]["tokens"] += total_tokens
+                user_usage_map[uid]["cost_usd"] += cost
+
+            for uid, info in user_usage_map.items():
+                info["cost_usd"] = round(info["cost_usd"], 4)
+                info["cost_ils"] = round(info["cost_usd"] * 3.75, 2)
+        except Exception as ue:
+            logger.warning(f"Failed to aggregate user usage logs: {ue}")
+
         student_txs_raw = _as_dict_list(tx_res.data)
         student_txs = []
         for tx in student_txs_raw:
             plan_obj = tx.get("subscription_plans") or {}
             prof_obj = tx.get("profiles") or {}
+            u_id = tx.get("user_id")
+            usage_info = user_usage_map.get(u_id, {
+                "tokens": 0,
+                "cost_usd": 0.0,
+                "cost_ils": 0.0,
+                "lectures_count": 0
+            })
             tx["plan_name"] = plan_obj.get("name") or plan_obj.get("name_en") or "اشتراك لمّاح"
             tx["sender_name"] = prof_obj.get("full_name") or "طالب"
             tx["sender_phone"] = prof_obj.get("phone_number") or ""
+            tx["tokens_used"] = usage_info["tokens"]
+            tx["ai_cost_usd"] = usage_info["cost_usd"]
+            tx["ai_cost_ils"] = usage_info["cost_ils"]
+            tx["lectures_processed"] = usage_info["lectures_count"]
             student_txs.append(tx)
         student_revenue = sum(float(tx.get("amount", 0) or 0) for tx in student_txs)
         
