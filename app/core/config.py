@@ -12,6 +12,8 @@ class Settings(BaseSettings):
         "https://api.lammah.site",
         "http://localhost:3000",
         "http://127.0.0.1:3000",
+        "http://localhost:18080",
+        "http://127.0.0.1:18080",
         "http://localhost:3001",
         "http://127.0.0.1:3001",
         "http://localhost:3002",
@@ -48,5 +50,3 @@ class Settings(BaseSettings):
     )
 
 settings = Settings()
-
-# Triggering Uvicorn reload for new .env load

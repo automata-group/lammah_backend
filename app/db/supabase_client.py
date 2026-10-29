@@ -8,16 +8,18 @@ _db_client: Client | None = None
 
 def _init_clients():
     global _auth_client, _db_client
+    url = str(settings.SUPABASE_URL).strip("\"' ")
+    key = str(settings.SUPABASE_KEY).strip("\"' ")
+    service_key = str(settings.SUPABASE_SERVICE_KEY or settings.SUPABASE_KEY).strip("\"' ")
     if _auth_client is None:
         try:
-            _auth_client = create_client(settings.SUPABASE_URL, settings.SUPABASE_KEY)
+            _auth_client = create_client(url, key)
         except Exception as e:
             logger.error(f"❌ Failed to create Supabase auth client: {e}")
             raise
     if _db_client is None:
         try:
-            db_key = settings.SUPABASE_SERVICE_KEY or settings.SUPABASE_KEY
-            _db_client = create_client(settings.SUPABASE_URL, db_key)
+            _db_client = create_client(url, service_key)
         except Exception as e:
             logger.error(f"❌ Failed to create Supabase DB client: {e}")
             raise

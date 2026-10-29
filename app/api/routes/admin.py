@@ -6,6 +6,7 @@ from postgrest.types import CountMethod
 from app.core.auth_guard import get_user_profile
 from app.db.supabase_client import get_supabase
 from app.core.logger import logger
+from app.core.config import settings
 from io import BytesIO
 from datetime import datetime, timedelta, timezone
 import json
@@ -646,11 +647,11 @@ async def assign_subscription_by_email(data: AssignSubscriptionModel, admin=Depe
 
 @router.get("/analytics/financial")
 async def get_financial_analytics(admin=Depends(verify_admin)):
-    """Fetch separated financial analytics (Student Subscriptions vs Teacher Tutoring 50/50 Revenue)."""
+    """Fetch financial analytics (Student Subscriptions and OpenRouter AI costs)."""
     try:
         supabase = get_supabase()
         
-        # 1. Student Subscription Transactions (Fixed query to use valid joined tables)
+        # 1. Student Subscription Transactions
         tx_res = supabase.table("transactions")\
             .select("id, short_order_id, user_id, amount, status, payment_method, created_at, subscription_plans(name, name_en, price_ils), profiles:user_id(full_name, phone_number)")\
             .in_("status", ["completed", "approved"])\
@@ -668,9 +669,7 @@ async def get_financial_analytics(admin=Depends(verify_admin)):
             student_txs.append(tx)
         student_revenue = sum(float(tx.get("amount", 0) or 0) for tx in student_txs)
         
-        from datetime import datetime, timedelta, timezone
         thirty_days_ago = datetime.now(timezone.utc) - timedelta(days=30)
-        
         student_mrr = 0.0
         for tx in student_txs:
             try:
@@ -679,71 +678,53 @@ async def get_financial_analytics(admin=Depends(verify_admin)):
                     student_mrr += float(tx.get("amount", 0) or 0)
             except Exception:
                 pass
-                
-        # 2. Peer Tutoring Bookings (50/50 Split)
-        tutoring_bookings: List[Dict[str, Any]] = []
-        tutoring_gross_volume = 0.0
-        tutoring_platform_revenue = 0.0
-        tutoring_tutor_share = 0.0
-        
-        try:
-            book_res = supabase.table("tutoring_bookings")\
-                .select("id, total_price, tutor_share, platform_share, status, session_date, created_at, student_name, student_phone, tutoring_services(title, subject_name), tutor_profiles:tutor_id(headline, university, major, profiles:id(full_name, phone_number))")\
-                .in_("status", ["confirmed", "completed"])\
-                .order("created_at", desc=True)\
-                .execute()
-                
-            tutoring_bookings = _as_dict_list(book_res.data)
-            for b in tutoring_bookings:
-                t_price = float(b.get("total_price", 0) or 0)
-                p_share = float(b.get("platform_share", t_price * 0.5) or (t_price * 0.5))
-                t_share = float(b.get("tutor_share", t_price * 0.5) or (t_price * 0.5))
-                tutoring_gross_volume += t_price
-                tutoring_platform_revenue += p_share
-                tutoring_tutor_share += t_share
-        except Exception as e:
-            logger.warning(f"Could not load tutoring bookings analytics: {e}")
 
-        # 3. Tutor Payouts & Wallets
-        tutor_payouts_completed = 0.0
-        tutor_payouts_pending = 0.0
-        pending_payouts_list: List[Dict[str, Any]] = []
-        completed_payouts_list: List[Dict[str, Any]] = []
-        total_wallets_balance = 0.0
+        # 2. OpenRouter AI Costs & Credits Integration (Live API)
+        openrouter_stats = {
+            "configured": bool(settings.OPENROUTER_API_KEY),
+            "total_credits_usd": 0.0,
+            "total_usage_usd": 0.0,
+            "remaining_balance_usd": 0.0,
+            "total_usage_ils": 0.0,
+            "exchange_rate": 3.75,
+            "is_low_balance": False
+        }
 
-        try:
-            # Fetch all payouts with tutor profile and user info
-            payouts_res = supabase.table("tutor_payouts")\
-                .select("id, tutor_id, amount, payout_method, payout_details, status, receipt_image_url, admin_notes, created_at, updated_at, tutor_profiles:tutor_id(headline, university, major, payout_details, profiles:id(full_name, phone_number))")\
-                .order("created_at", desc=True)\
-                .execute()
-                
-            all_payouts = _as_dict_list(payouts_res.data)
-            for p in all_payouts:
-                amt = float(p.get("amount", 0) or 0)
-                if p.get("status") == "completed":
-                    tutor_payouts_completed += amt
-                    completed_payouts_list.append(p)
-                elif p.get("status") in ["requested", "processing"]:
-                    tutor_payouts_pending += amt
-                    pending_payouts_list.append(p)
-                    
-            # Fetch total tutor wallets balance (total liability owed to tutors)
-            wallets_res = supabase.table("tutor_wallets").select("available_balance, pending_balance").execute()
-            for w in _as_dict_list(wallets_res.data):
-                total_wallets_balance += float(w.get("available_balance", 0) or 0) + float(w.get("pending_balance", 0) or 0)
-        except Exception as e:
-            logger.warning(f"Could not load tutor payouts analytics: {e}")
+        if settings.OPENROUTER_API_KEY:
+            try:
+                import httpx
+                async with httpx.AsyncClient(timeout=4.0) as client:
+                    resp = await client.get(
+                        "https://openrouter.ai/api/v1/credits",
+                        headers={"Authorization": f"Bearer {settings.OPENROUTER_API_KEY}"}
+                    )
+                    if resp.status_code == 200:
+                        cred_data = resp.json().get("data", {})
+                        total_credits = float(cred_data.get("total_credits", 0.0) or 0.0)
+                        total_usage = float(cred_data.get("total_usage", 0.0) or 0.0)
+                        remaining = max(0.0, total_credits - total_usage)
+                        usd_ils_rate = 3.75
+                        usage_ils = round(total_usage * usd_ils_rate, 2)
+                        
+                        openrouter_stats.update({
+                            "total_credits_usd": round(total_credits, 2),
+                            "total_usage_usd": round(total_usage, 2),
+                            "remaining_balance_usd": round(remaining, 2),
+                            "total_usage_ils": usage_ils,
+                            "exchange_rate": usd_ils_rate,
+                            "is_low_balance": remaining < 3.0
+                        })
+            except Exception as oe:
+                logger.warning(f"Could not load OpenRouter credits in admin analytics: {oe}")
 
-        # Overall Platform Net Profit & Cash Inflow
-        total_platform_net = student_revenue + tutoring_platform_revenue
-        total_gross_inflow = student_revenue + tutoring_gross_volume
-        total_teacher_liabilities = total_wallets_balance + tutor_payouts_pending
+        true_net_profit = round(max(0.0, student_revenue - openrouter_stats["total_usage_ils"]), 2)
 
         return {
-            "net_platform_profit": total_platform_net,
-            "total_gross_inflow": total_gross_inflow,
-            "total_teacher_liabilities": total_teacher_liabilities,
+            "net_platform_profit": student_revenue,
+            "true_net_profit": true_net_profit,
+            "openrouter": openrouter_stats,
+            "total_gross_inflow": student_revenue,
+            "total_teacher_liabilities": 0.0,
             "mrr": student_mrr,
             
             # Student Subscriptions
@@ -754,24 +735,22 @@ async def get_financial_analytics(admin=Depends(verify_admin)):
                 "recent_transactions": student_txs
             },
             
-            # Peer Tutoring & Payouts Desk
+            # Legacy compatibility
             "tutoring": {
-                "platform_net_revenue": tutoring_platform_revenue,
-                "gross_booking_volume": tutoring_gross_volume,
-                "tutor_earned_share": tutoring_tutor_share,
-                "tutor_payouts_completed": tutor_payouts_completed,
-                "tutor_payouts_pending": tutor_payouts_pending,
-                "total_wallets_balance": total_wallets_balance,
-                "total_bookings_count": len(tutoring_bookings),
-                "recent_bookings": tutoring_bookings,
-                "pending_payouts": pending_payouts_list,
-                "completed_payouts": completed_payouts_list
+                "platform_net_revenue": 0.0,
+                "gross_booking_volume": 0.0,
+                "tutor_earned_share": 0.0,
+                "tutor_payouts_completed": 0.0,
+                "tutor_payouts_pending": 0.0,
+                "total_wallets_balance": 0.0,
+                "total_bookings_count": 0,
+                "recent_bookings": [],
+                "pending_payouts": [],
+                "completed_payouts": []
             },
-            
-            # Legacy compatibility fields
-            "total_platform_net_revenue": total_platform_net,
-            "total_revenue": total_platform_net,
-            "total_approved_transactions": len(student_txs) + len(tutoring_bookings)
+            "total_platform_net_revenue": student_revenue,
+            "total_revenue": student_revenue,
+            "total_approved_transactions": len(student_txs)
         }
     except Exception as e:
         logger.error(f"❌ Error fetching financial analytics: {str(e)}")
