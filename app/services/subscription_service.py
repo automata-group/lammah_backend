@@ -94,6 +94,12 @@ def create_subscription(user_id: str, plan_id: str):
         "quota_reset_at": expires_at.isoformat()
     }).eq("id", user_id).execute()
     
+    try:
+        from app.core.auth_guard import invalidate_profile_cache
+        invalidate_profile_cache(user_id)
+    except Exception:
+        pass
+        
     logger.info(f"✅ اشتراك جديد للمستخدم {user_id}: {plan.get('name')} ({plan_quota} دقيقة)")
     
     return sub_result.data[0] if sub_result.data else None, None
@@ -134,6 +140,11 @@ def use_lecture_quota(user_id: str, metadata: dict = None, cost: int = 15):
                 .update({"quota_remaining": new_remaining}) \
                 .eq("id", user_id) \
                 .execute()
+            try:
+                from app.core.auth_guard import invalidate_profile_cache
+                invalidate_profile_cache(user_id)
+            except Exception:
+                pass
             used_subscription = True
             logger.info(f"📉 خصم {cost} دقيقة من باقة الاشتراك: المستخدم {user_id} - (مستخدم: {new_used}/{quota} - متبقي: {new_remaining})")
             

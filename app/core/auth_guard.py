@@ -222,49 +222,31 @@ async def verify_phone_active(profile=Depends(get_user_profile)):
 
 async def check_quota(request: Request, profile=Depends(get_user_profile)):
     """Verify user has remaining quota and prevent device-level trial abuse."""
-    logger.info(f"🛡️ [CHECK_QUOTA] Checking quota for user: {profile.get('id')} | Current quota: {profile.get('quota_remaining')}")
-    supabase = get_supabase()
-    quota = profile.get("quota_remaining", 0)
-    fingerprint = profile.get("device_fingerprint") # Already updated by get_user_profile
+    from app.services.subscription_service import get_user_subscription_info
+    user_id = profile.get("id")
+    logger.info(f"🛡️ [CHECK_QUOTA] Checking quota for user: {user_id}")
     
-    # 2. Check for active subscription first (Paid users bypass blocks)
-    active_sub = None
-    try:
-        sub_result = supabase.table("user_subscriptions") \
-            .select("*, subscription_plans(*)") \
-            .eq("user_id", profile["id"]) \
-            .eq("status", "active") \
-            .gte("expires_at", datetime.now(timezone.utc).isoformat()) \
-            .order("created_at", desc=True) \
-            .limit(1) \
-            .execute()
-        active_sub = sub_result.data[0] if sub_result.data else None
-    except Exception as e:
-        logger.error(f"❌ Error checking subscription: {str(e)}")
-
-    # 3. Device trial protection removed - site operates strictly on paid subscriptions
-
-    # 4. Quota enforcement
-    if quota <= 0:
-        if not active_sub:
-            raise HTTPException(status_code=403, detail={
-                "user_message": "يلزم وجود اشتراك نشط لمعالجة المحاضرات. يرجى الاشتراك وتفعيل حسابك.",
-                "type": "no_quota"
-            })
+    sub_info = get_user_subscription_info(user_id)
+    quota_remaining = sub_info.get("quota_remaining", 0)
+    active_sub = sub_info.get("active_subscription")
+    
+    # Synchronize profile object in memory with true quota
+    profile["quota_remaining"] = quota_remaining
+    
+    if quota_remaining > 0:
+        return profile
         
-        plan = active_sub.get("subscription_plans", {})
-        used = active_sub.get("lectures_used", 0) or 0
-        quota_total = plan.get("lecture_quota", 0)
-        
-        if used < quota_total:
-            return profile
-            
+    if not active_sub:
         raise HTTPException(status_code=403, detail={
-            "user_message": f"📊 استخدمت كل محاضراتك في باقة ({plan.get('name', 'الحالية')}). يرجى الترقية أو التجديد.",
-            "type": "quota_exceeded"
+            "user_message": "يلزم وجود اشتراك نشط لمعالجة المحاضرات. يرجى الاشتراك وتفعيل حسابك.",
+            "type": "no_quota"
         })
-    
-    return profile
+        
+    plan = active_sub.get("subscription_plans", {}) or {}
+    raise HTTPException(status_code=403, detail={
+        "user_message": f"📊 استخدمت كل رصيدك في باقة ({plan.get('name', 'الحالية')}). يرجى الترقية أو التجديد.",
+        "type": "quota_exceeded"
+    })
 
 async def check_premium_plans(request: Request, profile=Depends(check_quota)):
     """Enforces access control: ONLY 'شهري - برو' or 'أسبوعي - VIP' subscribers are authorized."""
