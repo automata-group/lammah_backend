@@ -5,6 +5,7 @@ from pydantic import BaseModel
 from typing import Optional, List, Dict, Any
 from datetime import datetime, timezone
 import json
+import time
 
 router = APIRouter()
 
@@ -154,19 +155,25 @@ async def get_history_item(log_id: str, profile=Depends(get_user_profile)):
         
         # Allow any user to retrieve the demo lecture
         if log_id == "4198557f-5b1b-48ac-91a8-d8129de8ca0b":
-            result = supabase.table("usage_logs").select("*").eq("id", log_id).single().execute()
+            result = supabase.table("usage_logs").select("*").eq("id", log_id).limit(1).execute()
         else:
-            result = supabase.table("usage_logs").select("*").eq("id", log_id).eq("user_id", profile["id"]).single().execute()
+            result = supabase.table("usage_logs").select("*").eq("id", log_id).eq("user_id", profile["id"]).limit(1).execute()
             
-        data_dict = _as_dict(result.data)
-        if not data_dict:
-            raise HTTPException(status_code=404, detail="السجل غير موجود")
+        data_list = _as_dict_list(result.data)
+        if not data_list:
+            raise HTTPException(status_code=404, detail="السجل غير موجود أو يخص شخصاً آخر")
         
-        data_dict["total_chat_count"] = _get_cached_total_chats(profile["id"], supabase)
+        data_dict = data_list[0]
+        try:
+            data_dict["total_chat_count"] = _get_cached_total_chats(profile["id"], supabase)
+        except Exception:
+            data_dict["total_chat_count"] = 0
         return data_dict
+    except HTTPException:
+        raise
     except Exception as e:
-        logger.warning(f"⚠️ خطأ في جلب تفاصيل السجل: {str(e)}")
-        raise HTTPException(status_code=404, detail="السجل غير موجود أو يخص شخصاً آخر")
+        logger.error(f"❌ خطأ غير متوقع في جلب تفاصيل السجل {log_id}: {str(e)}")
+        raise HTTPException(status_code=500, detail="خطأ في الخادم أثناء استرجاع المحاضرة")
 
 
 class UpdateTitleRequest(BaseModel):
