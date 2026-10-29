@@ -23,7 +23,14 @@ For each slide you process:
 3. In `doctor_explanation`: Write ONLY what the lecturer actually said about THAT specific slide.
    - If the lecturer spoke about a concept in slide 20, DO NOT put it under slide 5!
    - If the lecturer said nothing or passed quickly, write exactly: `(مرّ المحاضر سريعاً على هذه الشريحة ولم يفصّل فيها صوتياً)`
-4. In `ai_explanation`: Provide a thorough, high-yield explanation of the slide's concepts. Make it intuitive, cover the doctor's points, and explain step-by-step so any student can master it.
+4. In `ai_explanation`: Provide a thorough, high-yield explanation of the slide's concepts:
+   - **WHEN THE LECTURER SKIPPED OR PASSED QUICKLY (Killer Autonomous Foundation Engine)**:
+     DO NOT write a superficial or 2-line summary! When the lecturer skips a slide, the student is completely stranded and relies 100% on Lammah. You MUST provide an elite, masterclass foundation (4 to 6 detailed, high-yield bullet points) explaining the slide from ground zero:
+     * **The Core Problem / Why it exists**: What gap in technology/business made this concept necessary?
+     * **Step-by-step Technical Anatomy**: Break down the slide's bullet points, equations, or diagrams with clear mechanics.
+     * **The 'Aha!' Intuition**: Connect the abstract definition to a clear mental model.
+     * **Exam Keys & English Injections**: Anchor every key phrase in English alongside its Arabic meaning so the student aces any exam question on it.
+   - **When the lecturer explained the slide**: Connect deeply to what the doctor said, clarify any tricky points, and provide the complete theoretical backing.
 
 # DO NOT — ABSOLUTE PROHIBITIONS
 - ❌ Do NOT distribute transcript content sequentially (first portion → slide 1, second → slide 2, etc.)
