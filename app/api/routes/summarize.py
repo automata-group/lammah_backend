@@ -763,7 +763,7 @@ async def process_batch_lectures(
             _done_history_id = log_id if (log_id and isinstance(log_id, str)) else unique_id
             _meta_msg = json.dumps({'type': 'metadata', 'transcript': transcript, 'annotations': annotations}, ensure_ascii=False)
             yield f"data: {_meta_msg}\n\n"
-            _done_msg = json.dumps({'type': 'done', 'download_url': download_url, 'history_id': _done_history_id, 'title': ai_title}, ensure_ascii=False)
+            _done_msg = json.dumps({'type': 'done', 'download_url': download_url, 'job_id': unique_id, 'history_id': _done_history_id, 'title': ai_title}, ensure_ascii=False)
             yield f"data: {_done_msg}\n\n"
 
         except Exception as e:
@@ -1214,7 +1214,7 @@ async def process_lecture(
             
             _done_history_id = log_id if (log_id and isinstance(log_id, str)) else job.job_id
             yield f"data: {json.dumps({'type': 'metadata', 'annotations': annotations}, ensure_ascii=False)}\n\n"
-            yield f"data: {json.dumps({'type': 'done', 'download_url': download_url, 'history_id': _done_history_id, 'title': ai_title, 'annotations': annotations}, ensure_ascii=False)}\n\n"
+            yield f"data: {json.dumps({'type': 'done', 'download_url': download_url, 'job_id': job.job_id, 'history_id': _done_history_id, 'title': ai_title, 'annotations': annotations}, ensure_ascii=False)}\n\n"
 
         except Exception as e:
             logger.error(f"STREAM ERROR: {str(e)}", exc_info=True)
@@ -1288,7 +1288,32 @@ async def download_annotated_pdf(
                     pass
             if resolved_path:
                 break
-        
+
+    # Robust fallback: Check if clean_id is a history_id / log_id pointing to a job_id in usage_logs
+    if not resolved_path:
+        try:
+            from app.db.supabase_client import get_supabase
+            sb = get_supabase()
+            res = sb.table("usage_logs").select("metadata").eq("id", clean_id).maybe_single().execute()
+            if res and res.data:
+                meta_dict = res.data.get("metadata") or {}
+                real_job_id = meta_dict.get("job_id")
+                if real_job_id and real_job_id != clean_id:
+                    for c_dir in candidate_dirs:
+                        target = os.path.join(c_dir, f"{real_job_id}.pdf")
+                        if os.path.exists(target):
+                            resolved_path = target
+                            break
+                        if os.path.exists(c_dir):
+                            for f in os.listdir(c_dir):
+                                if (f.startswith(real_job_id) or real_job_id in f) and f.endswith(".pdf"):
+                                    resolved_path = os.path.join(c_dir, f)
+                                    break
+                        if resolved_path:
+                            break
+        except Exception as lookup_err:
+            logger.warning(f"[DOWNLOAD] Fallback history lookup failed for clean_id={clean_id}: {lookup_err}")
+
     if not resolved_path:
         logger.error(f"[DOWNLOAD] File not found for job_id={job_id}. Checked paths in candidate dirs: {candidate_dirs}")
         raise HTTPException(status_code=404, detail="File not found")
