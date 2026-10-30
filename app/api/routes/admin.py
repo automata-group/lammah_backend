@@ -379,6 +379,7 @@ class AssignSubscriptionModel(BaseModel):
     custom_minutes: Optional[int] = 0
     add_to_existing: bool = False
     notes: Optional[str] = None
+    payment_method: Optional[str] = "reflect"
 
 @router.get("/subscriptions/plans")
 async def get_admin_subscription_plans(admin=Depends(verify_admin)):
@@ -584,14 +585,27 @@ async def assign_subscription_by_email(data: AssignSubscriptionModel, admin=Depe
 
         # Record completed transaction
         try:
-            supabase.table("transactions").insert({
+            pay_method = (data.payment_method or "reflect").strip().lower()
+            tx_ins = supabase.table("transactions").insert({
                 "user_id": target_user_id,
                 "plan_id": plan["id"],
                 "amount": p_price,
-                "payment_method": "admin_direct",
+                "payment_method": pay_method,
                 "status": "completed",
                 "short_order_id": f"ADM-{target_user_id[:6].upper()}"
             }).execute()
+
+            if data.notes and tx_ins.data:
+                created_tx_id = tx_ins.data[0].get("id")
+                if created_tx_id:
+                    supabase.table("usage_logs").insert({
+                        "user_id": target_user_id,
+                        "action_type": "transaction_note",
+                        "metadata": {
+                            "transaction_id": created_tx_id,
+                            "note": data.notes.strip()
+                        }
+                    }).execute()
         except Exception as tx_err:
             logger.warning(f"Failed to record admin transaction: {tx_err}")
 
