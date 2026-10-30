@@ -225,30 +225,63 @@ async def background_worker(row: LectureRow, user_id: str, plan_name: str, histo
         base_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 
         async def _do_annotate_pdf():
-            if not pdf_path:
-                return None
             output_pdf_path = os.path.join(base_dir, "outputs", f"{job.job_id}.pdf")
             os.makedirs(os.path.dirname(output_pdf_path), exist_ok=True)
-            from app.services.pdf_annotator import annotate_pdf
-            await asyncio.to_thread(annotate_pdf, pdf_path, output_pdf_path, annotations, False)
-            return f"/api/v1/summarize/download/{job.job_id}.pdf"
+            if pdf_path:
+                from app.services.pdf_annotator import annotate_pdf
+                await asyncio.to_thread(annotate_pdf, pdf_path, output_pdf_path, annotations, False)
+                return f"/api/v1/summarize/download/{job.job_id}.pdf"
+            elif transcript or annotations.get("continuous_markdown"):
+                from app.services.aesthetic_notebook_service import generate_aesthetic_notebook_pdf
+                student_name = "طالب لماح"
+                if profile and isinstance(profile, dict) and profile.get("name"):
+                    student_name = profile["name"]
+                lecture_title = annotations.get("ai_title") or "الكتاب الجامعي المعتمد"
+                continuous_md = annotations.get("continuous_markdown") or ""
+                num_terms = len(annotations.get("cheat_sheet", []))
+                num_mcqs = len(annotations.get("mcqs", []))
+                num_comps = len(annotations.get("comparisons", []))
+                word_count = len(continuous_md.split())
+                est_study_time = max(25, min(120, round(word_count / 100)))
+                calculated_stats = {
+                    "num_key_terms": num_terms or 16,
+                    "num_mcqs": num_mcqs or 8,
+                    "num_comparisons": num_comps or 2,
+                    "est_study_time": est_study_time
+                }
+                await asyncio.to_thread(
+                    generate_aesthetic_notebook_pdf,
+                    output_path=output_pdf_path,
+                    continuous_markdown=continuous_md,
+                    student_name=student_name,
+                    lecture_title=lecture_title,
+                    cheat_sheet=annotations.get("cheat_sheet", []),
+                    mcqs=annotations.get("mcqs", []),
+                    comparisons=annotations.get("comparisons", []),
+                    study_strategy=annotations.get("study_strategy"),
+                    tldr=annotations.get("tldr"),
+                    stats=calculated_stats
+                )
+                return f"/api/v1/summarize/download/{job.job_id}.pdf"
+            return None
 
-        update_progress("5/5", "🎨 اللمسات الأخيرة! جاري تلوين الشرائح وصياغة العنوان...")
+        update_progress("5/5", "🎨 اللمسات الأخيرة! جاري تلوين الشرائح وهندسة الدفتر الأكاديمي الشامل...")
         ai_title, download_url = await asyncio.gather(
             generate_ai_title(llm, transcript, pdf_context),
             _do_annotate_pdf()
         )
 
         # Save sidecar metadata for downloads
-        if pdf_path:
+        if pdf_path or download_url:
             try:
                 meta_path = os.path.join(base_dir, "outputs", f"{job.job_id}.meta.json")
                 with open(meta_path, "w", encoding="utf-8") as mf:
                     json.dump({
-                        "title": ai_title,
+                        "title": ai_title or annotations.get("ai_title") or "المحاضرة الدراسية",
                         "has_audio": bool(audio_path),
-                        "has_pdf": bool(pdf_path),
+                        "has_pdf": True,
                         "is_prep": not bool(audio_path),
+                        "is_notebook": not bool(pdf_path),
                         "type": "summarize"
                     }, mf, ensure_ascii=False)
             except Exception as meta_e:
@@ -1119,7 +1152,7 @@ async def process_lecture(
             else:
                 annotations = await anno_task
 
-            # 4. Final PDF with live slide-by-slide progress
+            # 4. Final PDF with live progress
             download_url = None
             if pdf_path:
                 output_pdf_path = os.path.join(base_dir_out, "outputs", f"{job.job_id}.pdf")
@@ -1180,12 +1213,56 @@ async def process_lecture(
                 await annotate_task
                 download_url = f"/api/v1/summarize/download/{job.job_id}.pdf"
 
+            elif transcript or annotations.get("continuous_markdown"):
+                # Audio-only Master Study Dossier generation
+                output_pdf_path = os.path.join(base_dir_out, "outputs", f"{job.job_id}.pdf")
+                os.makedirs(os.path.dirname(output_pdf_path), exist_ok=True)
+                
+                yield f"data: {json.dumps({'type': 'progress', 'step': '5/5', 'progress_percent': 92, 'time_estimate': 6, 'message': '🧠 5/5 جاري صياغة فصول ومباحث الكتاب الجامعي المعتمد وتأصيل المفاهيم...'}, ensure_ascii=False)}\n\n"
+                
+                from app.services.aesthetic_notebook_service import generate_aesthetic_notebook_pdf
+                student_name = "طالب لماح"
+                if profile and isinstance(profile, dict) and profile.get("name"):
+                    student_name = profile["name"]
+                
+                lecture_title = annotations.get("ai_title") or "الكتاب الجامعي المعتمد"
+                continuous_md = annotations.get("continuous_markdown") or ""
+                num_terms = len(annotations.get("cheat_sheet", []))
+                num_mcqs = len(annotations.get("mcqs", []))
+                num_comps = len(annotations.get("comparisons", []))
+                word_count = len(continuous_md.split())
+                est_study_time = max(25, min(120, round(word_count / 100)))
+                calculated_stats = {
+                    "num_key_terms": num_terms or 16,
+                    "num_mcqs": num_mcqs or 8,
+                    "num_comparisons": num_comps or 2,
+                    "est_study_time": est_study_time
+                }
+                
+                yield f"data: {json.dumps({'type': 'progress', 'step': '5/5', 'progress_percent': 96, 'time_estimate': 3, 'message': '📄 5/5 جاري رصف وطباعة صفحات الكتاب الجامعي المعتمد وتظليل المصطلحات...'}, ensure_ascii=False)}\n\n"
+
+                await asyncio.to_thread(
+                    generate_aesthetic_notebook_pdf,
+                    output_path=output_pdf_path,
+                    continuous_markdown=continuous_md,
+                    student_name=student_name,
+                    lecture_title=lecture_title,
+                    cheat_sheet=annotations.get("cheat_sheet", []),
+                    mcqs=annotations.get("mcqs", []),
+                    comparisons=annotations.get("comparisons", []),
+                    study_strategy=annotations.get("study_strategy"),
+                    tldr=annotations.get("tldr"),
+                    stats=calculated_stats
+                )
+                download_url = f"/api/v1/summarize/download/{job.job_id}.pdf"
+                yield f"data: {json.dumps({'type': 'progress', 'step': '5/5', 'progress_percent': 99, 'time_estimate': 1, 'message': '✨ 5/5 اكتملت الطباعة! جاري تجهيز رابط التحميل وحفظ الملف...'}, ensure_ascii=False)}\n\n"
+
             # Final 100% progress event before metadata
-            yield f"data: {json.dumps({'type': 'progress', 'step': '5/5', 'progress_percent': 100, 'time_estimate': 0, 'message': '🎉 اكتملت المعالجة بنجاح! جاري تحضير ملفك المخطط والمظلل...'}, ensure_ascii=False)}\n\n"
+            yield f"data: {json.dumps({'type': 'progress', 'step': '5/5', 'progress_percent': 100, 'time_estimate': 0, 'message': '🎉 اكتملت المعالجة بنجاح! تم تجهيز ملفك الأكاديمي الشامل...'}, ensure_ascii=False)}\n\n"
  
             # 5. Save History & Finalize
             # Generate AI Title
-            ai_title = await generate_ai_title(llm, transcript, pdf_context)
+            ai_title = annotations.get("ai_title") or await generate_ai_title(llm, transcript, pdf_context)
             
             history_meta = {
                 "title": ai_title,
@@ -1193,22 +1270,23 @@ async def process_lecture(
                 "slides_text": "\n\n".join(pdf_context) if pdf_context else "",
                 "annotations": annotations,
                 "job_id": job.job_id,
-                "has_pdf": bool(pdf_path),
+                "has_pdf": bool(download_url or pdf_path),
                 "is_prep": is_document_only,
                 "has_audio": not is_document_only
             }
             log_id = use_lecture_quota(profile["id"], metadata=history_meta, cost=calculated_cost)
 
             # Save sidecar metadata for downloads
-            if pdf_path:
+            if pdf_path or download_url:
                 try:
                     meta_path = os.path.join(base_dir_out, "outputs", f"{job.job_id}.meta.json")
                     with open(meta_path, "w", encoding="utf-8") as mf:
                         json.dump({
                             "title": ai_title,
                             "has_audio": not is_document_only,
-                            "has_pdf": bool(pdf_path),
+                            "has_pdf": True,
                             "is_prep": is_document_only,
+                            "is_notebook": not bool(pdf_path),
                             "type": "summarize"
                         }, mf, ensure_ascii=False)
                 except Exception as meta_e:
@@ -1341,6 +1419,7 @@ async def download_annotated_pdf(
     if resolved_is_prep is None and mode is not None:
         resolved_is_prep = mode.lower() in ["prep", "slides", "document", "document_only"]
 
+    resolved_is_notebook = False
     # 1. Check sidecar metadata file (.meta.json)
     meta_path_1 = os.path.join(backend_dir, "outputs", f"{job_id}.meta.json")
     meta_path_2 = os.path.join(base_dir, "outputs", f"{job_id}.meta.json")
@@ -1353,6 +1432,8 @@ async def download_annotated_pdf(
                         resolved_title = meta_data.get("title")
                     if resolved_is_prep is None and "is_prep" in meta_data:
                         resolved_is_prep = bool(meta_data["is_prep"])
+                    if "is_notebook" in meta_data:
+                        resolved_is_notebook = bool(meta_data["is_notebook"])
                 break
             except Exception as meta_err:
                 logger.warning(f"Error reading sidecar {mp}: {meta_err}")
@@ -1379,13 +1460,17 @@ async def download_annotated_pdf(
                     else:
                         tr = str(sb_meta.get("transcript", ""))
                         resolved_is_prep = len(tr.strip()) == 0
+                if "is_notebook" in sb_meta:
+                    resolved_is_notebook = bool(sb_meta["is_notebook"])
+                elif not sb_meta.get("slides_text") and sb_meta.get("transcript"):
+                    resolved_is_notebook = True
         except Exception as sb_err:
             logger.warning(f"Fast Supabase lookup bypassed for {job_id}: {sb_err}")
 
     from app.services.filename_helper import format_arabic_download_filename
     arabic_filename = format_arabic_download_filename(
         title=resolved_title,
-        is_notebook=False,
+        is_notebook=bool(resolved_is_notebook),
         is_prep=bool(resolved_is_prep)
     )
 

@@ -10,13 +10,9 @@ _LLM_CACHE: dict[str, Any] = {}
 def get_llm_for_user(user_id: Optional[str] = None, streaming: bool = False):
     """
     Returns an LLM client with automatic resilient fallbacks:
-    1. Primary: Google Gemini direct via ChatGoogleGenerativeAI (if GEMINI_API_KEY configured)
-       - 40% faster, lower cost, direct context caching
-    2. Fallback 1: Google Gemini 2.5 Flash via OpenRouter (if OPENROUTER_API_KEY configured)
-    3. Fallback 2: Groq LLaMA 3.3 70B via OpenAI-compatible endpoint (if GROQ_API_KEY configured)
-    
-    Caches LLM client instances to reuse underlying HTTP connection pools (eliminating TLS handshakes)
-    per OpenAI & Anthropic latency optimization guidelines.
+    1. Primary: OpenRouter (Google Gemini 2.5 Flash) - Highly available, production-grade, no free-tier caps
+    2. Fallback 1: Direct Google Gemini (with max_retries=0 to failover instantly without 4-minute retry loops)
+    3. Fallback 2: Groq LLaMA 3.3 70B via OpenAI-compatible endpoint
     """
     cache_key = f"streaming_{streaming}"
     if cache_key in _LLM_CACHE:
@@ -25,41 +21,45 @@ def get_llm_for_user(user_id: Optional[str] = None, streaming: bool = False):
     primary_llm = None
     fallbacks: List[Any] = []
 
-    # 1. Primary: Direct Google Gemini (أسرع بنسبة 40% وأقل تكلفة مع دعم مباشر للـ Context Caching)
+    # 1. Primary: OpenRouter (Gemini 2.5 Flash)
+    if settings.OPENROUTER_API_KEY:
+        try:
+            openrouter_llm = ChatOpenAI(
+                model="google/gemini-2.5-flash",
+                openai_api_key=settings.OPENROUTER_API_KEY,
+                base_url="https://openrouter.ai/api/v1",
+                temperature=0.2,
+                streaming=streaming,
+                request_timeout=60,
+                max_retries=1,
+                default_headers={
+                    "HTTP-Referer": "https://lammah.site",
+                    "X-Title": "Lammah Platform"
+                }
+            )
+            primary_llm = openrouter_llm
+        except Exception as e:
+            logger.warning(f"[LLM] Failed to initialize OpenRouter: {e}")
+
+    # 2. Direct Google Gemini (with max_retries=0 so it fails over instantly on 429 quota exhaustion)
     if settings.GEMINI_API_KEY:
         try:
             from langchain_google_genai import ChatGoogleGenerativeAI
-            primary_llm = ChatGoogleGenerativeAI(
+            gemini_llm = ChatGoogleGenerativeAI(
                 model="gemini-2.5-flash",
                 google_api_key=settings.GEMINI_API_KEY,
                 temperature=0.2,
                 streaming=streaming,
-                max_retries=2
+                max_retries=0
             )
+            if primary_llm is None:
+                primary_llm = gemini_llm
+            else:
+                fallbacks.append(gemini_llm)
         except Exception as e:
             logger.warning(f"[LLM] Failed to initialize direct Gemini: {e}")
 
-    # 2. Fallback 1: OpenRouter (طبقة احتياطية أولى أو رئيسية في حال عدم توفر مفتاح Gemini المباشر)
-    if settings.OPENROUTER_API_KEY:
-        openrouter_llm = ChatOpenAI(
-            model="google/gemini-2.5-flash",
-            openai_api_key=settings.OPENROUTER_API_KEY,
-            base_url="https://openrouter.ai/api/v1",
-            temperature=0.2,
-            streaming=streaming,
-            request_timeout=120,
-            max_retries=2,
-            default_headers={
-                "HTTP-Referer": "https://lammah.site",
-                "X-Title": "Lammah Platform"
-            }
-        )
-        if primary_llm is None:
-            primary_llm = openrouter_llm
-        else:
-            fallbacks.append(openrouter_llm)
-
-    # 3. Fallback 2: Groq via OpenAI client
+    # 3. Fallback 2: Groq LLaMA 3.3 70B
     if settings.GROQ_API_KEY:
         try:
             groq_llm = ChatOpenAI(
@@ -68,8 +68,8 @@ def get_llm_for_user(user_id: Optional[str] = None, streaming: bool = False):
                 base_url="https://api.groq.com/openai/v1",
                 temperature=0.2,
                 streaming=streaming,
-                request_timeout=120,
-                max_retries=2
+                request_timeout=60,
+                max_retries=1
             )
             if primary_llm is None:
                 primary_llm = groq_llm

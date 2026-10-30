@@ -249,7 +249,7 @@ def _transcribe_large_audio(file_path: str, progress_callback=None) -> str:
     segment_seconds = 180  # 3-minute segments ensure Qwen3 provider limit (<290s) is never hit
 
     if progress_callback:
-        progress_callback("✂️ جاري تقسيم الملف لمقاطع (3 دقائق) لتوليد التوقيتات الدقيقة...")
+        progress_callback("🎧 جاري معالجة وتفريغ الصوت بدقة فائقة...")
 
     try:
         subprocess.run([

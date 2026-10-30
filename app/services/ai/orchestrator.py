@@ -148,56 +148,13 @@ class AIOrchestrator:
         # Concurrency control: parallel batches across OpenRouter / Gemini Flash (Throttled to 4 to prevent upstream 429 Rate Limits)
         semaphore = asyncio.Semaphore(4)
 
-        # LINK/AUDIO ONLY BYPASS: Skip Mapper and Tutor if no PDF is uploaded
+        # AUDIO-ONLY / LINK-ONLY MASTER DOSSIER SYNTHESIS:
+        # Instead of skipping the tutor and returning an empty shell with no PDF,
+        # we synthesize an exhaustive, high-yield academic study dossier that feeds
+        # the Aesthetic Notebook PDF engine, creating a complete master study PDF.
         if not pdf_context:
-            logger.info("[ORCHESTRATOR] PDF Context is empty. Skipping Mapper and Tutor (link/audio-only). Only running Examiner...")
-            logger.info("[ORCHESTRATOR] Starting Fast Batch Assessment Processing...")
-            transcript_chunks = self._chunk_text(transcript, chunk_size=25000)
-            
-            assessment_tasks = []
-            async def process_examiner_chunk_only(chunk, idx):
-                async with semaphore:
-                    return await self.examiner.run_with_retry(llm, f"Transcript Chunk {idx+1}:\n{chunk}\n\nExisting Explanations: []")
-
-            for i, chunk in enumerate(transcript_chunks[:4]):
-                assessment_tasks.append(process_examiner_chunk_only(chunk, i))
-            
-            batch_results = await asyncio.gather(*assessment_tasks)
-            
-            seen_questions = set()
-            for batch in batch_results:
-                if not isinstance(batch, dict): continue
-                
-                for mcq in batch.get("mcqs", []):
-                    q_text = mcq.get("question", "")
-                    if q_text and q_text not in seen_questions:
-                        final_results["mcqs"].append(mcq)
-                        seen_questions.add(q_text)
-                
-                for card in batch.get("flashcards", []):
-                    front = card.get("front", "")
-                    if front and not any(f.get("front") == front for f in final_results["flashcards"]):
-                        final_results["flashcards"].append(card)
-
-            final_results["mcqs"] = final_results["mcqs"][:30] 
-            final_results["flashcards"] = final_results["flashcards"][:30]
-            final_results["expected_questions"] = final_results["mcqs"]
-            final_results["past_exams"] = [
-                {
-                    "id": f"pe_{idx}",
-                    "year": "امتحان النهائي 2024" if idx % 2 == 0 else "امتحان الميدتيرم 2023",
-                    "exam_type": "Final Exam" if idx % 2 == 0 else "Midterm Exam",
-                    "page_number": idx + 1,
-                    "question": q.get("question", ""),
-                    "options": q.get("options", []),
-                    "correct_answer": q.get("correct_answer", ""),
-                    "doctor_explanation": q.get("explanation") or "إجابة نموذجية معتمدة وفق ما ركز عليه المحاضر.",
-                    "trap_warning": "⚠️ فخ شائع: انتبه لصيغة النفي أو الكلمات الخادعة (مثل NOT أو EXCEPT أو Most likely) التي يكررها الدكاترة في هذا السؤال!"
-                }
-                for idx, q in enumerate(final_results["mcqs"])
-            ]
-            logger.info(f"[ORCHESTRATOR] Bypassed flow complete. MCQs: {len(final_results['mcqs'])}, Past Exams: {len(final_results['past_exams'])}")
-            return final_results
+            logger.info("[ORCHESTRATOR] PDF Context is empty. Synthesizing Comprehensive Master Audio Dossier...")
+            return await self._synthesize_master_audio_dossier(llm, transcript)
 
         # SMART DOCUMENT-ONLY / SELF-STUDY MODE: When no audio transcript is provided
         if not transcript or not transcript.strip():
@@ -479,3 +436,218 @@ class AIOrchestrator:
 
         logger.info(f"[ORCHESTRATOR] Refactored Flow Complete. MCQs: {len(final_results['mcqs'])}, Past Exams: {len(final_results['past_exams'])}, Slides: {len(final_results['slide_explanations'])}")
         return final_results
+
+    async def _synthesize_master_audio_dossier(self, llm, transcript: str) -> Dict[str, Any]:
+        """
+        Synthesizes an exhaustive, college-level Master Study Dossier from audio transcript alone.
+        Outputs rich structured JSON with continuous markdown (tables, Oxford Cornell margins,
+        exam radar traps, formulas/rules), active recall MCQs, flashcards, and virtual slide modules.
+        """
+        clean_transcript = (transcript or "").strip()
+        if not clean_transcript:
+            return {
+                "highlights": [], "sticky_notes": [], "focus_points": [], "slide_explanations": [],
+                "mcqs": [], "flashcards": [], "past_exams": [], "continuous_markdown": "",
+                "study_strategy": "", "tldr": [], "cheat_sheet": [], "comparisons": []
+            }
+
+        system_prompt = """أنت "المحقق الأكاديمي الرئيسي" وخبير تأليف المراجع والكتب الجامعية لمنصة "لمّاح" (Lammah Academic Intelligence Engine).
+مهمتك تحويل هذا التسجيل الصوتي لمحاضرة جامعية إلى "كتاب جامعي رسمي معتمد" متكامل الأركان، يتناسب حجمه وعمقه طردياً وبدقة تامة مع طول المحاضرة.
+
+قواعد التأليف والتحقيق الأكاديمي الصارمة:
+1. الشمولية التامة ومنع التلخيص المقتضب (Exhaustive Academic Exposition):
+   - يُمنع منعاً باتاً الاقتصار على رؤوس أقلام أو كبسولات مقتضبة. الطالب يحتاج كتاباً جامعياً شاملاً يغنيه بنسبة 100% عن الاستماع للتسجيل أو البحث في مصادر خارجية.
+   - اكتب بأسلوب النثر التعليمي الرصين الشارح. اشرح الأفكار والمفاهيم والنظريات باستفاضة منهجية وافية (350 إلى 500 كلمة لكل محور/فصل).
+   - وثّق جميع الأمثلة الواقعية والقصص التطبيقية التي ضربها الدكتور في المحاضرة.
+
+2. الهيكلة إلى فصول ومباحث دراسية كبرى (Book Chapters & Modules):
+   - قسّم المحاضرة إلى فصول دراسية رئيسية (من 5 إلى 9 فصول بحسب طول التسجيل) تغطي كافة موضوعات الشرح.
+   - استخدم ## للفصول الرئيسية و ### للمباحث والتفريعات.
+   - داخل continuous_markdown، ضمّن لكل فصل:
+     - 💡 الفكرة الجوهرية والمدخل المفاهيمي
+     - 🧠 الشرح والتفصيل المعمق مع الأمثلة الحية
+     - 🔑 المصطلحات الأساسية مع إحاطة المصطلح الإنجليزي بوسم <mark>Term</mark> لتظليله بالماركر
+     - > ⚠️ فخ امتحاني: [تحذير صريح من فخ متكرر يقع فيه الطلاب أو نبه عليه المحاضر]
+     - > 💡 استبصار أكاديمي: [شرح وتوضيح ذكي لمعلومة بين السطور]
+     - > 📌 قاعدة ذهبية: [قاعدة أو معادلة للحفظ والتطبيق الفوري]
+     - > 💬 توثيق من كلام المحاضر: [جملة أو نصيحة قالها المحاضر في سياق الشرح]
+
+3. الأسلوب ثنائي اللغة والتظليل التفاعلي (Bilingual Terminology & Highlighting):
+   - اشرح المنطق والفلسفة بلغة عربية أكاديمية سلسة وواضحة.
+   - احقن المصطلحات الإنجليزية الأساسية بجوار مقابلها العربي مباشرة، واجعل المصطلحات الإنجليزية المفتاحية محاطة بوسم <mark>English Term</mark> ليتم تظليلها بالماركر الأكاديمي تلقائياً في الكتاب.
+
+4. جداول مقارنة ومصفوفات تفريقية (Markdown Comparison Tables):
+   - أنشئ جداول مقارنة شاملة لتفكيك أي لبس بين المفاهيم المتقابلة التي وردت في الشرح.
+
+5. بنك التقييم الذاتي المتقدم ثنائي اللغة (Bilingual University MCQs):
+   - 8 إلى 12 سؤال اختيار من متعدد (MCQs) بمستوى الامتحانات الجامعية الرسمية.
+   - إلزامية الصيغة المزدوجة (Bilingual Requirement):
+     * السؤال: يُكتب باللغة الإنجليزية متبوعاً بترجمته وشرحه بالعربية بين قوسين لضمان الفهم والتدرب على نمط الامتحانات الحقيقية.
+     * الخيارات الأربعة (A, B, C, D): كل خيار يجب حتماً أن يتضمن المصطلح باللغة الإنجليزية ومقابله أو شرحه بالعربية، يُمنع منعاً باتاً كتابة خيارات عربية صماء دون الإنجليزية!
+     * حقل "correct_answer": حرف الخيار الصحيح فقط (A أو B أو C أو D) دون نسخ نص الخيار.
+   - 8 إلى 12 بطاقة استذكار سريع (Flashcards).
+   - 4 إلى 6 أسئلة امتحانية متوقعة (Past Exams Style) بنظام الفخ الامتحاني.
+
+المخرجات حصراً كائن JSON صالح، بنفس الهيكل التالي ودون أي نصوص إضافية:
+{
+  "ai_title": "عنوان دقيق ورسمي للكتاب الجامعي",
+  "study_strategy": "منهجية وخارطة طريق المذاكرة الفعالة لهذا المرجع",
+  "tldr": ["الركيزة الجوهرية الأولى للمحاضرة", "الركيزة الجوهرية الثانية", "الركيزة الجوهرية الثالثة", "الركيزة الجوهرية الرابعة"],
+  "continuous_markdown": "النص الأكاديمي الشامل للكتاب مقسم إلى فصول (##) ومباحث (###) وشرح مستفيض ووسوم <mark>...</mark> وصناديق التنبيهات والأفخاخ وجداول المقارنة",
+  "cheat_sheet": [
+    {"term": "المصطلح بالإنجليزية والعربية", "brief_definition": "التعريف التأصيلي المركز والقاعدة الأساسية"}
+  ],
+  "comparisons": [
+    {
+      "title": "مقارنة منهجية شاملة بين ... و ...",
+      "concept_a": "المفهوم (أ)",
+      "concept_b": "المفهوم (ب)",
+      "differences": [
+        {"aspect": "وجه المقارنة", "a_desc": "شرح وتحليل أ", "b_desc": "شرح وتحليل ب"}
+      ]
+    }
+  ],
+  "slide_explanations": [
+    {
+      "page_number": 1,
+      "title": "الفصل 1: عنوان المبحث الأول",
+      "explanation": "شرح تحليلي موسع ومستفيض لما شرحه المحاضر في هذا الجزء.",
+      "focus_points": ["الركيزة الجوهرية لهذا الفصل أو الفخ الامتحاني"]
+    }
+  ],
+  "focus_points": [
+    {"page_number": 1, "text": "نقطة التركيز الأساسية لهذا الفصل"}
+  ],
+  "sticky_notes": [
+    {"page_number": 1, "note_text": "⚠️ تنبيه المحاضر: توجيه أكاديمي هام نبه عليه الدكتور صراحة."}
+  ],
+  "mcqs": [
+    {
+      "question": "What is the primary function of X? (ما هي الوظيفة الأساسية لـ X في المقرر؟)",
+      "options": [
+        "A) English Option Concept (الشرح والمقابل بالعربية)",
+        "B) English Option Concept (الشرح والمقابل بالعربية)",
+        "C) English Option Concept (الشرح والمقابل بالعربية)",
+        "D) English Option Concept (الشرح والمقابل بالعربية)"
+      ],
+      "correct_answer": "A",
+      "explanation": "التعليل الأكاديمي للإجابة الصحيحة وكشف مغالطات الخيارات الأخرى."
+    }
+  ],
+  "flashcards": [
+    {
+      "front": "المصطلح أو المفهوم (English / Arabic)",
+      "back": "التأصيل العلمي الدقيق مع مثال المحاضر التطبيقي",
+      "hint": "تلميح استذكاري سريع"
+    }
+  ],
+  "past_exams": [
+    {
+      "id": "pe_1",
+      "year": "امتحان نهائي متوقع 2026",
+      "exam_type": "Final Exam",
+      "page_number": 1,
+      "question": "سؤال امتحاني جوهري",
+      "options": ["A) ...", "B) ...", "C) ...", "D) ..."],
+      "correct_answer": "A) ...",
+      "doctor_explanation": "الإجابة النموذجية المعتمدة وفق ما قاله الدكتور.",
+      "trap_warning": "⚠️ فخ امتحاني: تجنب الخلط بين ..."
+    }
+  ]
+}
+أعد فقط كائن JSON الصالح بدون أي علامات أو مقدمات خارج الـ JSON."""
+
+        try:
+            # We pass the full transcript (or up to 120,000 chars) directly to the LLM
+            prompt_input = f"تفريغ المحاضرة الصوتي بالكامل:\n{clean_transcript[:120000]}"
+            response = await llm.ainvoke([
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": prompt_input}
+            ])
+
+            raw_text = response.content.strip()
+            # Clean possible markdown block wrappers
+            if raw_text.startswith("```json"):
+                raw_text = raw_text[7:]
+            elif raw_text.startswith("```"):
+                raw_text = raw_text[3:]
+            if raw_text.endswith("```"):
+                raw_text = raw_text[:-3]
+            raw_text = raw_text.strip()
+
+            # Attempt JSON parse
+            try:
+                data = json.loads(raw_text)
+            except Exception:
+                # Fallback: regex search for outer JSON object
+                m = re.search(r'(\{[\s\S]*\})', raw_text)
+                if m:
+                    data = json.loads(m.group(1))
+                else:
+                    raise ValueError("No valid JSON found in LLM response")
+
+            # Extract fields with safe defaults
+            final_results = {
+                "highlights": [],
+                "sticky_notes": [],
+                "focus_points": data.get("focus_points") or [],
+                "slide_explanations": data.get("slide_explanations") or [],
+                "mcqs": data.get("mcqs") or [],
+                "flashcards": data.get("flashcards") or [],
+                "past_exams": data.get("past_exams") or [],
+                "expected_questions": data.get("mcqs") or [],
+                "continuous_markdown": data.get("continuous_markdown") or "",
+                "study_strategy": data.get("study_strategy") or "",
+                "tldr": data.get("tldr") or [],
+                "cheat_sheet": data.get("cheat_sheet") or [],
+                "comparisons": data.get("comparisons") or [],
+                "ai_title": data.get("ai_title") or "دفتر المذاكرة الأكاديمي الشامل"
+            }
+
+            # If slide_explanations is empty, create at least 1-3 modular virtual slides from continuous markdown
+            if not final_results["slide_explanations"] and final_results["continuous_markdown"]:
+                sections = re.split(r'\n(?=##\s+)', final_results["continuous_markdown"])
+                for idx, sec in enumerate(sections[:10]):
+                    lines = sec.strip().split("\n")
+                    sec_title = lines[0].replace("#", "").strip() if lines else f"الوحدة {idx+1}"
+                    sec_body = "\n".join(lines[1:]).strip() if len(lines) > 1 else sec
+                    final_results["slide_explanations"].append({
+                        "page_number": idx + 1,
+                        "title": sec_title,
+                        "explanation": sec_body[:1500],
+                        "focus_points": [sec_title]
+                    })
+                    final_results["focus_points"].append({
+                        "page_number": idx + 1,
+                        "text": sec_title
+                    })
+
+            # If past_exams is empty, synthesize from mcqs
+            if not final_results["past_exams"] and final_results["mcqs"]:
+                final_results["past_exams"] = [
+                    {
+                        "id": f"pe_{idx}",
+                        "year": "امتحان النهائي 2024" if idx % 2 == 0 else "امتحان الميدتيرم 2023",
+                        "exam_type": "Final Exam" if idx % 2 == 0 else "Midterm Exam",
+                        "page_number": idx + 1,
+                        "question": q.get("question", ""),
+                        "options": q.get("options", []),
+                        "correct_answer": q.get("correct_answer", ""),
+                        "doctor_explanation": q.get("explanation") or "إجابة نموذجية معتمدة وفق ما ركز عليه المحاضر.",
+                        "trap_warning": "⚠️ فخ شائع: انتبه لصيغة النفي أو الكلمات الخادعة التي يكررها الدكاترة في هذا السؤال!"
+                    }
+                    for idx, q in enumerate(final_results["mcqs"])
+                ]
+
+            logger.info(f"[ORCHESTRATOR] Audio Master Dossier synthesized successfully. Markdown: {len(final_results['continuous_markdown'])} chars, MCQs: {len(final_results['mcqs'])}, Slides: {len(final_results['slide_explanations'])}")
+            return final_results
+
+        except Exception as e:
+            logger.error(f"[ORCHESTRATOR] Failed to synthesize master audio dossier: {e}", exc_info=True)
+            # Resilient fallback so job doesn't fail
+            return {
+                "highlights": [], "sticky_notes": [], "focus_points": [], "slide_explanations": [],
+                "mcqs": [], "flashcards": [], "past_exams": [], "continuous_markdown": clean_transcript,
+                "study_strategy": "", "tldr": [], "cheat_sheet": [], "comparisons": [],
+                "ai_title": "ملخص المحاضرة"
+            }

@@ -15,6 +15,7 @@ Features:
 
 import os
 import re
+import math
 import logging
 import urllib.request
 from typing import Optional, List, Dict, Any, Union
@@ -106,7 +107,7 @@ C_BLUE     = HexColor("#1B3A8A")   # Royal blue headings
 C_GOLD     = HexColor("#B45309")   # Burnt sienna accents
 C_TEAL     = HexColor("#0F766E")   # Teal for exam alerts
 C_GREEN    = HexColor("#166534")   # Dark green for tips
-C_MARK     = HexColor("#EDE0C4")   # Beige highlighter
+C_MARK     = HexColor("#FDE68A")   # Soft amber/gold academic highlighter
 C_BOX_BG   = HexColor("#F7F1E8")   # Callout background
 C_BOX_BD   = HexColor("#D9C9B5")   # Callout border
 C_DIV      = HexColor("#E3D9C9")   # Divider lines
@@ -232,12 +233,12 @@ class _S:
             pw = c.stringWidth(pg, FONT_REG, 7.5)
             c.drawString(W - MARGIN - pw, BOTTOM - 20, pg)
         else:
-            brand, _ = _bidi("متجر لمّاح للملازم")
+            brand, _ = _bidi("الكتاب الجامعي المعتمد • إصدار الفحص الأكاديمي الشامل")
             c.drawString(MARGIN, BOTTOM - 20, brand)
-            attr, _ = _bidi(f"إعداد: {self.student_name}")
+            attr, _ = _bidi(f"المحقق الدراسي: {self.student_name}")
             aw = c.stringWidth(attr, FONT_REG, 7.5)
             c.drawString(W / 2 - aw / 2, BOTTOM - 20, attr)
-            pg, _ = _bidi(f"صفحة {self.page_num}")
+            pg, _ = _bidi(f"صحيفتها: {self.page_num}")
             pw = c.stringWidth(pg, FONT_REG, 7.5)
             c.drawString(W - MARGIN - pw, BOTTOM - 20, pg)
 
@@ -371,18 +372,25 @@ def _para(c, text, st, font_sz: Union[int, float] = FSIZ, lh: Union[int, float] 
             else:
                 x = x_base + bul_ind
 
-            # Draw highlighter rectangles
+            # Draw highlighter rectangles (Accurate bilingual & English term highlight)
             for hw in hl:
-                hd, _ = _bidi(hw, base_dir='R' if para_is_rtl else 'L')
-                idx = display_idx = 0
+                clean_hw = _clean(hw).strip()
+                if not clean_hw:
+                    continue
+                hd, _ = _bidi(clean_hw, base_dir='R' if para_is_rtl else 'L')
+                target_str = hd if hd in disp else (clean_hw if clean_hw in disp else None)
+                if not target_str:
+                    continue
+                display_idx = 0
                 while True:
-                    idx = disp.find(hd, display_idx)
-                    if idx == -1: break
+                    idx = disp.find(target_str, display_idx)
+                    if idx == -1:
+                        break
                     prefix_w = c.stringWidth(disp[:idx], dfn, font_sz)
-                    hw_w     = c.stringWidth(hd, dfn, font_sz)
+                    hw_w = c.stringWidth(target_str, dfn, font_sz)
                     c.setFillColor(C_MARK)
-                    c.roundRect(x + prefix_w - 1, st.y - 2, hw_w + 2, font_sz + 4, 2, fill=1, stroke=0)
-                    display_idx = idx + len(hd)
+                    c.roundRect(x + prefix_w - 1, st.y - 2, hw_w + 3, font_sz + 4, 2, fill=1, stroke=0)
+                    display_idx = idx + len(target_str)
 
             c.setFillColor(color)
             c.drawString(x, st.y, disp)
@@ -567,14 +575,54 @@ def _cornell_box(c, st, text, kind="note"):
 # ── Code & Formula Card ──────────────────────────────────────────────────────
 
 
-def _draw_study_strategy_and_tldr(c, st, lecture_title, study_strategy=None, tldr=None):
+def _draw_study_strategy_and_tldr(c, st, lecture_title, study_strategy=None, tldr=None, stats=None):
     _bg(c, is_rtl=st.main_rtl)
     st._footer(c)
     st.y = H - MARGIN - 18
     
-    header_title = "دليل دراسة المحاضرة والزبدة السريعة" if st.main_rtl else "Study Guide & TL;DR"
+    header_title = "مخطط المقرر وخارطة المذاكرة المعتمدة" if st.main_rtl else "Course Syllabus & Study Blueprint"
     _h1(c, st, header_title)
-    
+
+    # Render Blueprint 2x2 Metric Cards inside Page 2 if stats provided
+    if stats:
+        box_w = (TXT_W - 12) / 2
+        box_h = 44
+        col1_x = MARGIN
+        col2_x = MARGIN + box_w + 12
+        row1_y = st.y - 48
+        row2_y = row1_y - 50
+        
+        study_time_val = f"{stats.get('est_study_time', 25)} دقيقة" if st.main_rtl else f"{stats.get('est_study_time', 25)} min"
+        
+        cards = [
+            (col1_x, row1_y, str(stats.get("num_key_terms", 16)), "مصطلح وقاعدة أساسية (Key Terms)" if st.main_rtl else "Key Terminology (High-Yield)", HexColor("#EEF2FF"), HexColor("#C7D2FE"), HexColor("#4F46E5"), HexColor("#3730A3")),
+            (col2_x, row1_y, str(stats.get("num_mcqs", 5)), "سؤال محاكاة امتحاني (Simulation MCQs)" if st.main_rtl else "Simulation MCQs (Exam Level)", HexColor("#ECFDF5"), HexColor("#A7F3D0"), HexColor("#10B981"), HexColor("#065F46")),
+            (col1_x, row2_y, str(stats.get("num_comparisons", 1)), "جدول مقارنة وفروق (Comparisons)" if st.main_rtl else "Comparison Matrices", HexColor("#FFFBEB"), HexColor("#FDE68A"), HexColor("#F59E0B"), HexColor("#92400E")),
+            (col2_x, row2_y, study_time_val, "الوقت المقدر للمراجعة (Study Time)" if st.main_rtl else "Target Study Time", HexColor("#F0F9FF"), HexColor("#BAE6FD"), HexColor("#0EA5E9"), HexColor("#0369A1")),
+        ]
+        
+        for x, y, val, lbl, bg, bd, acc, num_c in cards:
+            c.setFillColor(bg)
+            c.setStrokeColor(bd)
+            c.setLineWidth(0.8)
+            c.roundRect(x, y, box_w, box_h, 6, fill=1, stroke=1)
+            
+            c.setFillColor(acc)
+            c.roundRect(x + 3, y + 4, 2.5, box_h - 8, 1, fill=1, stroke=0)
+            
+            val_d, _ = _bidi(val)
+            c.setFont(FONT_BOLD, 13)
+            c.setFillColor(num_c)
+            vw = c.stringWidth(val_d, FONT_BOLD, 13)
+            c.drawString(x + box_w / 2 - vw / 2, y + 23, val_d)
+            
+            lbl_d, _ = _bidi(lbl)
+            c.setFont(FONT_REG, 7.5)
+            c.setFillColor(HexColor("#475569"))
+            lw = c.stringWidth(lbl_d, FONT_REG, 7.5)
+            c.drawString(x + box_w / 2 - lw / 2, y + 9, lbl_d)
+            
+        st.y = row2_y - 20
     if not study_strategy:
         study_strategy = "هذه المحاضرة غنية بالمفاهيم الأساسية، ننصحك بالتركيز على مراجعة المصطلحات والأسئلة التدريبية لترسيخ الفهم."
         
@@ -967,57 +1015,49 @@ def _cover(c, title, student_name, stats: Optional[dict] = None, language_mode: 
     c.setFillColor(HexColor("#D97706"))
     c.circle(W / 2, hero_y - 98, 2.5, fill=1, stroke=0)
 
-    # 4. Analytics 2x2 Metric Cards
-    panel_y = hero_y - 128
-    panel_text = "مخطط المحاضرة والبيانات الأساسية (Lecture Blueprint & Key Metrics)" if not is_english else "Lecture Blueprint & Key Metrics"
-    panel_lbl, _ = _bidi(panel_text)
-    c.setFont(FONT_BOLD, 9)
-    c.setFillColor(HexColor("#64748B"))
-    pl_w = c.stringWidth(panel_lbl, FONT_BOLD, 9)
-    c.drawString(W / 2 - pl_w / 2, panel_y, panel_lbl)
+    # 4. Royal Academic Seal & Core Declaration Plaque
+    seal_y = hero_y - 120
+    seal_h = 135
+    c.setFillColor(HexColor("#F8FAFC"))
+    c.setStrokeColor(HexColor("#CBD5E1"))
+    c.setLineWidth(1.0)
+    c.roundRect(MARGIN, seal_y - seal_h, TXT_W, seal_h, 8, fill=1, stroke=1)
     
-    if not stats:
-        stats = {"num_key_terms": 16, "num_mcqs": 5, "num_comparisons": 2, "est_study_time": 25}
-        
-    box_w = (TXT_W - 12) / 2
-    box_h = 56
-    col1_x = MARGIN
-    col2_x = MARGIN + box_w + 12
-    row1_y = panel_y - 70
-    row2_y = row1_y - 66
+    # Inner gold border
+    c.setStrokeColor(HexColor("#FDE68A"))
+    c.setLineWidth(0.6)
+    c.roundRect(MARGIN + 4, seal_y - seal_h + 4, TXT_W - 8, seal_h - 8, 6, fill=0, stroke=1)
     
-    study_time_val = f"{stats.get('est_study_time', 25)} دقيقة" if not is_english else f"{stats.get('est_study_time', 25)} min"
+    # Top Seal Badge
+    seal_badge = "• وثيقة الاعتماد الأكاديمي الشامل | OFFICIAL STUDY SPECIFICATION •" if not is_english else "• OFFICIAL ACADEMIC SPECIFICATION | UNIVERSITY REFERENCE •"
+    sb_d, _ = _bidi(seal_badge)
+    c.setFont(FONT_BOLD, 8.5)
+    c.setFillColor(HexColor("#B45309"))
+    sb_w = c.stringWidth(sb_d, FONT_BOLD, 8.5)
+    c.drawString(W / 2 - sb_w / 2, seal_y - 24, sb_d)
     
-    cards = [
-        (col1_x, row1_y, str(stats.get("num_key_terms", 16)), "مصطلح وقاعدة أساسية (Key Terms)" if not is_english else "Key Terminology (High-Yield)", HexColor("#EEF2FF"), HexColor("#C7D2FE"), HexColor("#4F46E5"), HexColor("#3730A3")),
-        (col2_x, row1_y, str(stats.get("num_mcqs", 5)), "سؤال محاكاة امتحاني (Simulation MCQs)" if not is_english else "Simulation MCQs (Exam Level)", HexColor("#ECFDF5"), HexColor("#A7F3D0"), HexColor("#10B981"), HexColor("#065F46")),
-        (col1_x, row2_y, str(stats.get("num_comparisons", 1)), "جدول مقارنة وفروق (Comparisons)" if not is_english else "Comparison Matrices", HexColor("#FFFBEB"), HexColor("#FDE68A"), HexColor("#F59E0B"), HexColor("#92400E")),
-        (col2_x, row2_y, study_time_val, "الوقت المقدر للمراجعة (Study Time)" if not is_english else "Target Study Time", HexColor("#F0F9FF"), HexColor("#BAE6FD"), HexColor("#0EA5E9"), HexColor("#0369A1")),
-    ]
+    # Seal Title
+    stitle_text = "كتاب المذاكرة الجامعي المعتمد • المرجع الدراسي الشامل" if not is_english else "Accredited University Reference Text • Complete Edition"
+    st_d, _ = _bidi(stitle_text)
+    c.setFont(FONT_BOLD, 12)
+    c.setFillColor(HexColor("#0F172A"))
+    st_w = c.stringWidth(st_d, FONT_BOLD, 12)
+    c.drawString(W / 2 - st_w / 2, seal_y - 48, st_d)
     
-    for x, y, val, lbl, bg, bd, acc, num_c in cards:
-        c.setFillColor(bg)
-        c.setStrokeColor(bd)
-        c.setLineWidth(0.8)
-        c.roundRect(x, y, box_w, box_h, 8, fill=1, stroke=1)
-        
-        c.setFillColor(acc)
-        c.roundRect(x + 4, y + 6, 3, box_h - 12, 1.5, fill=1, stroke=0)
-        
-        val_d, _ = _bidi(val)
-        c.setFont(FONT_BOLD, 17)
-        c.setFillColor(num_c)
-        vw = c.stringWidth(val_d, FONT_BOLD, 17)
-        c.drawString(x + box_w / 2 - vw / 2, y + 28, val_d)
-        
-        lbl_d, _ = _bidi(lbl)
-        c.setFont(FONT_REG, 7.8)
-        c.setFillColor(HexColor("#475569"))
-        lw = c.stringWidth(lbl_d, FONT_REG, 7.8)
-        c.drawString(x + box_w / 2 - lw / 2, y + 12, lbl_d)
+    # Academic Declaration text
+    decl_p1 = "مرجع دراسي تأصيلي تم إعداده بالكامل وفق معايير التحليل الأكاديمي الصوتي المتقدم،" if not is_english else "An authoritative academic coursebook synthesized through advanced lecture audio intelligence,"
+    decl_p2 = "يتضمن التأصيل المفاهيمي، الشرح المستفيض، مصفوفة المصطلحات ثنائية اللغة، والأفخاخ الامتحانية،" if not is_english else "integrating foundational concepts, exhaustive expositions, bilingual lexicons, and exam traps,"
+    decl_p3 = "ليكون المرجع الأساسي والوحيد للدراسة والاستعداد للاختبار النهائي دون الحاجة للرجوع للتسجيل." if not is_english else "serving as the complete, standalone study reference for university exams."
+    
+    c.setFont(FONT_REG, 8.8)
+    c.setFillColor(HexColor("#334155"))
+    for idx_p, p_text in enumerate([decl_p1, decl_p2, decl_p3]):
+        pd, _ = _bidi(p_text)
+        pw = c.stringWidth(pd, FONT_REG, 8.8)
+        c.drawString(W / 2 - pw / 2, seal_y - 74 - idx_p * 18, pd)
 
     # 5. Luxury Credentials Card
-    cred_y = 95
+    cred_y = 65
     cred_h = 100
     c.setFillColor(HexColor("#F8FAFC"))
     c.setStrokeColor(HexColor("#E2E8F0"))
@@ -1033,10 +1073,10 @@ def _cover(c, title, student_name, stats: Optional[dict] = None, language_mode: 
         
     if not is_english:
         lines_info = [
-            ("إعداد وتوثيق الطالب:", s_name),
-            ("الجهة الناشرة:", "منصة لمّاح الرقمية للدراسة الجامعية الذكية"),
-            ("طبيعة الإصدار الأكاديمي:", "نسخة معتمدة ومطابقة لمتطلبات الاختبارات الجامعية"),
-            ("حقوق الملكية الفكرية:", "محفوظة للطالب ولمنصة لمّاح © 2026")
+            ("المحقق الأكاديمي المعتمد:", s_name),
+            ("هيئة التحرير والتدقيق:", "محرك التحليل الأكاديمي الذكي المتقدم • منصة لمّاح"),
+            ("طبيعة الإصدار والاعتماد:", "مرجع دراسي شامل ومعتمد للمراجعة والاختبارات النهائية"),
+            ("معيار الجودة والأصالة:", "مطابق للأطر الأكاديمية والتوثيق المرجعي الشامل © 2026")
         ]
         for idx, (label, val) in enumerate(lines_info):
             ly = cred_y + cred_h - 22 - idx * 20
@@ -1180,6 +1220,15 @@ def _draw_cheat_sheet(c, st, items: list):
         c.drawString(x_def, st.y - row_h + 7, dd)
         st.y -= row_h
 
+def _clean_ans_letter(raw_val):
+    s = str(raw_val).strip()
+    m = re.search(r'([A-Da-dأ-ي])', s)
+    if m:
+        l = m.group(1).upper()
+        ar_map = {"أ": "A", "ا": "A", "ب": "B", "ج": "C", "د": "D"}
+        return ar_map.get(l, l)
+    return s[:2].upper() if s else "?"
+
 # ── MCQ Quiz Page ──────────────────────────────────────────────────────────────
 def _draw_mcqs(c, st, mcqs: list):
     """Renders 'اختبر نفسك' multiple choice questions with bilingual English exam support."""
@@ -1204,11 +1253,11 @@ def _draw_mcqs(c, st, mcqs: list):
     c.setFillColor(HexColor("#D97706"))
     c.rect(MARGIN, st.y - 37, TXT_W, 3, fill=1, stroke=0)
     
-    title_text = "اختبر نفسك — هل أنت جاهز للامتحان؟ (Simulation MCQs)" if is_arabic_mcqs else "Simulation Exam Questions (Self-Test MCQs)"
+    title_text = "اختبر نفسك — بنك الأسئلة والمحاكاة الامتحانية (Bilingual Simulation MCQs)" if is_arabic_mcqs else "Simulation Exam Questions (Bilingual Self-Test MCQs)"
     title_d, _ = _bidi(title_text)
     c.setFillColor(HexColor("#FFFFFF"))
-    c.setFont(FONT_BOLD, 13)
-    tw = c.stringWidth(title_d, FONT_BOLD, 13)
+    c.setFont(FONT_BOLD, 12)
+    tw = c.stringWidth(title_d, FONT_BOLD, 12)
     c.drawString(W / 2 - tw / 2, st.y - 23, title_d)
     st.y -= 52
 
@@ -1245,7 +1294,7 @@ def _draw_mcqs(c, st, mcqs: list):
         
         # Choices list (supports both choices and options keys)
         choices = q.get("choices") or q.get("options") or []
-        q_total_h = q_box_h + len(choices) * 24 + 16
+        q_total_h = q_box_h + len(choices) * 26 + 16
         
         # Keep entire question + choices together if possible
         if st.y - q_total_h < BOTTOM and st.y < H - MARGIN - 60:
@@ -1284,15 +1333,14 @@ def _draw_mcqs(c, st, mcqs: list):
             
         st.y = box_y - 12
 
-        # Choices with modern pill badges
+        # Choices with modern pill badges & clean multi-line wrapping
         for j, ch in enumerate(choices):
-            if st.y - 24 < BOTTOM: st.new_page(c)
-            
-            # Extract letter and body
             ch_str = str(ch).strip()
             m = re.match(r'^([A-Da-dأ-ي][\)\.\:\-]?)\s*(.*)', ch_str)
             if m:
                 letter = m.group(1).rstrip(').:- ').upper()
+                ar_map = {"أ": "A", "ا": "A", "ب": "B", "ج": "C", "د": "D"}
+                letter = ar_map.get(letter, letter)
                 body = m.group(2).strip()
             else:
                 letter = chr(65 + (j % 4))
@@ -1300,10 +1348,32 @@ def _draw_mcqs(c, st, mcqs: list):
                 
             ch_is_rtl = _has_ar(body) and not bool(re.search(r'^[a-zA-Z]', _clean(body)))
             
-            badge_w, badge_h = 20, 15
+            badge_w, badge_h = 20, 16
+            avail_ch_w = TXT_W - badge_w - 24
+            
+            # Word wrap choice body
+            ch_words = body.split()
+            ch_lines = []
+            cur_ch_words = []
+            cur_ch_w = 0.0
+            for cw in ch_words:
+                cwd, _ = _bidi(cw, base_dir='R' if ch_is_rtl else 'L')
+                ww = c.stringWidth(cwd + " ", FONT_REG, 9)
+                if cur_ch_w + ww <= avail_ch_w:
+                    cur_ch_words.append(cw)
+                    cur_ch_w += ww
+                else:
+                    if cur_ch_words: ch_lines.append(" ".join(cur_ch_words))
+                    cur_ch_words = [cw]
+                    cur_ch_w = ww
+            if cur_ch_words: ch_lines.append(" ".join(cur_ch_words))
+            if not ch_lines: ch_lines = [""]
+            
+            choice_box_h = max(20, len(ch_lines) * 15 + 4)
+            if st.y - choice_box_h < BOTTOM: st.new_page(c)
             
             if ch_is_rtl:
-                badge_x = W - MARGIN - badge_w - 6
+                badge_x = W - MARGIN - badge_w - 4
                 badge_y = st.y - 14
                 
                 c.setFillColor(HexColor("#F1F5F9"))
@@ -1313,16 +1383,18 @@ def _draw_mcqs(c, st, mcqs: list):
                 
                 c.setFont(FONT_BOLD, 9)
                 c.setFillColor(HexColor("#334155"))
-                c.drawCentredString(badge_x + badge_w / 2, badge_y + 3.5, letter)
+                c.drawCentredString(badge_x + badge_w / 2, badge_y + 4, letter)
                 
                 # Choice body right aligned
                 text_x = badge_x - 8
-                body_d, _ = _bidi(body, base_dir='R')
                 c.setFont(FONT_REG, 9)
                 c.setFillColor(HexColor("#1E293B"))
-                c.drawRightString(text_x, st.y - 11, body_d)
+                for cli, cline in enumerate(ch_lines):
+                    line_y = st.y - 11 - cli * 15
+                    cline_d, _ = _bidi(cline, base_dir='R')
+                    c.drawRightString(text_x, line_y, cline_d)
             else:
-                badge_x = MARGIN + 8
+                badge_x = MARGIN + 6
                 badge_y = st.y - 14
                 
                 c.setFillColor(HexColor("#F1F5F9"))
@@ -1332,48 +1404,90 @@ def _draw_mcqs(c, st, mcqs: list):
                 
                 c.setFont(FONT_BOLD, 9)
                 c.setFillColor(HexColor("#334155"))
-                c.drawCentredString(badge_x + badge_w / 2, badge_y + 3.5, letter)
+                c.drawCentredString(badge_x + badge_w / 2, badge_y + 4, letter)
                 
                 # Choice body left aligned
                 text_x = badge_x + badge_w + 8
-                body_d, _ = _bidi(body, base_dir='L')
                 c.setFont(FONT_REG, 9)
                 c.setFillColor(HexColor("#1E293B"))
-                c.drawString(text_x, st.y - 11, body_d)
+                for cli, cline in enumerate(ch_lines):
+                    line_y = st.y - 11 - cli * 15
+                    cline_d, _ = _bidi(cline, base_dir='L')
+                    c.drawString(text_x, line_y, cline_d)
             
-            st.y -= 22
+            st.y -= (len(ch_lines) * 15 + 7)
 
-        ans_val = q.get('answer') or q.get('correct_answer') or q.get('correct') or ""
-        answers.append(f"{i+1}. {ans_val}")
+        raw_ans = q.get('answer') or q.get('correct_answer') or q.get('correct') or ""
+        clean_letter = _clean_ans_letter(raw_ans)
+        answers.append({"num": i + 1, "letter": clean_letter})
         st.y -= 8
 
-    # Answers Section
+    # Answers Section (Answer Key Badges Grid - Zero text collision guarantee)
     if answers:
         st.y -= 10
+        ans_pill_w = 46
+        ans_pill_h = 22
+        gap_x = 8
+        gap_y = 6
+        
+        # Calculate how many pills fit per row
+        pills_per_row = max(1, int((TXT_W - 32) / (ans_pill_w + gap_x)))
+        num_rows = math.ceil(len(answers) / pills_per_row)
+        ans_box_h = 34 + num_rows * (ans_pill_h + gap_y) + 4
+        
+        if st.y - ans_box_h < BOTTOM:
+            st.new_page(c)
+            st.y -= 4
+            
+        box_y = st.y - ans_box_h
         c.setFillColor(HexColor("#F8FAFC"))
         c.setStrokeColor(HexColor("#E2E8F0"))
         c.setLineWidth(0.8)
-        ans_box_h = 32
-        c.roundRect(MARGIN, st.y - ans_box_h, TXT_W, ans_box_h, 6, fill=1, stroke=1)
+        c.roundRect(MARGIN, box_y, TXT_W, ans_box_h, 6, fill=1, stroke=1)
         
-        ans_lbl = "مفتاح الإجابات النموذجية (Answer Key):" if is_arabic_mcqs else "Answer Key:"
+        # Header inside box
+        ans_lbl = "مفتاح الإجابات النموذجية • Examination Answer Key"
         ans_lbl_d, _ = _bidi(ans_lbl, base_dir='R' if is_arabic_mcqs else 'L')
-        c.setFont(FONT_BOLD, 8.5)
+        c.setFont(FONT_BOLD, 8.8)
         c.setFillColor(HexColor("#475569"))
         if is_arabic_mcqs:
-            c.drawRightString(W - MARGIN - 12, st.y - 20, ans_lbl_d)
+            c.drawRightString(W - MARGIN - 14, box_y + ans_box_h - 18, ans_lbl_d)
         else:
-            c.drawString(MARGIN + 12, st.y - 20, ans_lbl_d)
-        
-        ans_text = "   |   ".join(answers)
-        c.setFont(FONT_BOLD, 9)
-        c.setFillColor(HexColor("#0D9488"))
-        if is_arabic_mcqs:
-            c.drawString(MARGIN + 16, st.y - 20, ans_text)
-        else:
-            c.drawString(MARGIN + 100, st.y - 20, ans_text)
-        
-        st.y -= ans_box_h + 16
+            c.drawString(MARGIN + 14, box_y + ans_box_h - 18, ans_lbl_d)
+            
+        # Draw individual Answer Badges
+        start_y = box_y + ans_box_h - 26 - ans_pill_h
+        for idx, ans_obj in enumerate(answers):
+            q_num = ans_obj["num"]
+            clean_l = ans_obj["letter"]
+            
+            row_idx = idx // pills_per_row
+            col_idx = idx % pills_per_row
+            
+            if is_arabic_mcqs:
+                px = W - MARGIN - 16 - (col_idx + 1) * ans_pill_w - col_idx * gap_x
+            else:
+                px = MARGIN + 16 + col_idx * (ans_pill_w + gap_x)
+                
+            py = start_y - row_idx * (ans_pill_h + gap_y)
+            
+            # Badge background & border
+            c.setFillColor(HexColor("#ECFDF5"))
+            c.setStrokeColor(HexColor("#A7F3D0"))
+            c.setLineWidth(0.7)
+            c.roundRect(px, py, ans_pill_w, ans_pill_h, 4, fill=1, stroke=1)
+            
+            # Left accent stripe
+            c.setFillColor(HexColor("#10B981"))
+            c.roundRect(px + 1, py + 2, 2.5, ans_pill_h - 4, 1, fill=1, stroke=0)
+            
+            # Badge label
+            badge_str = f"Q{q_num}: {clean_l}"
+            c.setFont(FONT_BOLD, 8.5)
+            c.setFillColor(HexColor("#065F46"))
+            c.drawCentredString(px + ans_pill_w / 2 + 1, py + 6, badge_str)
+            
+        st.y = box_y - 18
 
     # Self-Evaluation Mastery Checklist (keep checklist title + items together)
     if st.y - 100 < BOTTOM:
@@ -1640,7 +1754,7 @@ def generate_aesthetic_notebook_pdf(
     st = _S(page_num=2, student_name=student_name, is_rtl=is_main_rtl, is_free_trial=is_free_trial)
 
     # 2a. Study Strategy & TL;DR page (Page 2)
-    _draw_study_strategy_and_tldr(cv, st, lecture_title, study_strategy=study_strategy, tldr=tldr)
+    _draw_study_strategy_and_tldr(cv, st, lecture_title, study_strategy=study_strategy, tldr=tldr, stats=stats)
     # 2b. Continuous Markdown (Seamlessly flow onto Page 2 if space remains, otherwise new page)
     if st.y - 180 < BOTTOM:
         st.new_page(cv)
