@@ -653,7 +653,7 @@ async def get_financial_analytics(admin=Depends(verify_admin)):
         
         # 1. Student Subscription Transactions
         tx_res = supabase.table("transactions")\
-            .select("id, short_order_id, user_id, amount, status, payment_method, created_at, subscription_plans(name, name_en, price_ils), profiles:user_id(full_name, phone_number)")\
+            .select("id, short_order_id, user_id, amount, status, payment_method, created_at, subscription_plans(name, name_en, price_ils), profiles:user_id(full_name, phone_number, quota_remaining)")\
             .in_("status", ["completed", "approved"])\
             .order("created_at", desc=True)\
             .execute()
@@ -702,6 +702,39 @@ async def get_financial_analytics(admin=Depends(verify_admin)):
         except Exception as ue:
             logger.warning(f"Failed to aggregate user usage logs: {ue}")
 
+        # Build user email map from auth.admin
+        user_email_map: Dict[str, str] = {}
+        try:
+            auth_page = 1
+            while True:
+                auth_users = supabase.auth.admin.list_users(page=auth_page, per_page=500)
+                if not auth_users:
+                    break
+                for u in auth_users:
+                    uid = str(getattr(u, "id", "") or (u.get("id") if isinstance(u, dict) else ""))
+                    uemail = getattr(u, "email", "") or (u.get("email") if isinstance(u, dict) else "")
+                    if uid and uemail:
+                        user_email_map[uid] = uemail.strip().lower()
+                if len(auth_users) < 500:
+                    break
+                auth_page += 1
+        except Exception as ae:
+            logger.warning(f"Error loading auth user emails in financial analytics: {ae}")
+
+        # Build user minutes used map from user_subscriptions
+        user_minutes_used_map: Dict[str, int] = {}
+        try:
+            sub_res = supabase.table("user_subscriptions")\
+                .select("user_id, lectures_used, status")\
+                .execute()
+            for s in _as_dict_list(sub_res.data):
+                uid = s.get("user_id")
+                used = int(s.get("lectures_used", 0) or 0)
+                if uid:
+                    user_minutes_used_map[uid] = max(user_minutes_used_map.get(uid, 0), used)
+        except Exception as se:
+            logger.warning(f"Error loading user subscription minutes: {se}")
+
         student_txs_raw = _as_dict_list(tx_res.data)
         student_txs = []
         for tx in student_txs_raw:
@@ -714,9 +747,16 @@ async def get_financial_analytics(admin=Depends(verify_admin)):
                 "cost_ils": 0.0,
                 "lectures_count": 0
             })
+            email = user_email_map.get(u_id, "")
+            full_name = prof_obj.get("full_name") or ""
+            display_name = full_name if full_name else (email.split("@")[0] if email else "طالب")
+
             tx["plan_name"] = plan_obj.get("name") or plan_obj.get("name_en") or "اشتراك لمّاح"
-            tx["sender_name"] = prof_obj.get("full_name") or "طالب"
+            tx["student_email"] = email
+            tx["sender_name"] = display_name
             tx["sender_phone"] = prof_obj.get("phone_number") or ""
+            tx["minutes_remaining"] = int(prof_obj.get("quota_remaining", 0) or 0)
+            tx["minutes_used"] = user_minutes_used_map.get(u_id, 0)
             tx["tokens_used"] = usage_info["tokens"]
             tx["ai_cost_usd"] = usage_info["cost_usd"]
             tx["ai_cost_ils"] = usage_info["cost_ils"]
