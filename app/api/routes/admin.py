@@ -660,11 +660,20 @@ async def get_financial_analytics(admin=Depends(verify_admin)):
         
         # Build user usage & token consumption map from usage_logs
         user_usage_map: Dict[str, Any] = {}
+        tx_notes_map: Dict[str, str] = {}
         try:
             logs_res = supabase.table("usage_logs")\
-                .select("user_id, metadata, api_cost_usd")\
+                .select("user_id, action_type, metadata, api_cost_usd")\
                 .execute()
             for l in _as_dict_list(logs_res.data):
+                act = l.get("action_type")
+                meta = l.get("metadata") or {}
+                if act == "transaction_note":
+                    tid = meta.get("transaction_id")
+                    if tid:
+                        tx_notes_map[tid] = meta.get("notes") or ""
+                    continue
+
                 uid = l.get("user_id")
                 if not uid:
                     continue
@@ -676,7 +685,6 @@ async def get_financial_analytics(admin=Depends(verify_admin)):
                         "lectures_count": 0
                     }
                 user_usage_map[uid]["lectures_count"] += 1
-                meta = l.get("metadata") or {}
                 transcript = meta.get("transcript") or ""
                 annotations = meta.get("annotations") or {}
                 inp_chars = len(transcript) if isinstance(transcript, str) else 0
@@ -713,6 +721,7 @@ async def get_financial_analytics(admin=Depends(verify_admin)):
             tx["ai_cost_usd"] = usage_info["cost_usd"]
             tx["ai_cost_ils"] = usage_info["cost_ils"]
             tx["lectures_processed"] = usage_info["lectures_count"]
+            tx["notes"] = tx_notes_map.get(str(tx.get("id")), "")
             student_txs.append(tx)
         student_revenue = sum(float(tx.get("amount", 0) or 0) for tx in student_txs)
         
@@ -840,10 +849,11 @@ class UpdateTransactionModel(BaseModel):
     amount: Optional[float] = None
     payment_method: Optional[str] = None
     status: Optional[str] = None
+    notes: Optional[str] = None
 
 @router.put("/transactions/{tx_id}")
 async def update_transaction(tx_id: str, data: UpdateTransactionModel, admin=Depends(verify_admin)):
-    """Update subscription transaction amount, payment method, or status."""
+    """Update subscription transaction amount, payment method, status, or notes."""
     try:
         supabase = get_supabase()
         update_data = {}
@@ -854,15 +864,39 @@ async def update_transaction(tx_id: str, data: UpdateTransactionModel, admin=Dep
         if data.status is not None:
             update_data["status"] = data.status
 
-        if not update_data:
-            raise HTTPException(status_code=400, detail="لا توجد بيانات للتعديل.")
+        res_data = None
+        if update_data:
+            res = supabase.table("transactions").update(update_data).eq("id", tx_id).execute()
+            if not res.data:
+                raise HTTPException(status_code=404, detail="العملية غير موجودة.")
+            res_data = res.data[0]
 
-        res = supabase.table("transactions").update(update_data).eq("id", tx_id).execute()
-        if not res.data:
-            raise HTTPException(status_code=404, detail="العملية غير موجودة.")
+        # Handle notes storage in usage_logs
+        if data.notes is not None:
+            clean_note = data.notes.strip()
+            # Remove any existing note for this transaction
+            try:
+                supabase.table("usage_logs").delete()\
+                    .eq("action_type", "transaction_note")\
+                    .filter("metadata->>transaction_id", "eq", tx_id)\
+                    .execute()
+            except Exception as de:
+                logger.warning(f"Failed deleting previous transaction note: {de}")
 
-        logger.info(f"✅ Admin {admin['id']} updated transaction {tx_id}: {update_data}")
-        return {"status": "success", "message": "تم تحديث بيانات المعاملة بنجاح.", "transaction": res.data[0]}
+            if clean_note:
+                note_rec = {
+                    "user_id": admin["id"],
+                    "action_type": "transaction_note",
+                    "status": "success",
+                    "metadata": {
+                        "transaction_id": tx_id,
+                        "notes": clean_note
+                    }
+                }
+                supabase.table("usage_logs").insert(note_rec).execute()
+
+        logger.info(f"✅ Admin {admin['id']} updated transaction {tx_id}: {update_data}, notes='{data.notes}'")
+        return {"status": "success", "message": "تم تحديث بيانات المعاملة والملاحظات بنجاح.", "transaction": res_data}
     except HTTPException:
         raise
     except Exception as e:
@@ -875,6 +909,14 @@ async def delete_transaction(tx_id: str, admin=Depends(verify_admin)):
     try:
         supabase = get_supabase()
         res = supabase.table("transactions").delete().eq("id", tx_id).execute()
+        # Clean associated note if present
+        try:
+            supabase.table("usage_logs").delete()\
+                .eq("action_type", "transaction_note")\
+                .filter("metadata->>transaction_id", "eq", tx_id)\
+                .execute()
+        except Exception:
+            pass
         logger.info(f"🗑️ Admin {admin['id']} deleted transaction {tx_id}")
         return {"status": "success", "message": "تم حذف المعاملة وإلغاء أرباحها بنجاح."}
     except Exception as e:
