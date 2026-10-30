@@ -764,13 +764,41 @@ async def get_financial_analytics(admin=Depends(verify_admin)):
             except Exception as oe:
                 logger.warning(f"Could not load OpenRouter credits in admin analytics: {oe}")
 
-        true_net_profit = round(max(0.0, student_revenue - openrouter_stats["total_usage_ils"]), 2)
+        # 3. Server & Operational Expenses (from usage_logs action_type='server_expense')
+        server_expenses_list = []
+        total_server_expenses_ils = 0.0
+        try:
+            exp_res = supabase.table("usage_logs")\
+                .select("id, metadata, api_cost_usd, created_at")\
+                .eq("action_type", "server_expense")\
+                .order("created_at", desc=True)\
+                .execute()
+            for r in _as_dict_list(exp_res.data):
+                meta = r.get("metadata") or {}
+                amt_ils = float(meta.get("amount_ils") or (float(r.get("api_cost_usd") or 0.0) * 3.75))
+                total_server_expenses_ils += amt_ils
+                server_expenses_list.append({
+                    "id": r.get("id"),
+                    "title": meta.get("title") or "تكلفة سيرفر وتشغيل",
+                    "amount_ils": round(amt_ils, 2),
+                    "amount_usd": round(amt_ils / 3.75, 2),
+                    "category": meta.get("category") or "server",
+                    "notes": meta.get("notes") or "",
+                    "created_at": r.get("created_at")
+                })
+        except Exception as ee:
+            logger.warning(f"Could not load server expenses: {ee}")
+
+        total_server_expenses_ils = round(total_server_expenses_ils, 2)
+        true_net_profit = round(max(0.0, student_revenue - openrouter_stats["total_usage_ils"] - total_server_expenses_ils), 2)
 
         return {
             "net_platform_profit": student_revenue,
             "true_net_profit": true_net_profit,
             "openrouter": openrouter_stats,
             "total_gross_inflow": student_revenue,
+            "total_server_expenses_ils": total_server_expenses_ils,
+            "server_expenses": server_expenses_list,
             "total_teacher_liabilities": 0.0,
             "mrr": student_mrr,
             
@@ -802,6 +830,103 @@ async def get_financial_analytics(admin=Depends(verify_admin)):
     except Exception as e:
         logger.error(f"❌ Error fetching financial analytics: {str(e)}")
         raise HTTPException(status_code=500, detail="فشل جلب التحليلات المالية")
+
+
+# =========================================================================
+# 💰 TRANSACTIONS & EXPENSES MANAGEMENT (EDIT PRICING & SERVER EXPENSES)
+# =========================================================================
+
+class UpdateTransactionModel(BaseModel):
+    amount: Optional[float] = None
+    payment_method: Optional[str] = None
+    status: Optional[str] = None
+
+@router.put("/transactions/{tx_id}")
+async def update_transaction(tx_id: str, data: UpdateTransactionModel, admin=Depends(verify_admin)):
+    """Update subscription transaction amount, payment method, or status."""
+    try:
+        supabase = get_supabase()
+        update_data = {}
+        if data.amount is not None:
+            update_data["amount"] = float(data.amount)
+        if data.payment_method is not None:
+            update_data["payment_method"] = data.payment_method
+        if data.status is not None:
+            update_data["status"] = data.status
+
+        if not update_data:
+            raise HTTPException(status_code=400, detail="لا توجد بيانات للتعديل.")
+
+        res = supabase.table("transactions").update(update_data).eq("id", tx_id).execute()
+        if not res.data:
+            raise HTTPException(status_code=404, detail="العملية غير موجودة.")
+
+        logger.info(f"✅ Admin {admin['id']} updated transaction {tx_id}: {update_data}")
+        return {"status": "success", "message": "تم تحديث بيانات المعاملة بنجاح.", "transaction": res.data[0]}
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error updating transaction: {e}")
+        raise HTTPException(status_code=500, detail="فشل تحديث المعاملة.")
+
+@router.delete("/transactions/{tx_id}")
+async def delete_transaction(tx_id: str, admin=Depends(verify_admin)):
+    """Delete a transaction completely from revenue records."""
+    try:
+        supabase = get_supabase()
+        res = supabase.table("transactions").delete().eq("id", tx_id).execute()
+        logger.info(f"🗑️ Admin {admin['id']} deleted transaction {tx_id}")
+        return {"status": "success", "message": "تم حذف المعاملة وإلغاء أرباحها بنجاح."}
+    except Exception as e:
+        logger.error(f"Error deleting transaction: {e}")
+        raise HTTPException(status_code=500, detail="فشل حذف المعاملة.")
+
+
+class ServerExpenseModel(BaseModel):
+    title: str
+    amount_ils: float
+    category: Optional[str] = "server"
+    notes: Optional[str] = ""
+
+@router.post("/expenses")
+async def add_server_expense(data: ServerExpenseModel, admin=Depends(verify_admin)):
+    """Add a server or operational expense to deduct from net profits."""
+    try:
+        supabase = get_supabase()
+        amt_ils = float(data.amount_ils)
+        amt_usd = round(amt_ils / 3.75, 4)
+        
+        record = {
+            "user_id": admin["id"],
+            "action_type": "server_expense",
+            "api_cost_usd": amt_usd,
+            "status": "success",
+            "metadata": {
+                "title": data.title.strip(),
+                "amount_ils": amt_ils,
+                "amount_usd": amt_usd,
+                "category": data.category or "server",
+                "notes": data.notes or ""
+            }
+        }
+        res = supabase.table("usage_logs").insert(record).execute()
+        logger.info(f"💸 Admin {admin['id']} added expense: {data.title} (₪{amt_ils})")
+        return {"status": "success", "message": "تمت إضافة التكلفة بنجاح وخصمها من صافي الأرباح.", "expense": res.data[0] if res.data else None}
+    except Exception as e:
+        logger.error(f"Error adding server expense: {e}")
+        raise HTTPException(status_code=500, detail="فشل تسجيل تكلفة السيرفر.")
+
+@router.delete("/expenses/{expense_id}")
+async def delete_server_expense(expense_id: str, admin=Depends(verify_admin)):
+    """Delete a server expense record."""
+    try:
+        supabase = get_supabase()
+        res = supabase.table("usage_logs").delete().eq("id", expense_id).eq("action_type", "server_expense").execute()
+        logger.info(f"🗑️ Admin {admin['id']} removed expense {expense_id}")
+        return {"status": "success", "message": "تم حذف التكلفة وإعادة احتساب الأرباح."}
+    except Exception as e:
+        logger.error(f"Error deleting server expense: {e}")
+        raise HTTPException(status_code=500, detail="فشل حذف التكلفة.")
 
 import json
 import os
