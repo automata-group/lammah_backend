@@ -213,6 +213,16 @@ def log_usage_failure(user_id: str, error_message: str):
 
 def get_user_subscription_info(user_id: str):
     """Get complete subscription info for a user."""
+    if not user_id or str(user_id).strip().lower() in ("none", "null", ""):
+        logger.warning(f"⚠️ get_user_subscription_info called with invalid user_id: {user_id}")
+        return {
+            "profile": None,
+            "active_subscription": None,
+            "quota_remaining": 0,
+            "plan_name": "free",
+            "has_active_subscription": False,
+            "lectures_remaining": 0,
+        }
     supabase = get_supabase()
     
     # Get profile (safe - no .single())
@@ -258,6 +268,8 @@ def get_usage_logs(user_id: str, limit: int = 50, include_full_metadata: bool = 
     Returns ultra-lightweight projected metadata directly from Postgres
     for 500x faster list rendering and negligible payload sizes.
     """
+    if not user_id or str(user_id).strip().lower() in ("none", "null", ""):
+        return []
     supabase = get_supabase()
     
     if not include_full_metadata:

@@ -66,12 +66,14 @@ async def early_security_middleware(request: Request, call_next):
             else:
                 from app.db.supabase_client import get_supabase
                 supabase = get_supabase()
-                profile_res = supabase.table("profiles").select("is_blocked, phone_verified").eq("id", user_id).execute()
+                profile_res = supabase.table("profiles").select("*").eq("id", user_id).execute()
                 
                 if not profile_res.data:
                     return JSONResponse(status_code=403, content={"detail": {"user_message": "🚫 لم يتم العثور على ملف شخصي."}})
                 
                 profile = profile_res.data[0]
+                if not profile.get("id"):
+                    profile["id"] = user_id
                 _PROFILE_CACHE[user_id] = (now, profile)
                 if profile.get("is_blocked"):
                     return JSONResponse(status_code=403, content={"detail": {"user_message": "🚫 حسابك محظور."}})
@@ -104,14 +106,20 @@ async def global_exception_handler(request: Request, exc: Exception):
     logger.error(error_msg, exc_info=True)
     
     error_str = str(exc)
+    origin = request.headers.get("origin")
+    headers = {}
+    if origin:
+        headers["Access-Control-Allow-Origin"] = origin
+        headers["Access-Control-Allow-Credentials"] = "true"
+
     if "429" in error_str or "rate_limit" in error_str.lower():
         return JSONResponse(status_code=429, content={
             "detail": {"user_message": "⏳ تم تجاوز الحد المسموح. يرجى الانتظار ثم المحاولة مجدداً."}
-        })
+        }, headers=headers)
     
     return JSONResponse(status_code=500, content={
         "detail": {"user_message": "❌ حدث خطأ داخلي. يرجى المحاولة مرة أخرى أو التواصل مع الدعم."}
-    })
+    }, headers=headers)
 
 @app.get("/")
 async def root():

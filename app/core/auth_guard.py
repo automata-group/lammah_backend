@@ -108,7 +108,11 @@ async def get_user_profile(request: Request, user=Depends(verify_token)):
     if user.id in _PROFILE_CACHE:
         cached_time, cached_profile = _PROFILE_CACHE[user.id]
         if now - cached_time < _PROFILE_CACHE_TTL:
-            return cached_profile
+            if isinstance(cached_profile, dict):
+                if not cached_profile.get("id"):
+                    cached_profile["id"] = user.id
+                if "quota_remaining" in cached_profile:
+                    return cached_profile
     supabase = get_supabase()
     
     # Step 1: Try to get existing profile
@@ -223,7 +227,13 @@ async def verify_phone_active(profile=Depends(get_user_profile)):
 async def check_quota(request: Request, profile=Depends(get_user_profile)):
     """Verify user has remaining quota and prevent device-level trial abuse."""
     from app.services.subscription_service import get_user_subscription_info
-    user_id = profile.get("id")
+    user_id = profile.get("id") if isinstance(profile, dict) else getattr(profile, "id", None)
+    if not user_id:
+        logger.error(f"🛡️ [CHECK_QUOTA] Profile missing id: {profile}")
+        raise HTTPException(status_code=401, detail={
+            "user_message": "🔒 لم يتم التعرف على هوية الحساب بشكل صحيح. يرجى إعادة تسجيل الدخول.",
+            "type": "invalid_session"
+        })
     logger.info(f"🛡️ [CHECK_QUOTA] Checking quota for user: {user_id}")
     
     sub_info = get_user_subscription_info(user_id)
