@@ -1304,7 +1304,11 @@ async def process_lecture(
 
         except Exception as e:
             logger.error(f"STREAM ERROR: {str(e)}", exc_info=True)
-            yield f"data: {json.dumps({'type': 'error', 'message': f'❌ فشل: {str(e)}'}, ensure_ascii=False)}\n\n"
+            err_str = str(e)
+            user_msg = "❌ تعذر استكمال تجهيز الملف حالياً بسبب ضغط المعالجة السحابية. لم يتم خصم أي دقيقة من رصيدك، يرجى إعادة المحاولة."
+            if "رصيد" in err_str or "quota" in err_str.lower():
+                user_msg = f"❌ {err_str}"
+            yield f"data: {json.dumps({'type': 'error', 'message': user_msg}, ensure_ascii=False)}\n\n"
         finally:
             # Cleanup
             try:
