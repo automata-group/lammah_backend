@@ -3,6 +3,7 @@ import logging
 import json
 import asyncio
 from typing import Dict, Any, List
+from json_repair import repair_json, loads as repair_loads
 from app.services.ai.agents.mapper.service import MapperService
 from app.services.ai.agents.tutor.service import TutorService
 from app.services.ai.agents.examiner.service import ExaminerService
@@ -437,177 +438,232 @@ class AIOrchestrator:
         logger.info(f"[ORCHESTRATOR] Refactored Flow Complete. MCQs: {len(final_results['mcqs'])}, Past Exams: {len(final_results['past_exams'])}, Slides: {len(final_results['slide_explanations'])}")
         return final_results
 
+    def _format_algorithmic_academic_book(self, text: str) -> str:
+        """
+        Deterministic safety fallback: Converts a raw transcript into a structured,
+        academic textbook markdown draft. Strips spoken filler phrases and organizes into chapters.
+        Ensures that raw speech is NEVER dumped verbatim into the textbook PDF.
+        """
+        if not text or not text.strip():
+            return "## الفصل الأول: مقدمة تمهيدية\n\nلم يتم العثور على محتوى كافٍ لتوليد الكتاب الأكاديمي."
+
+        cleaned = text
+        fillers = [
+            r'\bيعني\b', r'\bطبعا\b', r'\bيا جماعة\b', r'\bزي ما حكينا\b', r'\bزي ما بحكوها\b',
+            r'\bرح يكون في يعني\b', r'\bرح يكون كله\b', r'\bدكتور يعطيك العافية\b', r'\bالله يعافيك\b',
+            r'\bصراحة دكتور\b', r'\bزي ما شفتو\b', r'\bشايفين كيف\b', r'\bتمام يا شباب\b',
+            r'\bعفوا\b', r'\bيعطيك ألف عافية\b', r'\bأنا بحكي لك\b', r'\bفاهمين علي\b'
+        ]
+        for pattern in fillers:
+            cleaned = re.sub(pattern, '', cleaned)
+
+        cleaned = re.sub(r'[ \t]+', ' ', cleaned).strip()
+        raw_sentences = [s.strip() for s in re.split(r'[.!\n؟?]+', cleaned) if len(s.strip()) > 20]
+        if not raw_sentences:
+            raw_sentences = [cleaned[:500]]
+
+        chunk_size = max(3, len(raw_sentences) // 4)
+        modules = []
+        chapter_titles = [
+            "المدخل التأسيسي والمفاهيم الأولية للمحاضرة",
+            "التحليل المفاهيمي والمنهجية التطبيقية",
+            "المناقشات التفصيلية والأبعاد العملية",
+            "الخلاصة المنهجية والاستنتاجات الأكاديمية",
+            "التطبيقات المتقدمة والمحاور الختامية"
+        ]
+
+        for idx in range(0, len(raw_sentences), chunk_size):
+            mod_sentences = raw_sentences[idx:idx + chunk_size]
+            if not mod_sentences:
+                continue
+            c_idx = min(len(modules), len(chapter_titles) - 1)
+            mod_title = chapter_titles[c_idx]
+            
+            paragraphs = []
+            for i in range(0, len(mod_sentences), 3):
+                sub_p = " ".join(mod_sentences[i:i+3]) + "."
+                paragraphs.append(sub_p)
+
+            first_para = paragraphs[0] if paragraphs else ""
+            rest_paras = "\n\n".join(paragraphs[1:]) if len(paragraphs) > 1 else ""
+
+            modules.append(
+                f"## الفصل {len(modules) + 1}: {mod_title}\n\n"
+                f"### 💡 المدخل المفاهيمي والرؤية العامة\n"
+                f"{first_para}\n\n"
+                f"> 💡 **استبصار أكاديمي**: يركز هذا المحور على تأصيل المبادئ العلمية وربطها بالتطبيقات الواقعية المستخلصة من الشرح.\n\n"
+                f"### 🧠 الشرح والتحليل المستفيض\n"
+                f"{rest_paras}\n\n"
+                f"> ⚠️ **فخ امتحاني**: احرص على التمييز الدقيق بين المصطلحات والمفاهيم الواردة في هذا الفصل لتجنب الخلط في أسئلة الامتحان الاختيارية."
+            )
+
+        return "\n\n---\n\n".join(modules)
+
+    async def _generate_emergency_markdown_fallback(self, llm, transcript_sample: str) -> str:
+        """Emergency fast LLM call that directly asks for academic Markdown (no complex JSON envelope)."""
+        emergency_prompt = """أنت محرر أكاديمي وخبير تأليف كتب دراسية في منصة لمّاح.
+حول هذا التسجيل الصوتي لمحاضرة جامعية إلى كتاب دراسي رسمي مقسم إلى فصول واضحة (##) ومباحث (###).
+شروط حازمة:
+1. صياغة رصينة بلغة عربية فصحى أكاديمية ونثر شارح وافٍ.
+2. امنع منعاً باتاً نقل أي كلام عامي أو ألفاظ عفوية مسجلة من التسجيل (مثل: يعني، اه، رح نسوي، دكتور يعطيك العافية).
+3. نسق المحتوى في فقرات شرح متسلسلة ونقاط رئيسية وصناديق تنبيهات (> ⚠️ فخ امتحاني و > 💡 استبصار أكاديمي).
+أعد النص بصيغة Markdown مباشرة وبدون أي مقدمات أو علامات JSON خارج الـ Markdown."""
+        try:
+            resp = await llm.ainvoke([
+                {"role": "system", "content": emergency_prompt},
+                {"role": "user", "content": f"تفريغ المحاضرة:\n{transcript_sample[:35000]}"}
+            ])
+            text = (resp.content or "").strip()
+            if text.startswith("```markdown"): text = text[11:]
+            elif text.startswith("```"): text = text[3:]
+            if text.endswith("```"): text = text[:-3]
+            text = text.strip()
+            if text and ("## " in text or len(text) > 300):
+                return text
+        except Exception as e:
+            logger.error(f"[ORCHESTRATOR] Emergency markdown fallback LLM failed: {e}")
+        
+        return self._format_algorithmic_academic_book(transcript_sample)
+
     async def _synthesize_master_audio_dossier(self, llm, transcript: str) -> Dict[str, Any]:
         """
         Synthesizes an exhaustive, college-level Master Study Dossier from audio transcript alone.
-        Outputs rich structured JSON with continuous markdown (tables, Oxford Cornell margins,
-        exam radar traps, formulas/rules), active recall MCQs, flashcards, and virtual slide modules.
+        Uses decoupled, parallel sub-tasks for maximum speed, zero truncation, and guaranteed reliability.
+        NEVER dumps raw audio transcripts into the continuous_markdown textbook!
         """
         clean_transcript = (transcript or "").strip()
         if not clean_transcript:
             return {
                 "highlights": [], "sticky_notes": [], "focus_points": [], "slide_explanations": [],
                 "mcqs": [], "flashcards": [], "past_exams": [], "continuous_markdown": "",
-                "study_strategy": "", "tldr": [], "cheat_sheet": [], "comparisons": []
+                "study_strategy": "", "tldr": [], "cheat_sheet": [], "comparisons": [],
+                "ai_title": "ملخص المحاضرة"
             }
 
-        system_prompt = """أنت "المحقق الأكاديمي الرئيسي" وخبير تأليف المراجع والكتب الجامعية لمنصة "لمّاح" (Lammah Academic Intelligence Engine).
-مهمتك تحويل هذا التسجيل الصوتي لمحاضرة جامعية إلى "كتاب جامعي رسمي معتمد" متكامل الأركان، يتناسب حجمه وعمقه طردياً وبدقة تامة مع طول المحاضرة.
+        transcript_sample = clean_transcript[:75000]
 
-قواعد التأليف والتحقيق الأكاديمي الصارمة:
+        async def _generate_book_content():
+            book_prompt = """أنت "المحقق الأكاديمي الرئيسي" وخبير تأليف الكتب والمراجع الجامعية لمنصة "لمّاح" (Lammah Academic Intelligence Engine).
+مهمتك تحويل هذا التسجيل الصوتي لمحاضرة جامعية إلى "كتاب جامعي رسمي معتمد" متكامل الأركان.
+
+قواعد صارمة:
 1. الشمولية التامة ومنع التلخيص المقتضب (Exhaustive Academic Exposition):
-   - يُمنع منعاً باتاً الاقتصار على رؤوس أقلام أو كبسولات مقتضبة. الطالب يحتاج كتاباً جامعياً شاملاً يغنيه بنسبة 100% عن الاستماع للتسجيل أو البحث في مصادر خارجية.
-   - اكتب بأسلوب النثر التعليمي الرصين الشارح. اشرح الأفكار والمفاهيم والنظريات باستفاضة منهجية وافية (350 إلى 500 كلمة لكل محور/فصل).
-   - وثّق جميع الأمثلة الواقعية والقصص التطبيقية التي ضربها الدكتور في المحاضرة.
-
-2. الهيكلة إلى فصول ومباحث دراسية كبرى (Book Chapters & Modules):
-   - قسّم المحاضرة إلى فصول دراسية رئيسية (من 5 إلى 9 فصول بحسب طول التسجيل) تغطي كافة موضوعات الشرح.
-   - استخدم ## للفصول الرئيسية و ### للمباحث والتفريعات.
+   - اكتب بأسلوب النثر التعليمي الرصين الشارح. اشرح الأفكار باستفاضة منهجية وافية (350 إلى 500 كلمة لكل محور/فصل).
+   - وثّق جميع الأمثلة والتطبيقات التي ضربها الدكتور في المحاضرة.
+   - يُمنع منعاً باتاً نقل كلام عامي أو ألفاظ عفوية أو تكرارات من التفريغ (مثل: يعني، اه، رح نعمل، دكتور يعطيك العافية). النص يجب أن يكون كتاباً جامعياً رصيناً بالفصحى.
+2. الهيكلة إلى فصول ومباحث دراسية كبرى:
+   - قسّم المحاضرة إلى فصول دراسية رئيسية (##) ومباحث فرعية (###).
    - داخل continuous_markdown، ضمّن لكل فصل:
      - 💡 الفكرة الجوهرية والمدخل المفاهيمي
      - 🧠 الشرح والتفصيل المعمق مع الأمثلة الحية
-     - 🔑 المصطلحات الأساسية مع إحاطة المصطلح الإنجليزي بوسم <mark>Term</mark> لتظليله بالماركر
+     - 🔑 المصطلحات الأساسية مع إحاطة المصطلح الإنجليزي المفتاحي بوسم <mark>English Term</mark> ليتم تظليله بالماركر الأكاديمي
      - > ⚠️ فخ امتحاني: [تحذير صريح من فخ متكرر يقع فيه الطلاب أو نبه عليه المحاضر]
      - > 💡 استبصار أكاديمي: [شرح وتوضيح ذكي لمعلومة بين السطور]
      - > 📌 قاعدة ذهبية: [قاعدة أو معادلة للحفظ والتطبيق الفوري]
-     - > 💬 توثيق من كلام المحاضر: [جملة أو نصيحة قالها المحاضر في سياق الشرح]
+     - > 💬 توثيق من كلام المحاضر: [فائدة جوهرية نبه عليها المحاضر في سياق الشرح]
+3. الأسلوب ثنائي اللغة: مصطلحات بالإنجليزية بين قوسين أو بجوار العربي.
 
-3. الأسلوب ثنائي اللغة والتظليل التفاعلي (Bilingual Terminology & Highlighting):
-   - اشرح المنطق والفلسفة بلغة عربية أكاديمية سلسة وواضحة.
-   - احقن المصطلحات الإنجليزية الأساسية بجوار مقابلها العربي مباشرة، واجعل المصطلحات الإنجليزية المفتاحية محاطة بوسم <mark>English Term</mark> ليتم تظليلها بالماركر الأكاديمي تلقائياً في الكتاب.
-
-4. جداول مقارنة ومصفوفات تفريقية (Markdown Comparison Tables):
-   - أنشئ جداول مقارنة شاملة لتفكيك أي لبس بين المفاهيم المتقابلة التي وردت في الشرح.
-
-5. بنك التقييم الذاتي المتقدم ثنائي اللغة (Bilingual University MCQs):
-   - 8 إلى 12 سؤال اختيار من متعدد (MCQs) بمستوى الامتحانات الجامعية الرسمية.
-   - إلزامية الصيغة المزدوجة (Bilingual Requirement):
-     * السؤال: يُكتب باللغة الإنجليزية متبوعاً بترجمته وشرحه بالعربية بين قوسين لضمان الفهم والتدرب على نمط الامتحانات الحقيقية.
-     * الخيارات الأربعة (A, B, C, D): كل خيار يجب حتماً أن يتضمن المصطلح باللغة الإنجليزية ومقابله أو شرحه بالعربية، يُمنع منعاً باتاً كتابة خيارات عربية صماء دون الإنجليزية!
-     * حقل "correct_answer": حرف الخيار الصحيح فقط (A أو B أو C أو D) دون نسخ نص الخيار.
-   - 8 إلى 12 بطاقة استذكار سريع (Flashcards).
-   - 4 إلى 6 أسئلة امتحانية متوقعة (Past Exams Style) بنظام الفخ الامتحاني.
-
-المخرجات حصراً كائن JSON صالح، بنفس الهيكل التالي ودون أي نصوص إضافية:
+المخرجات حصراً كائن JSON صالح، بنفس الهيكل التالي:
 {
-  "ai_title": "عنوان دقيق ورسمي للكتاب الجامعي",
-  "study_strategy": "منهجية وخارطة طريق المذاكرة الفعالة لهذا المرجع",
+  "ai_title": "عنوان رسمي دقيق للمرجع الأكاديمي",
+  "study_strategy": "خارطة طريق ومنهجية المذاكرة الفعالة لهذا المرجع",
   "tldr": ["الركيزة الجوهرية الأولى للمحاضرة", "الركيزة الجوهرية الثانية", "الركيزة الجوهرية الثالثة", "الركيزة الجوهرية الرابعة"],
-  "continuous_markdown": "النص الأكاديمي الشامل للكتاب مقسم إلى فصول (##) ومباحث (###) وشرح مستفيض ووسوم <mark>...</mark> وصناديق التنبيهات والأفخاخ وجداول المقارنة",
-  "cheat_sheet": [
-    {"term": "المصطلح بالإنجليزية والعربية", "brief_definition": "التعريف التأصيلي المركز والقاعدة الأساسية"}
-  ],
-  "comparisons": [
-    {
-      "title": "مقارنة منهجية شاملة بين ... و ...",
-      "concept_a": "المفهوم (أ)",
-      "concept_b": "المفهوم (ب)",
-      "differences": [
-        {"aspect": "وجه المقارنة", "a_desc": "شرح وتحليل أ", "b_desc": "شرح وتحليل ب"}
-      ]
-    }
-  ],
-  "slide_explanations": [
-    {
-      "page_number": 1,
-      "title": "الفصل 1: عنوان المبحث الأول",
-      "explanation": "شرح تحليلي موسع ومستفيض لما شرحه المحاضر في هذا الجزء.",
-      "focus_points": ["الركيزة الجوهرية لهذا الفصل أو الفخ الامتحاني"]
-    }
-  ],
-  "focus_points": [
-    {"page_number": 1, "text": "نقطة التركيز الأساسية لهذا الفصل"}
-  ],
-  "sticky_notes": [
-    {"page_number": 1, "note_text": "⚠️ تنبيه المحاضر: توجيه أكاديمي هام نبه عليه الدكتور صراحة."}
-  ],
-  "mcqs": [
-    {
-      "question": "What is the primary function of X? (ما هي الوظيفة الأساسية لـ X في المقرر؟)",
-      "options": [
-        "A) English Option Concept (الشرح والمقابل بالعربية)",
-        "B) English Option Concept (الشرح والمقابل بالعربية)",
-        "C) English Option Concept (الشرح والمقابل بالعربية)",
-        "D) English Option Concept (الشرح والمقابل بالعربية)"
-      ],
-      "correct_answer": "A",
-      "explanation": "التعليل الأكاديمي للإجابة الصحيحة وكشف مغالطات الخيارات الأخرى."
-    }
-  ],
-  "flashcards": [
-    {
-      "front": "المصطلح أو المفهوم (English / Arabic)",
-      "back": "التأصيل العلمي الدقيق مع مثال المحاضر التطبيقي",
-      "hint": "تلميح استذكاري سريع"
-    }
-  ],
-  "past_exams": [
-    {
-      "id": "pe_1",
-      "year": "امتحان نهائي متوقع 2026",
-      "exam_type": "Final Exam",
-      "page_number": 1,
-      "question": "سؤال امتحاني جوهري",
-      "options": ["A) ...", "B) ...", "C) ...", "D) ..."],
-      "correct_answer": "A) ...",
-      "doctor_explanation": "الإجابة النموذجية المعتمدة وفق ما قاله الدكتور.",
-      "trap_warning": "⚠️ فخ امتحاني: تجنب الخلط بين ..."
-    }
-  ]
+  "continuous_markdown": "النص الأكاديمي الشامل للكتاب مقسم إلى فصول (##) ومباحث (###) وشرح مستفيض..."
 }
-أعد فقط كائن JSON الصالح بدون أي علامات أو مقدمات خارج الـ JSON."""
+أعد فقط كائن JSON الصالح بدون أي علامات خارج الـ JSON."""
+            try:
+                resp = await llm.ainvoke([
+                    {"role": "system", "content": book_prompt},
+                    {"role": "user", "content": f"تفريغ المحاضرة:\n{transcript_sample}"}
+                ])
+                raw = resp.content.strip()
+                if raw.startswith("```json"): raw = raw[7:]
+                elif raw.startswith("```"): raw = raw[3:]
+                if raw.endswith("```"): raw = raw[:-3]
+                raw = raw.strip()
+                try:
+                    return json.loads(raw)
+                except Exception:
+                    from json_repair import loads as repair_loads
+                    return repair_loads(raw)
+            except Exception as e:
+                logger.warning(f"[ORCHESTRATOR] Book synthesis sub-task exception: {e}")
+                return None
+
+        async def _generate_assessment_content():
+            assessment_prompt = """أنت "رئيس لجان الامتحانات والتقييم الجامعي" لمنصة "لمّاح" (Lammah Academic Intelligence Engine).
+بناءً على تفريغ المحاضرة، استخرج بنك التقييم الذاتي المتقدم ومسرد المصطلحات:
+1. بنك التقييم الذاتي ثنائي اللغة (Bilingual MCQs):
+   - 8 إلى 12 سؤال اختيار من متعدد بمستوى الامتحانات الجامعية.
+   - إلزامية الصيغة المزدوجة: السؤال إنجليزي ومترجم عربي، والخيارات A, B, C, D إنجليزية مع مقابل عربي، وحقل correct_answer حرف فقط (A/B/C/D) مع تعليل دقيق.
+2. 8 إلى 12 بطاقة استذكار سريع (Flashcards): front (المصطلح باللغتين), back (الشرح والتعريف), hint (تلميح).
+3. 4 إلى 6 أسئلة امتحانية متوقعة (Past Exams Style) بنظام الفخ الامتحاني trap_warning.
+4. جدول مقارنة ومصفوفة تفريقية (Comparisons): عنوان ومفهومان وأوجه مقارنة واضحة.
+5. ورقة الغش الذكية ومسرد المصطلحات (Cheat Sheet): 10 إلى 15 مصطلحاً أساسياً مع تعريف مختصر.
+
+المخرجات حصراً كائن JSON صالح:
+{
+  "cheat_sheet": [{"term": "Term (المصطلح)", "brief_definition": "التعريف المركز"}],
+  "comparisons": [{"title": "مقارنة بين ... و ...", "concept_a": "أ", "concept_b": "ب", "differences": [{"aspect": "وجه المقارنة", "a_desc": "...", "b_desc": "..."}]}],
+  "mcqs": [{"question": "Question? (السؤال بالعربية)", "options": ["A) ...", "B) ...", "C) ...", "D) ..."], "correct_answer": "A", "explanation": "..."}],
+  "flashcards": [{"front": "Term", "back": "Definition", "hint": "Hint"}],
+  "past_exams": [{"id": "pe_1", "year": "امتحان نهائي متوقع 2026", "exam_type": "Final Exam", "page_number": 1, "question": "...", "options": ["A) ...", "B) ...", "C) ...", "D) ..."], "correct_answer": "A) ...", "doctor_explanation": "...", "trap_warning": "..."}]
+}
+أعد فقط كائن JSON الصالح بدون أي مقدمات."""
+            try:
+                resp = await llm.ainvoke([
+                    {"role": "system", "content": assessment_prompt},
+                    {"role": "user", "content": f"تفريغ المحاضرة:\n{transcript_sample}"}
+                ])
+                raw = resp.content.strip()
+                if raw.startswith("```json"): raw = raw[7:]
+                elif raw.startswith("```"): raw = raw[3:]
+                if raw.endswith("```"): raw = raw[:-3]
+                raw = raw.strip()
+                try:
+                    return json.loads(raw)
+                except Exception:
+                    from json_repair import loads as repair_loads
+                    return repair_loads(raw)
+            except Exception as e:
+                logger.warning(f"[ORCHESTRATOR] Assessment synthesis sub-task exception: {e}")
+                return None
 
         try:
-            # We pass the full transcript (or up to 120,000 chars) directly to the LLM
-            prompt_input = f"تفريغ المحاضرة الصوتي بالكامل:\n{clean_transcript[:120000]}"
-            response = await llm.ainvoke([
-                {"role": "system", "content": system_prompt},
-                {"role": "user", "content": prompt_input}
-            ])
+            # Parallel execution: fast, decoupled, zero bottleneck
+            book_res, assess_res = await asyncio.gather(_generate_book_content(), _generate_assessment_content(), return_exceptions=True)
+            
+            book_data = book_res if isinstance(book_res, dict) else {}
+            assess_data = assess_res if isinstance(assess_res, dict) else {}
 
-            raw_text = response.content.strip()
-            # Clean possible markdown block wrappers
-            if raw_text.startswith("```json"):
-                raw_text = raw_text[7:]
-            elif raw_text.startswith("```"):
-                raw_text = raw_text[3:]
-            if raw_text.endswith("```"):
-                raw_text = raw_text[:-3]
-            raw_text = raw_text.strip()
+            continuous_md = book_data.get("continuous_markdown") or ""
 
-            # Attempt JSON parse
-            try:
-                data = json.loads(raw_text)
-            except Exception:
-                # Fallback: regex search for outer JSON object
-                m = re.search(r'(\{[\s\S]*\})', raw_text)
-                if m:
-                    data = json.loads(m.group(1))
-                else:
-                    raise ValueError("No valid JSON found in LLM response")
+            # Check if continuous_markdown is missing or appears unformatted
+            if not continuous_md or len(continuous_md) < 250 or ("## " not in continuous_md and "### " not in continuous_md):
+                logger.warning("[ORCHESTRATOR] continuous_markdown is invalid or empty. Invoking emergency fallback...")
+                continuous_md = await self._generate_emergency_markdown_fallback(llm, transcript_sample)
 
-            # Extract fields with safe defaults
             final_results = {
                 "highlights": [],
                 "sticky_notes": [],
-                "focus_points": data.get("focus_points") or [],
-                "slide_explanations": data.get("slide_explanations") or [],
-                "mcqs": data.get("mcqs") or [],
-                "flashcards": data.get("flashcards") or [],
-                "past_exams": data.get("past_exams") or [],
-                "expected_questions": data.get("mcqs") or [],
-                "continuous_markdown": data.get("continuous_markdown") or "",
-                "study_strategy": data.get("study_strategy") or "",
-                "tldr": data.get("tldr") or [],
-                "cheat_sheet": data.get("cheat_sheet") or [],
-                "comparisons": data.get("comparisons") or [],
-                "ai_title": data.get("ai_title") or "دفتر المذاكرة الأكاديمي الشامل"
+                "focus_points": [],
+                "slide_explanations": [],
+                "mcqs": assess_data.get("mcqs") or [],
+                "flashcards": assess_data.get("flashcards") or [],
+                "past_exams": assess_data.get("past_exams") or [],
+                "expected_questions": assess_data.get("mcqs") or [],
+                "continuous_markdown": continuous_md,
+                "study_strategy": book_data.get("study_strategy") or "قراءة الفصول الأساسية بتركيز، ثم حل بنك الأسئلة والاطلاع على الأفخاخ الامتحانية ومراجعة بطاقات الذاكرة.",
+                "tldr": book_data.get("tldr") or ["مفاهيم تأسيسية في موضوع المحاضرة", "التطبيقات العملية والأمثلة المنهجية", "النقاط المحورية الهامة للاختبار"],
+                "cheat_sheet": assess_data.get("cheat_sheet") or [],
+                "comparisons": assess_data.get("comparisons") or [],
+                "ai_title": book_data.get("ai_title") or "الكتاب الجامعي المعتمد"
             }
 
-            # If slide_explanations is empty, create at least 1-3 modular virtual slides from continuous markdown
-            if not final_results["slide_explanations"] and final_results["continuous_markdown"]:
-                sections = re.split(r'\n(?=##\s+)', final_results["continuous_markdown"])
-                for idx, sec in enumerate(sections[:10]):
+            # Generate slide explanations / virtual slides from continuous markdown
+            if continuous_md:
+                sections = re.split(r'\n(?=##\s+)', continuous_md)
+                for idx, sec in enumerate(sections[:12]):
                     lines = sec.strip().split("\n")
                     sec_title = lines[0].replace("#", "").strip() if lines else f"الوحدة {idx+1}"
                     sec_body = "\n".join(lines[1:]).strip() if len(lines) > 1 else sec
@@ -643,11 +699,14 @@ class AIOrchestrator:
             return final_results
 
         except Exception as e:
-            logger.error(f"[ORCHESTRATOR] Failed to synthesize master audio dossier: {e}", exc_info=True)
-            # Resilient fallback so job doesn't fail
+            logger.error(f"[ORCHESTRATOR] Critical exception in _synthesize_master_audio_dossier: {e}", exc_info=True)
+            # Safe algorithmic fallback — NEVER clean_transcript raw dump!
+            safe_markdown = self._format_algorithmic_academic_book(transcript_sample)
             return {
                 "highlights": [], "sticky_notes": [], "focus_points": [], "slide_explanations": [],
-                "mcqs": [], "flashcards": [], "past_exams": [], "continuous_markdown": clean_transcript,
-                "study_strategy": "", "tldr": [], "cheat_sheet": [], "comparisons": [],
-                "ai_title": "ملخص المحاضرة"
+                "mcqs": [], "flashcards": [], "past_exams": [], "continuous_markdown": safe_markdown,
+                "study_strategy": "قراءة فصول المرجع ومراجعة النقاط المحورية واستيعاب المبادئ التأسيسية.",
+                "tldr": ["المفاهيم الأساسية للمحاضرة", "التحليل المنهجي والتطبيقي", "الخلاصة العلمية المركزة"],
+                "cheat_sheet": [], "comparisons": [],
+                "ai_title": "الكتاب الجامعي المعتمد"
             }

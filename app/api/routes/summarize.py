@@ -238,6 +238,10 @@ async def background_worker(row: LectureRow, user_id: str, plan_name: str, histo
                     student_name = profile["name"]
                 lecture_title = annotations.get("ai_title") or "الكتاب الجامعي المعتمد"
                 continuous_md = annotations.get("continuous_markdown") or ""
+                if continuous_md and ((transcript and continuous_md.strip() == transcript.strip()) or ("## " not in continuous_md and "### " not in continuous_md and len(continuous_md) > 300)):
+                    from app.services.ai.orchestrator import AIOrchestrator
+                    logger.warning("[SUMMARIZE] continuous_markdown resembles raw transcript. Formatting into academic chapters...")
+                    continuous_md = AIOrchestrator()._format_algorithmic_academic_book(continuous_md)
                 num_terms = len(annotations.get("cheat_sheet", []))
                 num_mcqs = len(annotations.get("mcqs", []))
                 num_comps = len(annotations.get("comparisons", []))
@@ -1227,6 +1231,10 @@ async def process_lecture(
                 
                 lecture_title = annotations.get("ai_title") or "الكتاب الجامعي المعتمد"
                 continuous_md = annotations.get("continuous_markdown") or ""
+                if continuous_md and ((transcript and continuous_md.strip() == transcript.strip()) or ("## " not in continuous_md and "### " not in continuous_md and len(continuous_md) > 300)):
+                    from app.services.ai.orchestrator import AIOrchestrator
+                    logger.warning("[SUMMARIZE] continuous_markdown resembles raw transcript. Formatting into academic chapters...")
+                    continuous_md = AIOrchestrator()._format_algorithmic_academic_book(continuous_md)
                 num_terms = len(annotations.get("cheat_sheet", []))
                 num_mcqs = len(annotations.get("mcqs", []))
                 num_comps = len(annotations.get("comparisons", []))
