@@ -58,10 +58,27 @@ def clean_text(text: Any) -> str:
     return t.strip()
 
 def format_arabic(text: Any) -> str:
-    """Reshapes Arabic text and forces RTL base direction to prevent bidi flipping."""
+    """Reshapes Arabic text, sanitizes unsupported glyphs for Amiri font, and prevents bidi flipping."""
     if not text:
         return ""
     clean = clean_text(text)
+    # Strip emojis and unsupported Unicode symbols that render as missing glyph boxes in Amiri
+    clean = re.sub(r'[𐀀-􏿿]', '', clean)
+    clean = (
+        clean.replace('➔', '->')
+        .replace('⚡', '')
+        .replace('🏆', '')
+        .replace('🎯', '')
+        .replace('🔢', '')
+        .replace('⚠️', '')
+        .replace('🧠', '')
+        .replace('🚨', '')
+        .replace('👉', '')
+        .replace('✅', '')
+        .replace('Σ', 'Sum')
+        .replace('x̄', 'x_bar')
+        .replace('≈', '~')
+    )
     reshaped = arabic_reshaper.reshape(clean)
     display_val = get_display(reshaped, base_dir='R')
     if isinstance(display_val, bytes):
@@ -160,6 +177,249 @@ def insert_text_auto(page, rect, lines, start_fs=10.0, min_fs=7.0, fontname="ami
         logger.warning(f"[PDF_ANNOTATOR] insert_textbox failed on {rect}: {e}")
         return 0
 
+
+
+def _render_calculation_bento(
+    create_page_fn,
+    orig_page_num: int,
+    slide_title: str,
+    sub_text: str,
+    exp_entry: dict,
+    dims: dict
+):
+    """
+    Renders the dedicated 4-card high-impact STEM Problem-Solving Bento Grid.
+    Designed with Tufte cognitive hierarchy, dynamic adaptive font-scaling,
+    and a fail-safe fallback mechanism ensuring zero empty cards.
+    """
+    comp_p, fn_r, fn_b = create_page_fn()
+    pw, ph = dims['pw'], dims['ph']
+    m_x, top_m, h_h, gap, bot_m = dims['m_x'], dims['top_m'], dims['h_h'], dims['gap'], dims['bot_m']
+    c_top, c_bot = dims['c_top'], dims['c_bot']
+
+    # 1. Header Bar
+    h_rect = fitz.Rect(m_x, top_m, pw - m_x, top_m + h_h)
+    comp_p.draw_rect(h_rect, color=(0.85, 0.88, 0.93), fill=(1.0, 1.0, 1.0), radius=0.03, width=0.8)
+    comp_p.draw_line(fitz.Point(h_rect.x1 - 2, h_rect.y0 + 3), fitz.Point(h_rect.x1 - 2, h_rect.y1 - 3), color=(0.12, 0.25, 0.65), width=4.5)
+
+    pill_rect = fitz.Rect(h_rect.x0 + 12, h_rect.y0 + 16, h_rect.x0 + 130, h_rect.y1 - 16)
+    comp_p.draw_rect(pill_rect, color=(0.80, 0.85, 0.93), fill=(0.93, 0.95, 0.99), radius=0.2, width=0.8)
+    insert_text_auto(comp_p, fitz.Rect(pill_rect.x0 + 4, pill_rect.y0 + 8, pill_rect.x1 - 4, pill_rect.y1 - 4),
+                     [format_arabic(f"شريحة {orig_page_num} | حل المسائل")], start_fs=9.5, min_fs=8.5, fontname=fn_b, color=(0.12, 0.25, 0.65), align=fitz.TEXT_ALIGN_CENTER)
+
+    title_box = fitz.Rect(pill_rect.x1 + 14, top_m + 8, h_rect.x1 - 24, top_m + 42)
+    insert_text_auto(comp_p, title_box, [format_arabic(f"تفكيك وحل المسائل الحسابية  |  {slide_title}")],
+                     start_fs=12.2, min_fs=9.5, fontname=fn_b, color=(0.10, 0.16, 0.38))
+
+    sub_box = fitz.Rect(pill_rect.x1 + 14, top_m + 44, h_rect.x1 - 24, top_m + 72)
+    insert_text_auto(comp_p, sub_box, [format_arabic(f"الخلاصة: {sub_text}")],
+                     start_fs=9.8, min_fs=8.0, fontname=fn_r, color=(0.55, 0.30, 0.05))
+
+    prob_data = exp_entry.get("problem_data") or {}
+    final_answer = prob_data.get("final_answer") or {}
+    if isinstance(final_answer, dict):
+        hero_text = final_answer.get("hero_answer") or final_answer.get("value") or ""
+        hero_decision = final_answer.get("clinical_or_practical_decision") or final_answer.get("decision") or final_answer.get("interpretation") or ""
+    else:
+        hero_text = str(final_answer or "")
+        hero_decision = ""
+
+    if not hero_text:
+        hero_text = clean_text(exp_entry.get("summary_phrase", "")) or "تم تفكيك المعطيات والتعويض الرقمي بنجاح"
+    if not hero_decision and prob_data.get("sanity_check"):
+        hero_decision = clean_text(str(prob_data.get("sanity_check")))
+
+    # 2. Top Hero Badge (Dual-Zone High-Contrast Banner)
+    hero_rect = fitz.Rect(m_x, c_top, pw - m_x, c_top + 48)
+    comp_p.draw_rect(hero_rect, color=(0.18, 0.28, 0.52), fill=(0.06, 0.10, 0.22), radius=0.04, width=1.0)
+    comp_p.draw_line(fitz.Point(hero_rect.x1 - 3, hero_rect.y0 + 3), fitz.Point(hero_rect.x1 - 3, hero_rect.y1 - 3),
+                     color=(0.20, 0.60, 1.0), width=3.5)
+
+    if hero_decision:
+        insert_text_auto(comp_p, fitz.Rect(hero_rect.x0 + 16, hero_rect.y0 + 5, hero_rect.x1 - 16, hero_rect.y0 + 26),
+                         [format_arabic(f"النتيجة الحاسمة: {hero_text}")],
+                         start_fs=12.5, min_fs=9.8, fontname=fn_b, color=(1.0, 1.0, 1.0))
+        insert_text_auto(comp_p, fitz.Rect(hero_rect.x0 + 16, hero_rect.y0 + 26, hero_rect.x1 - 16, hero_rect.y1 - 4),
+                         [format_arabic(f"القرار / الاستنتاج: {hero_decision}")],
+                         start_fs=10.8, min_fs=8.8, fontname=fn_b, color=(1.0, 0.88, 0.35))
+    else:
+        insert_text_auto(comp_p, fitz.Rect(hero_rect.x0 + 16, hero_rect.y0 + 10, hero_rect.x1 - 16, hero_rect.y1 - 8),
+                         [format_arabic(f"النتيجة الحاسمة: {hero_text}")],
+                         start_fs=13.5, min_fs=10.5, fontname=fn_b, color=(1.0, 1.0, 1.0))
+
+    # 3. 4 Cards below
+    grid_top = c_top + 52 + gap
+    grid_h = c_bot - grid_top
+    uw = pw - (2 * m_x)
+    w_right = int(uw * 0.56)
+    w_left = uw - w_right - gap
+    h_top = int(grid_h * 0.48)
+
+    r_top = fitz.Rect(pw - m_x - w_right, grid_top, pw - m_x, grid_top + h_top)
+    r_bot = fitz.Rect(pw - m_x - w_right, grid_top + h_top + gap, pw - m_x, c_bot)
+    l_top = fitz.Rect(m_x, grid_top, m_x + w_left, grid_top + h_top)
+    l_bot = fitz.Rect(m_x, grid_top + h_top + gap, m_x + w_left, c_bot)
+
+    # Card A: Givens & Laws
+    comp_p.draw_rect(r_top, color=(0.82, 0.86, 0.92), fill=(1.0, 1.0, 1.0), radius=0.03, width=0.8)
+    comp_p.draw_line(fitz.Point(r_top.x1 - 2, r_top.y0 + 2), fitz.Point(r_top.x1 - 2, r_top.y1 - 2), color=(0.12, 0.28, 0.65), width=3.6)
+    insert_text_auto(comp_p, fitz.Rect(r_top.x0 + 12, r_top.y0 + 5, r_top.x1 - 12, r_top.y0 + 25),
+                     [format_arabic("تشريح المعطيات والمطلوب والقوانين")], start_fs=11.2, min_fs=9.5, fontname=fn_b, color=(0.12, 0.22, 0.50))
+    lines_a = []
+    givens = prob_data.get("givens", [])
+    if isinstance(givens, list) and givens:
+        lines_a.append("المعطيات الصريحة المستخرجة:")
+        for g in givens:
+            if isinstance(g, dict):
+                sym = g.get("symbol", "")
+                val = g.get("value", "") or g.get("raw_value", "")
+                unit = g.get("unit", "")
+                name = g.get("name", "") or g.get("meaning", "")
+                line_str = f"• {sym} = {val} {unit}".strip()
+                if name:
+                    line_str += f" ({name})"
+                lines_a.append(line_str)
+            else:
+                lines_a.append(f"• {clean_text(str(g))}")
+    elif prob_data.get("givens_text"):
+        lines_a.append(f"• {clean_text(str(prob_data.get('givens_text')))}")
+
+    target = prob_data.get("target")
+    if target:
+        if isinstance(target, dict):
+            sym = target.get('symbol', '')
+            meaning = target.get('meaning', '') or target.get('description', '')
+            lines_a.append(f"المطلوب: {sym} ({meaning})".strip(" ()"))
+        else:
+            lines_a.append(f"المطلوب: {clean_text(str(target))}")
+
+    laws = prob_data.get("governing_laws") or prob_data.get("governing_law")
+    if laws:
+        lines_a.append("القوانين الحاكمة:")
+        if isinstance(laws, list):
+            for lw in laws:
+                if isinstance(lw, dict):
+                    lines_a.append(f"  - {lw.get('formula_text', '') or lw.get('law_name', '')}")
+                else:
+                    lines_a.append(f"  - {clean_text(str(lw))}")
+        else:
+            lines_a.append(f"  - {clean_text(str(laws))}")
+
+    if not lines_a:
+        lines_a.append("• تم استخراج المتغيرات والقوانين الحاكمة لحل المسألة.")
+
+    insert_text_auto(comp_p, fitz.Rect(r_top.x0 + 14, r_top.y0 + 26, r_top.x1 - 14, r_top.y1 - 6),
+                     [format_arabic(l) for l in lines_a], start_fs=11.5, min_fs=9.2, fontname=fn_r, color=(0.15, 0.18, 0.25))
+
+    # Card B: Solution Steps (Triple-Tier Fallback to NEVER be blank)
+    comp_p.draw_rect(r_bot, color=(0.80, 0.88, 0.82), fill=(0.985, 1.0, 0.985), radius=0.03, width=0.8)
+    comp_p.draw_line(fitz.Point(r_bot.x1 - 2, r_bot.y0 + 2), fitz.Point(r_bot.x1 - 2, r_bot.y1 - 2), color=(0.08, 0.55, 0.32), width=3.6)
+    insert_text_auto(comp_p, fitz.Rect(r_bot.x0 + 12, r_bot.y0 + 5, r_bot.x1 - 12, r_bot.y0 + 25),
+                     [format_arabic("خطوات التعويض الجبري الصريح")], start_fs=11.2, min_fs=9.5, fontname=fn_b, color=(0.06, 0.45, 0.25))
+    lines_b = []
+    steps = prob_data.get("solution_steps") or prob_data.get("steps") or prob_data.get("detailed_steps")
+    if isinstance(steps, list) and steps:
+        for idx_s, stp in enumerate(steps):
+            if isinstance(stp, dict):
+                s_title = stp.get("title", "") or stp.get("action", "") or stp.get("name", "") or f"خطوة {idx_s+1}"
+                s_calc = stp.get("calc", "") or stp.get("content", "") or stp.get("expr", "") or stp.get("result", "")
+                if s_calc:
+                    lines_b.append(f"{idx_s+1}. {s_title}: {s_calc}".strip(" :"))
+                else:
+                    lines_b.append(f"{idx_s+1}. {s_title}".strip(" :"))
+            elif stp:
+                lines_b.append(f"{idx_s+1}. {clean_text(str(stp))}")
+    elif isinstance(steps, str) and steps.strip():
+        for stp in steps.strip().split("\n"):
+            if stp.strip():
+                lines_b.append(clean_text(stp))
+
+    # Fallback Tier 1: Extract from ai_explanation or doctor_explanation
+    if not lines_b:
+        raw_source = exp_entry.get("ai_explanation") or exp_entry.get("doctor_explanation") or exp_entry.get("student_explanation")
+        if raw_source:
+            bullets = sanitize_bullet_points(raw_source)
+            for idx_b, b in enumerate(bullets[:5]):
+                if b.strip():
+                    lines_b.append(f"{idx_b+1}. {b.strip()}")
+
+    # Fallback Tier 2: Synthesize step-by-step from governing laws and final answer
+    if not lines_b:
+        if laws:
+            first_law = laws[0].get('formula_text', '') if (isinstance(laws, list) and isinstance(laws[0], dict)) else str(laws)
+            lines_b.append(f"1. القانون: {clean_text(first_law)}")
+        if hero_text:
+            lines_b.append(f"2. التعويض والحساب: {hero_text}")
+        if hero_decision:
+            lines_b.append(f"3. القرار والنتيجة: {hero_decision}")
+
+    # Fallback Tier 3: Absolute safety guarantee
+    if not lines_b:
+        lines_b.append("1. استخراج المتغيرات والتعويض المباشر في القانون المعتمد.")
+        lines_b.append("2. إتمام العمليات الحسابية بدقة واستخراج القيمة النهائية.")
+
+    insert_text_auto(comp_p, fitz.Rect(r_bot.x0 + 14, r_bot.y0 + 26, r_bot.x1 - 14, r_bot.y1 - 6),
+                     [format_arabic(l) for l in lines_b], start_fs=11.5, min_fs=9.2, fontname=fn_r, color=(0.10, 0.20, 0.15))
+
+    # Card C: Calculator & Units
+    comp_p.draw_rect(l_top, color=(0.95, 0.85, 0.75), fill=(1.0, 0.985, 0.96), radius=0.03, width=0.8)
+    comp_p.draw_line(fitz.Point(l_top.x1 - 2, l_top.y0 + 2), fitz.Point(l_top.x1 - 2, l_top.y1 - 2), color=(0.85, 0.40, 0.10), width=3.6)
+    insert_text_auto(comp_p, fitz.Rect(l_top.x0 + 12, l_top.y0 + 5, l_top.x1 - 12, l_top.y0 + 25),
+                     [format_arabic("لغم الوحدات وضغطات الآلة الحاسبة")], start_fs=11.2, min_fs=9.5, fontname=fn_b, color=(0.75, 0.30, 0.05))
+    lines_c = []
+    traps = prob_data.get("unit_and_exam_traps") or prob_data.get("unit_conversion_trap") or prob_data.get("calculator_and_unit_traps")
+    if traps:
+        if isinstance(traps, list):
+            for tr in traps[:2]:
+                lines_c.append(f"تنبيه: {clean_text(str(tr))}")
+        else:
+            lines_c.append(f"تنبيه: {clean_text(str(traps))}")
+    else:
+        lines_c.append("تنبيه: تأكد من مطابقة وحدات القياس قبل التعويض المباشر في القانون.")
+
+    casio = prob_data.get("casio_calculator_guide") or prob_data.get("casio_keystrokes") or prob_data.get("calculator_hack")
+    if casio:
+        lines_c.append("")
+        lines_c.append("طريقة الحل بكاسيو (Casio fx-991) في ثوان:")
+        lines_c.append(clean_text(str(casio)))
+    else:
+        lines_c.append("")
+        lines_c.append("طريقة الآلة الحاسبة: احرص على حصر البسط والمقام بالأقواس لتفادي خطأ ترتيب العمليات.")
+
+    insert_text_auto(comp_p, fitz.Rect(l_top.x0 + 12, l_top.y0 + 26, l_top.x1 - 12, l_top.y1 - 6),
+                     [format_arabic(l) for l in lines_c], start_fs=11.0, min_fs=9.0, fontname=fn_r, color=(0.30, 0.15, 0.05))
+
+    # Card D: Exam Twist & Sanity
+    comp_p.draw_rect(l_bot, color=(0.88, 0.82, 0.95), fill=(0.99, 0.98, 1.0), radius=0.03, width=0.8)
+    comp_p.draw_line(fitz.Point(l_bot.x1 - 2, l_bot.y0 + 2), fitz.Point(l_bot.x1 - 2, l_bot.y1 - 2), color=(0.48, 0.22, 0.75), width=3.6)
+    insert_text_auto(comp_p, fitz.Rect(l_bot.x0 + 12, l_bot.y0 + 5, l_bot.x1 - 12, l_bot.y0 + 25),
+                     [format_arabic("فحص المنطقية وفخ الامتحان المعكوس")], start_fs=11.2, min_fs=9.5, fontname=fn_b, color=(0.40, 0.15, 0.65))
+    lines_d = []
+    sanity = prob_data.get("sanity_check") or prob_data.get("shortcut_and_sanity_check")
+    if sanity:
+        lines_d.append("فحص المنطقية (Sanity Check):")
+        lines_d.append(clean_text(str(sanity)))
+        lines_d.append("")
+
+    exam_twist = prob_data.get("reverse_exam_twist") or prob_data.get("exam_twist") or exp_entry.get("exam_tip")
+    if exam_twist:
+        lines_d.append("فخ الامتحان المعكوس (The Reverse Twist):")
+        if isinstance(exam_twist, list):
+            for et in exam_twist[:2]:
+                lines_d.append(f"• {clean_text(str(et))}")
+        else:
+            lines_d.append(clean_text(str(exam_twist)))
+    else:
+        lines_d.append("فخ الامتحان: ركز على ما إذا كان المطلوب حساب القيمة المباشرة أم استنتاج النسبة المعكوسة.")
+
+    insert_text_auto(comp_p, fitz.Rect(l_bot.x0 + 12, l_bot.y0 + 26, l_bot.x1 - 12, l_bot.y1 - 6),
+                     [format_arabic(l) for l in lines_d], start_fs=11.0, min_fs=9.0, fontname=fn_r, color=(0.20, 0.10, 0.35))
+
+    # 4. Footer
+    comp_p.draw_line(fitz.Point(m_x + 10, ph - 16), fitz.Point(pw - m_x - 10, ph - 16), color=(0.82, 0.84, 0.88), width=0.8)
+    comp_p.insert_textbox(fitz.Rect(m_x, ph - 16, pw - m_x, ph - 2),
+                         format_arabic(f"ملف لمّاح المخطط الأكاديمي  |  غرفة تفكيك وحل المسائل (Problem Solving)  |  شريحة {orig_page_num}"),
+                         fontsize=8.2, fontname=fn_r, color=(0.42, 0.45, 0.50), align=fitz.TEXT_ALIGN_CENTER)
 
 def annotate_pdf(input_path: str, output_path: str, annotations: dict, is_free_trial: bool = False, progress_callback: Any = None) -> str:
     """
@@ -519,8 +779,9 @@ def annotate_pdf(input_path: str, output_path: str, annotations: dict, is_free_t
                 has_ai_exp = bool(ai_exp_text and not _is_no_content(ai_exp_text))
                 has_extra = bool(example_text or vocab_list or exam_tip)
                 has_notes = bool(study_notes)
+                has_prob = bool(exp_entry.get("problem_data") or str(exp_entry.get("slide_type", "")).lower() in ("problem_solving", "calculation"))
 
-                if not has_real_audio and not has_ai_exp and not has_extra and not has_notes:
+                if not has_real_audio and not has_ai_exp and not has_extra and not has_notes and not has_prob:
                     continue
 
                 # Ensure real-world analogy is never empty to maintain balanced Bento Grid
@@ -582,6 +843,23 @@ def annotate_pdf(input_path: str, output_path: str, annotations: dict, is_free_t
                 uw = pw - (2 * m_x)
 
                 sub_text = summary_phrase if summary_phrase else "تفكيك ذكي وشامل لمفاهيم ومصطلحات الشريحة"
+
+                # Check if slide is a calculation / problem-solving slide
+                prob_data = exp_entry.get("problem_data")
+                slide_type = str(exp_entry.get("slide_type", "")).lower()
+                is_calc_slide = bool(prob_data or slide_type in ("problem_solving", "calculation"))
+                if is_calc_slide:
+                    _render_calculation_bento(
+                        create_page_fn=create_companion_page,
+                        orig_page_num=orig_page_num,
+                        slide_title=slide_title,
+                        sub_text=sub_text,
+                        exp_entry=exp_entry,
+                        dims={"pw": pw, "ph": ph, "m_x": m_x, "top_m": top_m, "h_h": h_h, "gap": gap, "bot_m": bot_m, "c_top": c_top, "c_bot": c_bot}
+                    )
+                    comp_pages_for_this_slide.append(len(new_doc))
+                    companion_page_map[orig_page_num] = comp_pages_for_this_slide
+                    continue
 
                 # Check if slide has rich content requiring Governed Dual-Page Companion (K=2)
                 # Adaptive Density: only split into 2 pages if content mass genuinely exceeds single page capacity (~1150 chars)

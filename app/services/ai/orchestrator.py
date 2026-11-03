@@ -251,7 +251,9 @@ class AIOrchestrator:
                         "example": s.get("example", ""),
                         "vocabulary": s.get("vocabulary", []),
                         "exam_tip": s.get("exam_tip", ""),
-                        "sticky_note": s.get("sticky_note", "")
+                        "sticky_note": s.get("sticky_note", ""),
+                        "slide_type": s.get("slide_type", "conceptual"),
+                        "problem_data": s.get("problem_data", None)
                     })
 
                 # MCQs - filter out intro/title slide questions
