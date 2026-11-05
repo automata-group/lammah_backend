@@ -3,12 +3,10 @@ package main
 import (
 	"bytes"
 	"encoding/json"
-	"fmt"
 	"io"
 	"log"
 	"net/http"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strings"
 	"sync"
@@ -19,8 +17,7 @@ import (
 )
 
 const (
-	MaxWorkers = 5
-	ChunkSize  = 10 * 1024 * 1024
+	ChunkSize = 10 * 1024 * 1024
 )
 
 type UploadResponse struct {
@@ -53,8 +50,6 @@ var httpClient = &http.Client{
 		IdleConnTimeout:     90 * time.Second,
 	},
 }
-
-var jobQueue = make(chan ProcessingJob, 100)
 
 // 2. استخدام sync.Pool لإعادة تدوير الذاكرة وتخفيف العبء على الـ Garbage Collector
 var bufferPool = sync.Pool{
@@ -111,10 +106,8 @@ func main() {
 	}
 	os.MkdirAll(tempDir, 0755)
 
-	// بدء تشغيل العمال (Workers)
-	for i := 1; i <= MaxWorkers; i++ {
-		go fileWorker(i)
-	}
+	// بدء تشغيل معالج الوسائط المتقدم وطابور Redis
+	go startRedisMediaWorker()
 
 	// تعريف Middleware للتعامل مع CORS بشكل هجين
 	corsMiddleware := func(next http.HandlerFunc) http.HandlerFunc {
@@ -171,118 +164,13 @@ func main() {
 		w.Write([]byte("ok"))
 	})
 
-	log.Printf("🚀 Go Uploader starting with %d workers on port %s...", MaxWorkers, port)
+	log.Printf("🚀 Go Uploader starting high-performance streaming server on port %s...", port)
 	if err := http.ListenAndServe(":"+port, nil); err != nil {
 		log.Fatal(err)
 	}
 }
 
-// عامل المعالجة الرئيسي الذي يستقبل المهام من الطابور
-func fileWorker(id int) {
-	log.Printf("Worker %d: Ready", id)
-	for job := range jobQueue {
-		// يتم تمرير المهمة لدالة منفصلة لضمان عمل defer بشكل صحيح وتفريغ الذاكرة
-		processJob(id, job)
-	}
-}
 
-// دالة لمعالجة المهمة وتوجيهها وإدارة دورة حياتها
-func processJob(workerID int, job ProcessingJob) {
-	startTime := time.Now()
-
-	// الحفاظ على الملف الأصلي حياً كمرجع للباك إند بايثون وعدم حذفه في defer
-	defer func() {
-		// يتم الاحتفاظ بالملف الأصلي في uploads/temp كـ fallback آمن
-	}()
-
-
-	info, err := os.Stat(job.FilePath)
-	if err != nil {
-		log.Printf("Worker %d: Error accessing file %s: %v", workerID, job.FileName, err)
-		return
-	}
-
-	log.Printf("Worker %d: Started processing %s (Size: %d MB)", workerID, job.FileName, info.Size()/(1024*1024))
-
-	ext := strings.ToLower(filepath.Ext(job.FileName))
-
-	// توجيه الملف للدالة الحقيقية المناسبة بناءً على نوعه
-	switch {
-	case ext == ".pdf":
-		err = processPDF(workerID, job.FilePath)
-	case ext == ".pptx":
-		// لا يحتاج معالجة في Go uploader، الباك إند بايثون سيتكفل به
-		log.Printf("Worker %d: PowerPoint file detected. Skipping Go processing.", workerID)
-		err = nil
-	case allowedExt[ext]: // باقي الملفات الصوتية المسموحة
-		err = processAudio(workerID, job.FilePath, ext)
-	default:
-		log.Printf("Worker %d: Unsupported extension during processing: %s", workerID, ext)
-		return
-	}
-
-	if err != nil {
-		log.Printf("Worker %d: Error processing %s: %v", workerID, job.FileName, err)
-		return
-	}
-
-	log.Printf("Worker %d: Finished %s in %v", workerID, job.FileName, time.Since(startTime))
-}
-
-// دالة معالجة ملفات PDF الحقيقية
-func processPDF(workerID int, filePath string) error {
-	log.Printf("Worker %d: Extracting text from PDF...", workerID)
-
-	// إنشاء مسار للملف النصي الناتج
-	txtOutputPath := strings.TrimSuffix(filePath, filepath.Ext(filePath)) + ".txt"
-
-	// استخدام أداة pdftotext (يجب أن تكون مثبتة على السيرفر عبر poppler-utils)
-	// الأمر: pdftotext input.pdf output.txt
-	cmd := exec.Command("pdftotext", filePath, txtOutputPath)
-
-	var stderr bytes.Buffer
-	cmd.Stderr = &stderr
-
-	err := cmd.Run()
-	if err != nil {
-		return fmt.Errorf("pdftotext failed: %v, stderr: %s", err, stderr.String())
-	}
-
-	// يمكنك هنا قراءة الملف النصي الناتج وإرساله لقاعدة البيانات أو لنموذج الذكاء الاصطناعي
-	log.Printf("Worker %d: Successfully extracted text to %s", workerID, txtOutputPath)
-
-	// تنظيف الملف النصي بعد الانتهاء من استخدامه (اختياري حسب منطق التطبيق لديك)
-	// defer os.Remove(txtOutputPath)
-
-	return nil
-}
-
-// دالة معالجة الملفات الصوتية الحقيقية
-func processAudio(workerID int, filePath string, extension string) error {
-	log.Printf("Worker %d: Converting and compressing audio file...", workerID)
-
-	// إنشاء مسار للملف الصوتي المعالج بصيغة mp3
-	mp3OutputPath := strings.TrimSuffix(filePath, extension) + "_processed.mp3"
-
-	// استخدام FFmpeg لتحويل أي صيغة صوت أو استخراج الصوت من الفيديو إلى MP3 بـ bitrate 128k
-	// الأمر: ffmpeg -y -i input -vn -b:a 128k output.mp3
-	cmd := exec.Command("ffmpeg", "-y", "-i", filePath, "-vn", "-b:a", "128k", mp3OutputPath)
-
-	var stderr bytes.Buffer
-	cmd.Stderr = &stderr // FFmpeg يكتب مخرجاته عادة في الـ stderr
-
-	err := cmd.Run()
-	if err != nil {
-		return fmt.Errorf("ffmpeg failed: %v, stderr: %s", err, stderr.String())
-	}
-
-	log.Printf("Worker %d: Successfully processed audio to %s", workerID, mp3OutputPath)
-
-	// هنا يمكنك رفع الملف المعالج (mp3OutputPath) إلى S3 أو إرساله لخدمة خارجية
-	// defer os.Remove(mp3OutputPath)
-
-	return nil
-}
 
 func handleUpload(w http.ResponseWriter, r *http.Request) {
 	log.Printf("📥 Received %s request for %s from %s", r.Method, r.URL.Path, r.RemoteAddr)
@@ -386,17 +274,7 @@ func handleUpload(w http.ResponseWriter, r *http.Request) {
 				return
 			}
 
-			// 5. التعامل الآمن مع امتلاء طابور المعالجة
-			select {
-			case jobQueue <- ProcessingJob{FilePath: finalPath, FileName: savedFilename}:
-				log.Printf("Job queued for %s", savedFilename)
-			default:
-				// السيرفر مضغوط والعمال مشغولون بالكامل والطابور ممتلئ
-				os.Remove(finalPath) // احذف الملف لتجنب امتلاء القرص
-				log.Printf("Error: Job queue full, rejected %s", savedFilename)
-				http.Error(w, "Server is too busy, please try again later", http.StatusServiceUnavailable)
-				return
-			}
+			log.Printf("✅ File uploaded successfully: %s", savedFilename)
 			break // قراءة أول ملف فقط لتجنب استغلال الثغرات برفع ملفات متعددة في نفس الطلب
 		}
 	}
@@ -411,7 +289,7 @@ func handleUpload(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(UploadResponse{
 		TempID:   savedFilename,
 		Filename: originalFilename,
-		Status:   "Processing",
+		Status:   "Ready",
 	})
 }
 

@@ -1,5 +1,8 @@
 from typing import Optional, List, Any
-from langchain_openai import ChatOpenAI
+try:
+    from langchain_openai import ChatOpenAI
+except ImportError:
+    ChatOpenAI = None
 from app.core.config import settings
 import logging
 

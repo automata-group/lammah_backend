@@ -5,7 +5,6 @@ on:
     branches: [ main ]
   workflow_dispatch:
 
-
 env:
   REGISTRY: ghcr.io
   BACKEND_IMAGE: automata-group/lammah_backend
@@ -13,7 +12,57 @@ env:
   YTDL_IMAGE: automata-group/lammah_ytdl_service
 
 jobs:
+  test:
+    name: Run Backend Security & Quality Tests
+    runs-on: ubuntu-latest
+    services:
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt pytest
+
+      - name: Run Pytest
+        env:
+          SUPABASE_URL: "https://ci-test.supabase.co"
+          SUPABASE_KEY: "dummy-ci-supabase-key"
+          SECRET_KEY: "ci-secret-key-at-least-32-characters"
+          OPENROUTER_API_KEY: "dummy-ci-openrouter-key"
+          REDIS_URL: "redis://localhost:6379/0"
+        run: |
+          pytest tests/
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.22'
+          check-latest: true
+
+      - name: Run Go Unit Tests
+        working-directory: ./uploader-go
+        run: |
+          go test -v ./...
+
   build:
+    name: Build and Push Docker Images
+    needs: test
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -116,6 +165,19 @@ jobs:
                   retries: 5
                   start_period: 30s
 
+              redis:
+                image: redis:7-alpine
+                restart: unless-stopped
+                ports:
+                  - "6379:6379"
+                volumes:
+                  - redis_data:/data
+                healthcheck:
+                  test: ["CMD", "redis-cli", "ping"]
+                  interval: 10s
+                  timeout: 5s
+                  retries: 5
+
               ytdl-service:
                 image: ghcr.io/automata-group/lammah_ytdl_service:latest
                 restart: unless-stopped
@@ -160,7 +222,10 @@ jobs:
                   - UPLOAD_DIR=/app/uploads
                   - YOUTUBE_DOWNLOADER_URL=http://ytdl-service:8001
                   - YOUTUBE_COOKIES_PATH=/app/youtube_cookies.txt
+                  - REDIS_URL=redis://redis:6379/0
                 depends_on:
+                  redis:
+                    condition: service_healthy
                   ytdl-service:
                     condition: service_healthy
                 healthcheck:
@@ -180,6 +245,10 @@ jobs:
                   - SUPABASE_URL=$SUPABASE_URL
                   - SUPABASE_KEY=$SUPABASE_KEY
                   - TEMP_DIR=/app/uploads/temp
+                  - REDIS_URL=redis://redis:6379/0
+                depends_on:
+                  redis:
+                    condition: service_healthy
                 healthcheck:
                   test: ["CMD", "wget", "--spider", "-q", "http://localhost:8080/health"]
                   interval: 30s
@@ -188,6 +257,7 @@ jobs:
 
             volumes:
               shared_uploads:
+              redis_data:
               warp_data:
             COMPOSE_EOF
 
@@ -225,15 +295,71 @@ jobs:
 
             docker compose up -d --force-recreate
             
-            echo "Waiting 10 seconds for containers to initialize..."
-            sleep 10
-            
             echo "Deployment successful!"
+
+            # ── Update Caddyfile (fix ERR_QUIC_PROTOCOL_ERROR on SSE streams) ──
+            cat > ~/Caddyfile << 'CADDY_EOF'
+            {
+                email omar@lammah.site
+                servers {
+                    protocols h1 h2
+                }
+            }
+
+            lammah.site, www.lammah.site {
+                request_body_limit 500mb
+                reverse_proxy localhost:3001
+            }
+
+            api.lammah.site {
+                handle /api/v1/summarize/upload-temp {
+                    request_body_limit 500mb
+                    reverse_proxy localhost:8080
+                }
+
+                handle /api/v1/summarize/upload-temp-py {
+                    request_body_limit 500mb
+                    reverse_proxy localhost:8000
+                }
+
+                handle /api/v1/summarize/process-lecture {
+                    reverse_proxy localhost:8000 {
+                        flush_interval -1
+                    }
+                }
+                handle /api/v1/summarize/process-batch-lectures {
+                    reverse_proxy localhost:8000 {
+                        flush_interval -1
+                    }
+                }
+                handle /api/v1/notebook/process-notebook {
+                    reverse_proxy localhost:8000 {
+                        flush_interval -1
+                    }
+                }
+
+                handle /api/* {
+                    reverse_proxy localhost:8000
+                }
+            }
+            CADDY_EOF
+
+            # Apply Caddyfile to wherever Caddy is running
+            if systemctl is-active --quiet caddy; then
+              sudo cp ~/Caddyfile /etc/caddy/Caddyfile
+              sudo systemctl reload caddy
+              echo "Caddy reloaded successfully."
+            elif command -v caddy &>/dev/null; then
+              sudo caddy reload --config ~/Caddyfile --adapter caddyfile 2>/dev/null || echo "Caddy reload failed, may need manual restart."
+            else
+              echo "WARNING: Caddy not found as system service. Caddyfile written to ~/Caddyfile for manual use."
+            fi
             
             echo "=== Docker Container Status ==="
             docker ps -a
             echo "=== Backend Container Logs ==="
-            docker compose logs --tail=100 backend
+            docker compose logs --tail=50 backend
             echo "=== Uploader Container Logs ==="
-            docker compose logs --tail=100 uploader
-
+            docker compose logs --tail=50 uploader
+            echo "=== Redis Container Logs ==="
+            docker compose logs --tail=50 redis

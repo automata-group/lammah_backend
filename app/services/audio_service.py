@@ -310,3 +310,50 @@ def _transcribe_large_audio(file_path: str, progress_callback=None) -> str:
 
     full_transcript = [r for r in results if r is not None]
     return " ".join(full_transcript).strip()
+
+
+def transcribe_precomputed_chunks(chunk_paths: List[str], progress_callback=None) -> str:
+    """
+    Transcribes a pre-generated list of 3-minute MP3 chunks produced by the Go media worker.
+    Zero FFmpeg overhead in Python, uses ThreadPoolExecutor for fast parallel transcription.
+    """
+    if not chunk_paths:
+        return ""
+
+    if len(chunk_paths) == 1:
+        if progress_callback:
+            progress_callback("⚡ إرسال الملف لمحرك التفريغ الصوتي فائق السرعة...")
+        return _transcribe_single_segment(chunk_paths[0], "mp3")
+
+    import threading
+    from concurrent.futures import ThreadPoolExecutor
+
+    results: List[Optional[str]] = [None] * len(chunk_paths)
+    completed_count = 0
+    lock = threading.Lock()
+
+    def process_chunk(idx: int, path: str):
+        nonlocal completed_count
+        try:
+            chunk_text = _transcribe_single_segment(path, "mp3")
+            m_start = idx * 3
+            m_end = (idx + 1) * 3
+            timestamp_label = f"\n\n⏱️ [{m_start:02d}:00 - {m_end:02d}:00]\n"
+            results[idx] = timestamp_label + chunk_text
+            with lock:
+                completed_count += 1
+                if progress_callback:
+                    progress_callback(f"🎧 اكتمل تفريغ {completed_count} من {len(chunk_paths)} مقاطع في محرك التفريغ...")
+        except Exception as e:
+            logger.error(f"❌ Chunk {idx+1} failed: {e}")
+            raise RuntimeError(f"فشل تفريغ المقطع #{idx+1} بعد استنفاد كافة المحركات المتاحة: {e}")
+
+    max_workers = min(4, len(chunk_paths))
+    with ThreadPoolExecutor(max_workers=max_workers) as executor:
+        futures = [executor.submit(process_chunk, idx, cp) for idx, cp in enumerate(chunk_paths)]
+        for future in futures:
+            future.result()
+
+    full_transcript = [r for r in results if r is not None]
+    return " ".join(full_transcript).strip()
+

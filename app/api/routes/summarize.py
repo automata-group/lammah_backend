@@ -1,3 +1,5 @@
+from app.services.media_queue_service import media_queue
+from app.services.audio_service import transcribe_precomputed_chunks
 from fastapi import APIRouter, File, UploadFile, HTTPException, Depends, Request, Form, BackgroundTasks, Query
 from fastapi.responses import StreamingResponse, FileResponse, Response
 import shutil
@@ -510,33 +512,43 @@ async def process_batch_lectures(
                 yield f"data: {json.dumps({'type': 'error', 'message': 'لم يتم العثور على أي ملف صوتي أو فشل تحميل الروابط.'}, ensure_ascii=False)}\n\n"
                 return
 
-            # 3. Calculate total duration and early quota check
-            total_seconds = 0.0
-            import subprocess
+            # 3. Audio Merging & Chunking via Media Queue (with resilient local fallback)
+            yield f"data: {json.dumps({'type': 'progress', 'step': '0/5', 'progress_percent': 6, 'time_estimate': est_pre, 'message': '⚡ جاري تهيئة وهندسة التسجيلات الصوتية بدقة متقدمة...'}, ensure_ascii=False)}\n\n"
+            
+            media_result = None
+            chunk_paths = []
+            total_seconds = sum(audio_durations) if audio_durations else 0.0
+
+            try:
+                async for event in media_queue.dispatch_and_stream(
+                    job_id=unique_id,
+                    user_id=profile["id"],
+                    task_type="batch_audio",
+                    audio_paths=audio_paths,
+                    pdf_path=pdf_path,
+                    chunk_seconds=180
+                ):
+                    if event.get("type") == "final_result":
+                        media_result = event
+                        break
+                    else:
+                        yield f": ping\n\n"
+                        pct = max(6, min(25, int(event.get("percent", 10) * 0.25)))
+                        msg = event.get("message", "جاري تهيئة الصوت...")
+                        yield f"data: {json.dumps({'type': 'progress', 'step': '0/5', 'progress_percent': pct, 'message': f'⚡ {msg}'}, ensure_ascii=False)}\n\n"
+            except Exception as q_err:
+                logger.warning(f"⚠️ [MEDIA_QUEUE] Queue processing bypassed, falling back to direct processing: {q_err}", exc_info=True)
+                media_result = None
+
+            if media_result and media_result.get("status") == "completed":
+                total_seconds = media_result.get("total_duration", total_seconds)
+                chunk_items = media_result.get("chunks", [])
+                chunk_paths = [c["path"] for c in chunk_items]
+            else:
+                logger.info("ℹ️ Using standard direct processing pipeline for audio inputs.")
+
             import math
-            
-            yield f"data: {json.dumps({'type': 'progress', 'step': '0/5', 'progress_percent': 7, 'time_estimate': est_pre, 'message': '📏 جاري حساب مدة المحاضرات وحصتك المتبقية...'}, ensure_ascii=False)}\n\n"
-            
-            audio_durations = []
-            for path in audio_paths:
-                duration_seconds = 0.0
-                try:
-                    cmd = ["ffprobe", "-v", "error", "-show_entries", "format=duration", "-of", "default=noprint_wrappers=1:nokey=1", path]
-                    duration_str = (await asyncio.to_thread(subprocess.check_output, cmd)).decode().strip()
-                    duration_seconds = float(duration_str)
-                except Exception as e:
-                    logger.warning(f"ffprobe failed for {path}: {e}. Falling back to file size calculation.")
-                    if os.path.exists(path):
-                        duration_seconds = os.path.getsize(path) / (128000 / 8)
-                
-                audio_durations.append(duration_seconds)
-                total_seconds += duration_seconds
-
-            is_free_trial = False
-
-            calculated_cost = math.ceil(total_seconds / 60)
-            if calculated_cost < 1:
-                calculated_cost = 1
+            calculated_cost = max(1, math.ceil(total_seconds / 60))
 
             # Early Quota Check
             from app.services.subscription_service import get_user_subscription_info
@@ -611,53 +623,84 @@ async def process_batch_lectures(
             
             yield f"data: {json.dumps({'type': 'progress', 'step': '1/5', 'progress_percent': 6, 'time_estimate': total_batch_sec, 'message': '🎧 1/5 جاري تفريغ الصوت آلياً... نعدك بدقة عالية وسرعة فائقة!'}, ensure_ascii=False)}\n\n"
             
-            transcripts = []
-            for idx, path in enumerate(audio_paths):
-                f_est = file_estimates[idx] if idx < len(file_estimates) else 22
-                rem_files_est = sum(file_estimates[idx+1:]) if (idx + 1 < len(file_estimates)) else 0
-                
+            transcript = ""
+            if chunk_paths:
+                # Parallel transcription of precomputed chunks from Go media worker
                 import queue
                 progress_q = queue.Queue()
                 def audio_progress_cb(msg):
                     progress_q.put(msg)
-                    
-                transcription_task = asyncio.create_task(asyncio.to_thread(transcribe_audio, path, audio_progress_cb))
-                
-                last_audio_msg = f'جاري تفريغ المحاضرة #{idx + 1} من {len(audio_paths)}...'
-                file_start = asyncio.get_event_loop().time()
+
+                transcription_task = asyncio.create_task(
+                    asyncio.to_thread(transcribe_precomputed_chunks, chunk_paths, audio_progress_cb)
+                )
+
+                chunk_start = asyncio.get_event_loop().time()
+                last_chunk_msg = "جاري تفريغ المقاطع الصوتية بالتوازي..."
                 while not transcription_task.done():
                     try:
                         while True:
-                            last_audio_msg = progress_q.get_nowait()
+                            last_chunk_msg = progress_q.get_nowait()
                     except queue.Empty:
                         pass
-                    
-                    elapsed_f = asyncio.get_event_loop().time() - file_start
-                    cur_file_rem = max(2, int(f_est - elapsed_f))
-                    cur_total_rem = rem_files_est + cur_file_rem + est_slides_sec + est_ai_sec + est_pdf_sec
-                    
-                    completed_files = idx
-                    f_progress = min(1.0, elapsed_f / max(1, f_est))
-                    overall_audio_ratio = (completed_files + f_progress) / max(1, len(audio_paths))
-                    pct = max(6, min(62, int(6 + overall_audio_ratio * 56)))
-                    
-                    yield f": ping\n\n"
-                    yield f"data: {json.dumps({'type': 'progress', 'step': '1/5', 'progress_percent': pct, 'time_estimate': cur_total_rem, 'message': f'🎧 1/5 المحاضرة #{idx + 1} من {len(audio_paths)}: {last_audio_msg}'}, ensure_ascii=False)}\n\n"
-                    await asyncio.sleep(1.2)
-                    
-                t = transcription_task.result()
-                if t:
-                    if idx < len(urls_list):
-                        transcripts.append(f"--- [محاضرة رابط {idx+1}] ---\n{t}\n")
-                    else:
-                        file_idx = idx - len(urls_list) + 1
-                        transcripts.append(f"--- [ملف صوتي {file_idx}] ---\n{t}\n")
 
-            if not transcripts:
+                    elapsed = asyncio.get_event_loop().time() - chunk_start
+                    pct = max(10, min(62, int(10 + min(0.95, elapsed / max(12, est_audio_total)) * 52)))
+                    cur_rem = max(5, total_batch_sec - int(elapsed))
+                    yield f": ping\n\n"
+                    yield f"data: {json.dumps({'type': 'progress', 'step': '1/5', 'progress_percent': pct, 'time_estimate': cur_rem, 'message': f'🎧 1/5 {last_chunk_msg}'}, ensure_ascii=False)}\n\n"
+                    await asyncio.sleep(1.2)
+
+                transcript = transcription_task.result()
+            else:
+                # Direct fallback transcription loop
+                transcripts = []
+                for idx, path in enumerate(audio_paths):
+                    f_est = file_estimates[idx] if idx < len(file_estimates) else 22
+                    rem_files_est = sum(file_estimates[idx+1:]) if (idx + 1 < len(file_estimates)) else 0
+                    
+                    import queue
+                    progress_q = queue.Queue()
+                    def audio_progress_cb(msg):
+                        progress_q.put(msg)
+                        
+                    transcription_task = asyncio.create_task(asyncio.to_thread(transcribe_audio, path, audio_progress_cb))
+                    
+                    last_audio_msg = f'جاري تفريغ المحاضرة #{idx + 1} من {len(audio_paths)}...'
+                    file_start = asyncio.get_event_loop().time()
+                    while not transcription_task.done():
+                        try:
+                            while True:
+                                last_audio_msg = progress_q.get_nowait()
+                        except queue.Empty:
+                            pass
+                        
+                        elapsed_f = asyncio.get_event_loop().time() - file_start
+                        cur_file_rem = max(2, int(f_est - elapsed_f))
+                        cur_total_rem = rem_files_est + cur_file_rem + est_slides_sec + est_ai_sec + est_pdf_sec
+                        
+                        completed_files = idx
+                        f_progress = min(1.0, elapsed_f / max(1, f_est))
+                        overall_audio_ratio = (completed_files + f_progress) / max(1, len(audio_paths))
+                        pct = max(6, min(62, int(6 + overall_audio_ratio * 56)))
+                        
+                        yield f": ping\n\n"
+                        yield f"data: {json.dumps({'type': 'progress', 'step': '1/5', 'progress_percent': pct, 'time_estimate': cur_total_rem, 'message': f'🎧 1/5 المحاضرة #{idx + 1} من {len(audio_paths)}: {last_audio_msg}'}, ensure_ascii=False)}\n\n"
+                        await asyncio.sleep(1.2)
+                        
+                    t = transcription_task.result()
+                    if t:
+                        if idx < len(urls_list):
+                            transcripts.append(f"--- [محاضرة رابط {idx+1}] ---\n{t}\n")
+                        else:
+                            file_idx = idx - len(urls_list) + 1
+                            transcripts.append(f"--- [ملف صوتي {file_idx}] ---\n{t}\n")
+
+                transcript = "\n\n".join(transcripts)
+
+            if not transcript or not transcript.strip():
                 yield f"data: {json.dumps({'type': 'error', 'message': 'لم يتم تفريغ أي نص من المحاضرات المرفوعة.'}, ensure_ascii=False)}\n\n"
                 return
-
-            transcript = "\n\n".join(transcripts)
             yield f"data: {json.dumps({'type': 'transcript', 'text': transcript}, ensure_ascii=False)}\n\n"
             
             # 6. Document Handling
@@ -1618,10 +1661,6 @@ async def upload_temp(
         raise HTTPException(status_code=500, detail="Error saving file")
     
     logger.info(f"✅ Temp file saved: {saved_filename} ({os.path.getsize(final_path) / (1024*1024):.1f} MB)")
-    if ext in VIDEO_EXTENSIONS or ext in {".opus", ".ogg", ".aac", ".wma", ".weba", ".wav", ".m4a", ".flac"}:
-        base, _ = os.path.splitext(saved_filename)
-        processed_p = os.path.join(temp_dir, f"{base}_processed.mp3")
-        background_tasks.add_task(_convert_media_bg, final_path, processed_p)
     
     return {
         "temp_id": saved_filename,

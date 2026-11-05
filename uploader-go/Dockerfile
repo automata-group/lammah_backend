@@ -13,7 +13,7 @@ RUN go mod download
 COPY . .
 
 # Build the application
-RUN go build -o uploader main.go
+RUN go build -o uploader .
 
 # Runtime stage
 FROM alpine:latest
