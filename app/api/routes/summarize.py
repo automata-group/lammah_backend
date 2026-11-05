@@ -1583,7 +1583,8 @@ async def upload_temp(
     
     # Validate extension
     VIDEO_EXTENSIONS = {".mp4", ".mov", ".mkv", ".webm", ".avi", ".m4v"}
-    allowed_ext = {".mp3", ".wav", ".m4a", ".pdf", ".ogg", ".flac", ".pptx"} | VIDEO_EXTENSIONS
+    AUDIO_EXTENSIONS = {".mp3", ".wav", ".m4a", ".pdf", ".ogg", ".opus", ".aac", ".flac", ".wma", ".weba"}
+    allowed_ext = AUDIO_EXTENSIONS | VIDEO_EXTENSIONS | {".pptx", ".ppt"}
     ext = os.path.splitext(file.filename or "")[1].lower()
     if ext not in allowed_ext:
         raise HTTPException(status_code=400, detail="File extension not supported")
@@ -1601,26 +1602,36 @@ async def upload_temp(
         raise HTTPException(status_code=500, detail="Error saving file")
     
     logger.info(f"✅ Temp file saved: {saved_filename} ({os.path.getsize(final_path) / (1024*1024):.1f} MB)")
-    if ext in VIDEO_EXTENSIONS:
+    if ext in VIDEO_EXTENSIONS or ext in {".opus", ".ogg", ".aac", ".wma", ".weba", ".wav", ".m4a", ".flac"}:
         try:
             import subprocess
             base, _ = os.path.splitext(saved_filename)
             processed_p = os.path.join(temp_dir, f"{base}_processed.mp3")
-            logger.info(f"🎬 [VIDEO_UPLOAD] Auto-extracting MP3 audio from video: {final_path} -> {processed_p}")
+            logger.info(f"🎧 [AUDIO_CONVERT] Auto-converting media to MP3: {final_path} -> {processed_p}")
             subprocess.run([
                 "ffmpeg", "-y", "-i", final_path,
-                "-vn", "-acodec", "libmp3lame", "-b:a", "64k", "-ac", "1",
+                "-vn", "-acodec", "libmp3lame", "-b:a", "128k", "-ac", "2",
                 processed_p
             ], check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-            logger.info(f"✅ [VIDEO_UPLOAD] Audio extracted successfully: {processed_p}")
+            logger.info(f"✅ [AUDIO_CONVERT] Media converted successfully: {processed_p}")
         except Exception as vid_err:
-            logger.error(f"❌ [VIDEO_UPLOAD] FFmpeg audio extraction error: {vid_err}")
+            logger.error(f"❌ [AUDIO_CONVERT] FFmpeg audio conversion error: {vid_err}")
     
     return {
         "temp_id": saved_filename,
         "filename": file.filename,
         "status": "Processing"
     }
+
+
+@router.post("/upload-temp-py")
+async def upload_temp_py(
+    file: UploadFile = File(...),
+    profile=Depends(check_quota)
+):
+    """Direct Python upload fallback endpoint bypassing Go uploader."""
+    return await upload_temp(file=file, profile=profile)
+
 
 
 @router.get("/debug-env", dependencies=[Depends(verify_admin)])

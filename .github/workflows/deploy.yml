@@ -44,6 +44,13 @@ jobs:
           push: true
           tags: ${{ env.REGISTRY }}/${{ env.YTDL_IMAGE }}:latest
 
+      - name: Build and push Uploader image
+        uses: docker/build-push-action@v5
+        with:
+          context: ./uploader-go
+          push: true
+          tags: ${{ env.REGISTRY }}/${{ env.UPLOADER_IMAGE }}:latest
+
   deploy:
     needs: build
     runs-on: ubuntu-latest
