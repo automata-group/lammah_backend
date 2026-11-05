@@ -128,6 +128,7 @@ async def get_pending_transactions(profile: dict = Depends(verify_admin)):
         raise HTTPException(status_code=500, detail={"user_message": "فشل جلب الطلبات. تأكد من تحديث قاعدة البيانات."})
 
 @router.post("/admin/{tx_id}/approve")
+@router.post("/admin/approve/{tx_id}")
 async def approve_transaction(tx_id: str, profile: dict = Depends(verify_admin)):
     supabase = get_supabase()
     try:
@@ -157,6 +158,7 @@ async def approve_transaction(tx_id: str, profile: dict = Depends(verify_admin))
         raise HTTPException(status_code=500, detail={"user_message": f"فشل في تأكيد الطلب: {str(e)}"})
 
 @router.post("/admin/{tx_id}/reject")
+@router.post("/admin/reject/{tx_id}")
 async def reject_transaction(tx_id: str, profile: dict = Depends(verify_admin)):
     supabase = get_supabase()
     try:
