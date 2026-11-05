@@ -218,7 +218,7 @@ async def background_worker(row: LectureRow, user_id: str, plan_name: str, histo
             update_progress("4/5", "🧠 لمّاح يفكّر الآن... جاري استنتاج أهم النقاط...")
         orchestrator = AIOrchestrator()
         llm = get_llm_for_user(user_id)
-        annotations = await orchestrator.generate_complete_annotations(llm, transcript, pdf_context)
+        annotations = await orchestrator.generate_complete_annotations(llm, transcript, pdf_context, study_language="ar")
 
         # 7. Annotation and Finalize (Concurrent Title Generation and PDF Annotation)
         download_url = None
@@ -390,6 +390,7 @@ async def process_batch_lectures(
     audio_temp_ids: Optional[str] = Form(None), # Comma separated
     start_page: Optional[int] = Form(None),
     end_page: Optional[int] = Form(None),
+    study_language: Optional[str] = Form("ar"),
     profile=Depends(check_quota)
 ):
     """
@@ -681,7 +682,7 @@ async def process_batch_lectures(
             # 7. AI Annotations
             orchestrator = AIOrchestrator()
             llm = get_llm_for_user(profile["id"])
-            anno_task = asyncio.create_task(orchestrator.generate_complete_annotations(llm, transcript, pdf_context))
+            anno_task = asyncio.create_task(orchestrator.generate_complete_annotations(llm, transcript, pdf_context, study_language=study_language or "ar"))
             
             num_slides = len(pdf_context) if pdf_context else 0
             est_ai_sec = max(25, min(80, 20 + int(num_slides * 0.7)))
@@ -838,6 +839,7 @@ async def process_lecture(
     metadata: Optional[str] = Form(None),
     start_page: Optional[int] = Form(None),
     end_page: Optional[int] = Form(None),
+    study_language: Optional[str] = Form("ar"),
     profile=Depends(check_quota)
 ):
     """
@@ -1129,7 +1131,7 @@ async def process_lecture(
             # 3. AI Annotations
             orchestrator = AIOrchestrator()
             llm = get_llm_for_user(profile["id"])
-            anno_task = asyncio.create_task(orchestrator.generate_complete_annotations(llm, transcript, pdf_context))
+            anno_task = asyncio.create_task(orchestrator.generate_complete_annotations(llm, transcript, pdf_context, study_language=study_language or "ar"))
             
             num_slides = len(pdf_context) if pdf_context else 0
             est_ai_sec = max(22, min(75, 16 + int(num_slides * 0.6)))
@@ -1278,7 +1280,8 @@ async def process_lecture(
                 "job_id": job.job_id,
                 "has_pdf": bool(download_url or pdf_path),
                 "is_prep": is_document_only,
-                "has_audio": not is_document_only
+                "has_audio": not is_document_only,
+                "study_language": study_language or "ar"
             }
             log_id = use_lecture_quota(profile["id"], metadata=history_meta, cost=calculated_cost)
 

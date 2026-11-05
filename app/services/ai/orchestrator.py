@@ -112,7 +112,7 @@ class AIOrchestrator:
             return transcript[:12000]
         return selected_text[:12000] # نافذة محكمة ومحددة لا تتجاوز 12 ألف حرف
 
-    async def generate_complete_annotations(self, llm, transcript: str, pdf_context: List[str]) -> Dict[str, Any]:
+    async def generate_complete_annotations(self, llm, transcript: str, pdf_context: List[str], study_language: str = "ar") -> Dict[str, Any]:
         """
         Refactored Orchestrator: Combines high-precision mapping with parallel slide-batch tutoring.
         Follows the multi-agent pipeline architecture while ensuring 100% slide and transcript coverage.
@@ -155,7 +155,7 @@ class AIOrchestrator:
         # the Aesthetic Notebook PDF engine, creating a complete master study PDF.
         if not pdf_context:
             logger.info("[ORCHESTRATOR] PDF Context is empty. Synthesizing Comprehensive Master Audio Dossier...")
-            return await self._synthesize_master_audio_dossier(llm, transcript)
+            return await self._synthesize_master_audio_dossier(llm, transcript, study_language=study_language)
 
         # SMART DOCUMENT-ONLY / SELF-STUDY MODE: When no audio transcript is provided
         if not transcript or not transcript.strip():
@@ -166,7 +166,7 @@ class AIOrchestrator:
 
             async def process_doc_study_batch(batch):
                 async with doc_semaphore:
-                    return await self.document_study.process_batch(llm, batch)
+                    return await self.document_study.process_batch(llm, batch, study_language=study_language)
 
             for i in range(0, len(slides), batch_size):
                 batch = slides[i : i + batch_size]
@@ -347,7 +347,7 @@ class AIOrchestrator:
                 
                 # استدعاء النافذة الذكية بدلاً من تمرير أول 40 ألف حرف المبتورة
                 batch_transcript = self._get_relevant_transcript_window(batch, transcript, len(slides))
-                return await self.tutor.process(llm, batch_transcript, batch, batch_mapping_context)
+                return await self.tutor.process(llm, batch_transcript, batch, batch_mapping_context, study_language=study_language)
 
         for i in range(0, len(slides), batch_size):
             batch = slides[i : i + batch_size]
@@ -527,7 +527,7 @@ class AIOrchestrator:
         
         return self._format_algorithmic_academic_book(transcript_sample)
 
-    async def _synthesize_master_audio_dossier(self, llm, transcript: str) -> Dict[str, Any]:
+    async def _synthesize_master_audio_dossier(self, llm, transcript: str, study_language: str = "ar") -> Dict[str, Any]:
         """
         Synthesizes an exhaustive, college-level Master Study Dossier from audio transcript alone.
         Uses decoupled, parallel sub-tasks for maximum speed, zero truncation, and guaranteed reliability.

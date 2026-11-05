@@ -16,7 +16,7 @@ class DocumentStudyService(BaseAgent):
     def __init__(self):
         super().__init__("document_study_agent.md")
 
-    async def process_batch(self, llm, slides_batch: List[Dict[str, Any]]) -> Dict[str, Any]:
+    async def process_batch(self, llm, slides_batch: List[Dict[str, Any]], study_language: str = "ar") -> Dict[str, Any]:
         """
         Processes a batch of slides (typically 4-6 slides).
         Returns structured annotations including multi-color highlights,
@@ -35,7 +35,28 @@ class DocumentStudyService(BaseAgent):
         # OpenAI & Anthropic Prompt Caching Architecture:
         # Placing the static instructions first ensures the prompt prefix matches across all slide batches
         # of the document. Only the slide payload at the end is dynamic, enabling high-rate KV caching.
+                lang_directive = ""
+        if study_language == "en":
+            lang_directive = (
+                "CRITICAL LANGUAGE DIRECTIVE: ENGLISH STUDY GUIDE MODE\n"
+                "- The user has explicitly selected ENGLISH STUDY GUIDE mode (specifically for English literature, translation, linguistics, and international curricula).\n"
+                "- Write student_explanation, title, summary_phrase, and exam_tip ENTIRELY in clear, accessible, and fluent Academic English.\n"
+                "- Do NOT output Arabic prose for primary explanations.\n"
+                "- For literature & texts (e.g. Robinson Crusoe, Shakespeare, poetry, linguistic theory): provide in-depth literary analysis (themes, symbolism, character analysis, rhetorical devices, and historical context).\n"
+                "- In vocabulary: provide essential key terms with concise definitions.\n"
+                "- In batch_mcqs & batch_flashcards: ALL questions, options, and explanations must be 100% in English.\n\n"
+            )
+        elif study_language == "bilingual":
+            lang_directive = (
+                "CRITICAL LANGUAGE DIRECTIVE: BILINGUAL STUDY MODE (DUAL ENGLISH & ARABIC)\n"
+                "- In student_explanation: provide explanation in fluent academic English followed immediately by a concise Arabic conceptual translation and vocabulary anchor.\n"
+                "- In exam_tip: provide the English exam trap along with its Arabic translation.\n"
+                "- In batch_mcqs: English question and options with bilingual explanation.\n\n"
+            )
+
         input_data = (
+            f"{lang_directive}"
+
             f"تعليمات التنفيذ الذكي:\n"
             f"1. لكل شريحة في الحزمة، حدد عبارات من نص الشريحة حرفياً لتظليلها (highlights) بألوان (yellow, green, cyan, pink).\n"
             f"2. أسلوب الشرح الإلزامي في student_explanation: اشرح حصراً باللهجة الفلسطينية الجامعية الودودة والمحبوبة (مثل: 'يا بطل، هاي الشريحة بتدخلنا في أول وأهم مرحلة وهي الـ Requirements (المتطلبات)... عشان نضمن... زي ما إنت شايف... شو الفكرة هون؟' - ويمنع منعاً باتاً استخدام أي لهجة خليجية أو مفردات مثل 'هذي' أو 'وش' أو 'الدافور')، مع التطبيق الإلزامي لأسلوب 'النص المُطعّم بالإنجليزية الامتحانية' (Enriched Bilingual Injection) بحيث يدخل المصطلح الإنجليزي الحرفي من السلايد في قلب كل جملة (مثل: مرحلة الـ Requirements (المتطلبات)، نوصل لـ Shared View (رؤية مشتركة)، بصيغة Textual format زي الـ User stories، بصيغة Diagrammatic زي الـ Use case diagrams) لكي تألف عين الطالب خيارات الامتحان الإنجليزية فوراً!\n"

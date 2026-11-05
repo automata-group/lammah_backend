@@ -5,7 +5,7 @@ class TutorService(BaseAgent):
     def __init__(self):
         super().__init__("tutor_agent.md")
 
-    async def process(self, llm, transcript: str, slides_batch: list, mapping_context: str):
+    async def process(self, llm, transcript: str, slides_batch: list, mapping_context: str, study_language: str = "ar"):
         slides_text = ""
         for s in slides_batch:
             slides_text += f"\n--- Slide {s['page_number']} ---\n{s['text']}\n"
@@ -19,6 +19,7 @@ class TutorService(BaseAgent):
         input_data = (
             f"=== Full Lecture Transcript (Reference Material) ===\n{transcript}\n\n"
             f"=== Instructions & Dialect Rules ===\n"
+            + ("- CRITICAL DIRECTIVE: The user selected ENGLISH STUDY GUIDE mode. Provide all explanations and insights in clear, accessible Academic English.\n" if study_language == "en" else "- CRITICAL DIRECTIVE: The user selected BILINGUAL mode. Provide explanation in English followed by concise Arabic translation.\n" if study_language == "bilingual" else "")
             f"- For each requested slide, find transcript segments where the professor discusses concepts FROM THAT SLIDE's text.\n"
             f"- Match by keywords/concepts — do NOT assign content sequentially.\n"
             f"- If a slide's concepts are NOT in the transcript at all → write exactly: (الدكتور ما ذكر هالشريحة بالتفصيل.)\n"
