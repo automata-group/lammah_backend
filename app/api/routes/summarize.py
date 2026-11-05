@@ -1568,7 +1568,7 @@ async def youtube_to_mp3(
 @router.post("/upload-temp")
 async def upload_temp(
     file: UploadFile = File(...),
-    profile=Depends(check_quota)
+    user=Depends(verify_token)
 ):
     """
     Temporary file upload endpoint (Python fallback for Go Uploader).
@@ -1627,10 +1627,10 @@ async def upload_temp(
 @router.post("/upload-temp-py")
 async def upload_temp_py(
     file: UploadFile = File(...),
-    profile=Depends(check_quota)
+    user=Depends(verify_token)
 ):
     """Direct Python upload fallback endpoint bypassing Go uploader."""
-    return await upload_temp(file=file, profile=profile)
+    return await upload_temp(file=file, user=user)
 
 
 

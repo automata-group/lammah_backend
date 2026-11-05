@@ -4,6 +4,7 @@ import json
 import os
 import jwt
 from datetime import datetime, timezone
+from typing import Optional
 from fastapi import Request, HTTPException, Depends
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from app.db.supabase_client import get_supabase, get_auth_client
@@ -28,11 +29,16 @@ class LocalUser:
         self.user_metadata = user_metadata or {}
         self.app_metadata = app_metadata or {}
 
-security = HTTPBearer()
+security = HTTPBearer(auto_error=False)
 
 
-async def verify_token(credentials: HTTPAuthorizationCredentials = Depends(security)):
+async def verify_token(credentials: Optional[HTTPAuthorizationCredentials] = Depends(security)):
     """Ultra-fast JWT verification with in-memory caching and optional local secret decode."""
+    if not credentials or not credentials.credentials:
+        raise HTTPException(
+            status_code=401,
+            detail={"user_message": "🔒 يرجى تسجيل الدخول أولاً لتتمكن من المتابعة.", "type": "unauthorized"}
+        )
     token = credentials.credentials
     now = time.time()
     token_exp = None
