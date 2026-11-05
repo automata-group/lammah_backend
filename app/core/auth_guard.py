@@ -108,6 +108,18 @@ async def verify_token(credentials: Optional[HTTPAuthorizationCredentials] = Dep
         })
 
 
+
+
+async def get_optional_user(credentials: Optional[HTTPAuthorizationCredentials] = Depends(security)):
+    """Lenient auth verification: returns user object if valid token exists, or None without throwing 401."""
+    if not credentials or not credentials.credentials:
+        return None
+    try:
+        return await verify_token(credentials)
+    except Exception as e:
+        logger.debug(f"Optional token verification skipped for temp ingest: {e}")
+        return None
+
 async def get_user_profile(request: Request, user=Depends(verify_token)):
     """Get user profile. Auto-create if missing. Capture device metadata."""
     now = time.time()

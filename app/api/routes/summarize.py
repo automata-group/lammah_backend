@@ -15,7 +15,7 @@ from app.services.pdf_service import extract_pages_from_pdf
 from app.services.ai.orchestrator import AIOrchestrator
 from app.services.subscription_service import use_lecture_quota, log_usage_failure, get_supabase, refund_lecture_quota
 from app.services.link_ingest_service import download_audio_from_link
-from app.core.auth_guard import check_quota, verify_phone_active, get_user_profile, verify_token, verify_admin
+from app.core.auth_guard import check_quota, verify_phone_active, get_user_profile, verify_token, verify_admin, get_optional_user
 from app.core.queue_manager import queue_manager, JobStatus
 from app.core.logger import logger
 from app.services.ai.factory import get_llm_for_user
@@ -1584,7 +1584,7 @@ def _convert_media_bg(final_path: str, processed_p: str):
 async def upload_temp(
     background_tasks: BackgroundTasks,
     file: UploadFile = File(...),
-    user=Depends(verify_token)
+    user=Depends(get_optional_user)
 ):
     """
     Temporary file upload endpoint (Ultra-fast Python fallback for Go Uploader).
@@ -1634,7 +1634,7 @@ async def upload_temp(
 async def upload_temp_py(
     background_tasks: BackgroundTasks,
     file: UploadFile = File(...),
-    user=Depends(verify_token)
+    user=Depends(get_optional_user)
 ):
     """Direct Python upload fallback endpoint bypassing Go uploader."""
     return await upload_temp(background_tasks=background_tasks, file=file, user=user)
