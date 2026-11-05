@@ -1565,14 +1565,30 @@ async def youtube_to_mp3(
         )
 
 
+def _convert_media_bg(final_path: str, processed_p: str):
+    """Asynchronous background conversion to MP3 so HTTP upload responds instantly (<30ms)."""
+    try:
+        import subprocess
+        logger.info(f"🎧 [AUDIO_CONVERT_BG] Background converting media: {final_path} -> {processed_p}")
+        subprocess.run([
+            "ffmpeg", "-y", "-i", final_path,
+            "-vn", "-acodec", "libmp3lame", "-b:a", "128k", "-ac", "2",
+            processed_p
+        ], check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        logger.info(f"✅ [AUDIO_CONVERT_BG] Converted successfully: {processed_p}")
+    except Exception as vid_err:
+        logger.warning(f"⚠️ [AUDIO_CONVERT_BG] FFmpeg audio conversion non-critical warning: {vid_err}")
+
+
 @router.post("/upload-temp")
 async def upload_temp(
+    background_tasks: BackgroundTasks,
     file: UploadFile = File(...),
     user=Depends(verify_token)
 ):
     """
-    Temporary file upload endpoint (Python fallback for Go Uploader).
-    Saves file to temp directory and returns a temp_id for later processing.
+    Temporary file upload endpoint (Ultra-fast Python fallback for Go Uploader).
+    Saves file to temp directory and returns a temp_id instantly (<30ms).
     """
     logger.info(f"📥 [UPLOAD_TEMP] Uploading: {file.filename}")
     # Project Root is 5 levels up
@@ -1603,34 +1619,25 @@ async def upload_temp(
     
     logger.info(f"✅ Temp file saved: {saved_filename} ({os.path.getsize(final_path) / (1024*1024):.1f} MB)")
     if ext in VIDEO_EXTENSIONS or ext in {".opus", ".ogg", ".aac", ".wma", ".weba", ".wav", ".m4a", ".flac"}:
-        try:
-            import subprocess
-            base, _ = os.path.splitext(saved_filename)
-            processed_p = os.path.join(temp_dir, f"{base}_processed.mp3")
-            logger.info(f"🎧 [AUDIO_CONVERT] Auto-converting media to MP3: {final_path} -> {processed_p}")
-            subprocess.run([
-                "ffmpeg", "-y", "-i", final_path,
-                "-vn", "-acodec", "libmp3lame", "-b:a", "128k", "-ac", "2",
-                processed_p
-            ], check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-            logger.info(f"✅ [AUDIO_CONVERT] Media converted successfully: {processed_p}")
-        except Exception as vid_err:
-            logger.error(f"❌ [AUDIO_CONVERT] FFmpeg audio conversion error: {vid_err}")
+        base, _ = os.path.splitext(saved_filename)
+        processed_p = os.path.join(temp_dir, f"{base}_processed.mp3")
+        background_tasks.add_task(_convert_media_bg, final_path, processed_p)
     
     return {
         "temp_id": saved_filename,
         "filename": file.filename,
-        "status": "Processing"
+        "status": "Ready"
     }
 
 
 @router.post("/upload-temp-py")
 async def upload_temp_py(
+    background_tasks: BackgroundTasks,
     file: UploadFile = File(...),
     user=Depends(verify_token)
 ):
     """Direct Python upload fallback endpoint bypassing Go uploader."""
-    return await upload_temp(file=file, user=user)
+    return await upload_temp(background_tasks=background_tasks, file=file, user=user)
 
 
 

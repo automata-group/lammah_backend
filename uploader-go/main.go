@@ -34,9 +34,19 @@ type ProcessingJob struct {
 	FileName string
 }
 
-// 1. تحسين اتصال HTTP لتجنب استنزاف الموارد
+type TokenCacheEntry struct {
+	ExpiresAt time.Time
+	Valid     bool
+}
+
+var (
+	tokenCache   = make(map[string]TokenCacheEntry)
+	tokenCacheMu sync.RWMutex
+)
+
+// 1. تحسين اتصال HTTP لتجنب استنزاف الموارد وضبط مهلة 15 ثانية للمرونة العالية
 var httpClient = &http.Client{
-	Timeout: 5 * time.Second,
+	Timeout: 15 * time.Second,
 	Transport: &http.Transport{
 		MaxIdleConns:        100,
 		MaxIdleConnsPerHost: 100,
@@ -180,17 +190,9 @@ func fileWorker(id int) {
 func processJob(workerID int, job ProcessingJob) {
 	startTime := time.Now()
 
-	// التأكد من حذف الملف الأصلي المؤقت بعد الانتهاء للأنواع المدعومة فقط
+	// الحفاظ على الملف الأصلي حياً كمرجع للباك إند بايثون وعدم حذفه في defer
 	defer func() {
-		ext := strings.ToLower(filepath.Ext(job.FileName))
-		if ext != ".pdf" && ext != ".pptx" { // لا نحذف الـ PDF والـ PPTX لأن الباك إند يحتاجهما
-			err := os.Remove(job.FilePath)
-			if err != nil && !os.IsNotExist(err) {
-				log.Printf("Worker %d: Failed to delete temp file %s: %v", workerID, job.FilePath, err)
-			} else {
-				log.Printf("Worker %d: Successfully deleted temp file: %s", workerID, job.FileName)
-			}
-		}
+		// يتم الاحتفاظ بالملف الأصلي في uploads/temp كـ fallback آمن
 	}()
 
 
@@ -427,7 +429,20 @@ func verifyToken(token string) bool {
 		token = "Bearer " + token
 	}
 
-	req, _ := http.NewRequest("GET", supabaseURL+"/auth/v1/user", nil)
+	// 1. فحص الكاش الداخلي (< 0.01ms) لتجنب الـ Rate-limit وخنق Supabase
+	tokenCacheMu.RLock()
+	entry, exists := tokenCache[token]
+	tokenCacheMu.RUnlock()
+
+	if exists && time.Now().Before(entry.ExpiresAt) {
+		return entry.Valid
+	}
+
+	// 2. التحقق من Supabase بمهلة 15 ثانية
+	req, err := http.NewRequest("GET", supabaseURL+"/auth/v1/user", nil)
+	if err != nil {
+		return false
+	}
 	req.Header.Set("Authorization", token)
 	req.Header.Set("apikey", os.Getenv("SUPABASE_KEY"))
 
@@ -442,5 +457,17 @@ func verifyToken(token string) bool {
 		log.Printf("❌ Supabase Auth check failed with status: %d for URL: %s", resp.StatusCode, supabaseURL)
 	}
 
-	return resp.StatusCode == http.StatusOK
+	isValid := resp.StatusCode == http.StatusOK
+
+	// 3. حفظ النتيجة في الكاش الداخلي لمدة 3 دقائق
+	if isValid {
+		tokenCacheMu.Lock()
+		tokenCache[token] = TokenCacheEntry{
+			ExpiresAt: time.Now().Add(3 * time.Minute),
+			Valid:     true,
+		}
+		tokenCacheMu.Unlock()
+	}
+
+	return isValid
 }
