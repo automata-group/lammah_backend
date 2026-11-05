@@ -12,6 +12,12 @@ class TutorService(BaseAgent):
 
         batch_page_numbers = [s['page_number'] for s in slides_batch]
 
+        lang_instr = ""
+        if study_language == "en":
+            lang_instr = "- CRITICAL DIRECTIVE: The user selected ENGLISH STUDY GUIDE mode. Provide all explanations and insights in clear, accessible Academic English.\n"
+        elif study_language == "bilingual":
+            lang_instr = "- CRITICAL DIRECTIVE: The user selected BILINGUAL mode. Provide explanation in English followed by concise Arabic translation.\n"
+
         # OpenAI & Anthropic Prompt Caching Architecture:
         # Placing the stable shared context (Transcript & Instructions) FIRST produces an identical prefix
         # across all slide batches of this lecture. Batches 2..N hit the KV cache, reducing TTFT by up to 80%
@@ -19,7 +25,7 @@ class TutorService(BaseAgent):
         input_data = (
             f"=== Full Lecture Transcript (Reference Material) ===\n{transcript}\n\n"
             f"=== Instructions & Dialect Rules ===\n"
-            + ("- CRITICAL DIRECTIVE: The user selected ENGLISH STUDY GUIDE mode. Provide all explanations and insights in clear, accessible Academic English.\n" if study_language == "en" else "- CRITICAL DIRECTIVE: The user selected BILINGUAL mode. Provide explanation in English followed by concise Arabic translation.\n" if study_language == "bilingual" else "")
+            f"{lang_instr}"
             f"- For each requested slide, find transcript segments where the professor discusses concepts FROM THAT SLIDE's text.\n"
             f"- Match by keywords/concepts — do NOT assign content sequentially.\n"
             f"- If a slide's concepts are NOT in the transcript at all → write exactly: (الدكتور ما ذكر هالشريحة بالتفصيل.)\n"

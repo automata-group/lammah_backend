@@ -32,10 +32,7 @@ class DocumentStudyService(BaseAgent):
 
         batch_page_numbers = [s.get('page_number') for s in slides_batch]
 
-        # OpenAI & Anthropic Prompt Caching Architecture:
-        # Placing the static instructions first ensures the prompt prefix matches across all slide batches
-        # of the document. Only the slide payload at the end is dynamic, enabling high-rate KV caching.
-                lang_directive = ""
+        lang_directive = ""
         if study_language == "en":
             lang_directive = (
                 "CRITICAL LANGUAGE DIRECTIVE: ENGLISH STUDY GUIDE MODE\n"
@@ -54,18 +51,19 @@ class DocumentStudyService(BaseAgent):
                 "- In batch_mcqs: English question and options with bilingual explanation.\n\n"
             )
 
+        # OpenAI & Anthropic Prompt Caching Architecture:
+        # Placing the static instructions first ensures the prompt prefix matches across all slide batches
+        # of the document. Only the slide payload at the end is dynamic, enabling high-rate KV caching.
         input_data = (
-            f"{lang_directive}"
-
-            f"تعليمات التنفيذ الذكي:\n"
-            f"1. لكل شريحة في الحزمة، حدد عبارات من نص الشريحة حرفياً لتظليلها (highlights) بألوان (yellow, green, cyan, pink).\n"
-            f"2. أسلوب الشرح الإلزامي في student_explanation: اشرح حصراً باللهجة الفلسطينية الجامعية الودودة والمحبوبة (مثل: 'يا بطل، هاي الشريحة بتدخلنا في أول وأهم مرحلة وهي الـ Requirements (المتطلبات)... عشان نضمن... زي ما إنت شايف... شو الفكرة هون؟' - ويمنع منعاً باتاً استخدام أي لهجة خليجية أو مفردات مثل 'هذي' أو 'وش' أو 'الدافور')، مع التطبيق الإلزامي لأسلوب 'النص المُطعّم بالإنجليزية الامتحانية' (Enriched Bilingual Injection) بحيث يدخل المصطلح الإنجليزي الحرفي من السلايد في قلب كل جملة (مثل: مرحلة الـ Requirements (المتطلبات)، نوصل لـ Shared View (رؤية مشتركة)، بصيغة Textual format زي الـ User stories، بصيغة Diagrammatic زي الـ Use case diagrams) لكي تألف عين الطالب خيارات الامتحان الإنجليزية فوراً!\n"
-            f"3. استخرج وترجم كل المصطلحات الإنجليزية وضعها في قائمة vocabulary.\n"
-            f"4. حدد فخ الامتحان وسؤال متوقع لكل شريحة في exam_tip بالصيغة الثنائية.\n"
-            f"5. في batch_mcqs: ولّد من 5 إلى 8 أسئلة امتحانية متقدمة (MCQs) باللغة الإنجليزية لكل حزمة لاختبار استيعاب الطالب.\n"
-            f"6. في batch_flashcards: ولّد من 5 إلى 8 بطاقات حفظ قوية (Flashcards) للمفاهيم والمصطلحات والتعاريف الأساسية.\n"
-            f"7. أرجع كائن JSON حصراً حسب الصيغة المطلوبة.\n\n"
-            f"=== حزمة الشرائح للتحليل والتخطيط والشرح الذكي (أرقام الشرائح: {batch_page_numbers}) ===\n"
+            f"{lang_directive}تعليمات هامة:\n"
+            f"1. التظليل الشامل والمفصل: يجب تظليل جميع المفاهيم، العناوين، القوانين، والمصطلحات الأساسية في كل شريحة (highlights) بالألوان المعتمدة (yellow, green, cyan, pink).\n"
+            f"2. أسلوب الشرح في student_explanation: اشرح بأسلوب الزميل المتفوق الذكي والودود، واعتمد أسلوب 'النص المُطعّم بالإنجليزية الامتحانية' (Enriched Bilingual Injection) لدمج المصطلحات الإنجليزية الأساسية في قلب الشرح لترسيخها في ذهن الطالب للامتحان!\n"
+            f"3. مفردات الشريحة في vocabulary.\n"
+            f"4. فخاخ الامتحان في exam_tip.\n"
+            f"5. أجب batch_mcqs: ولد من 5 إلى 8 أسئلة اختيار من متعدد (MCQs) تغطي كافة أفكار وتفاصيل الشرائح.\n"
+            f"6. أجب batch_flashcards: ولد من 5 إلى 8 بطاقات استذكار سريع (Flashcards) للمفاهيم والتعاريف.\n"
+            f"7. التزم بهيكل الـ JSON المطلوب بدقة.\n\n"
+            f"=== حزمة الشرائح المستهدفة للدراسة والتخطيط (أرقام الشرائح: {batch_page_numbers}) ===\n"
             f"{slides_text}"
         )
 
