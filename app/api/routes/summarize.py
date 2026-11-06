@@ -1,5 +1,5 @@
 from app.services.media_queue_service import media_queue
-from app.services.audio_service import transcribe_precomputed_chunks
+from app.services.audio_service import transcribe_audio, transcribe_precomputed_chunks, get_audio_duration_seconds
 from fastapi import APIRouter, File, UploadFile, HTTPException, Depends, Request, Form, BackgroundTasks, Query
 from fastapi.responses import StreamingResponse, FileResponse, Response
 import shutil
@@ -512,12 +512,15 @@ async def process_batch_lectures(
                 yield f"data: {json.dumps({'type': 'error', 'message': 'لم يتم العثور على أي ملف صوتي أو فشل تحميل الروابط.'}, ensure_ascii=False)}\n\n"
                 return
 
+            # Compute actual durations of all audio inputs to prevent NameError and accurately bill/estimate
+            audio_durations = [get_audio_duration_seconds(p) for p in audio_paths]
+            total_seconds = sum(audio_durations) if audio_durations else 0.0
+
             # 3. Audio Merging & Chunking via Media Queue (with resilient local fallback)
             yield f"data: {json.dumps({'type': 'progress', 'step': '0/5', 'progress_percent': 6, 'time_estimate': est_pre, 'message': '⚡ جاري تهيئة وهندسة التسجيلات الصوتية بدقة متقدمة...'}, ensure_ascii=False)}\n\n"
             
             media_result = None
             chunk_paths = []
-            total_seconds = sum(audio_durations) if audio_durations else 0.0
 
             try:
                 async for event in media_queue.dispatch_and_stream(
@@ -850,7 +853,12 @@ async def process_batch_lectures(
 
         except Exception as e:
             logger.error(f"BATCH STREAM ERROR: {e}\n{traceback.format_exc()}")
-            _err = json.dumps({'type': 'error', 'message': f'حدث خطأ في معالجة الحزمة: {str(e)}'}, ensure_ascii=False)
+            err_str = str(e)
+            if any(k in err_str for k in ["فشل", "تعذر", "رصيدك", "غير صالح", "المشترك"]):
+                user_msg = err_str
+            else:
+                user_msg = f"حدث خطأ أثناء معالجة المحاضرة: {err_str}"
+            _err = json.dumps({'type': 'error', 'message': user_msg}, ensure_ascii=False)
             yield f"data: {_err}\n\n"
         finally:
             # Clean up all temporary files
@@ -1352,8 +1360,8 @@ async def process_lecture(
             logger.error(f"STREAM ERROR: {str(e)}", exc_info=True)
             err_str = str(e)
             user_msg = "❌ تعذر استكمال تجهيز الملف حالياً بسبب ضغط المعالجة السحابية. لم يتم خصم أي دقيقة من رصيدك، يرجى إعادة المحاولة."
-            if "رصيد" in err_str or "quota" in err_str.lower():
-                user_msg = f"❌ {err_str}"
+            if any(k in err_str for k in ["رصيد", "quota", "تفريغ", "صوتي", "فشل", "غير صالح", "الملف"]):
+                user_msg = f"❌ {err_str.lstrip('❌').strip()}"
             yield f"data: {json.dumps({'type': 'error', 'message': user_msg}, ensure_ascii=False)}\n\n"
         finally:
             # Cleanup

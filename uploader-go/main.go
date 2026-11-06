@@ -130,10 +130,17 @@ func main() {
 			if origin == "" {
 				isAllowed = true // للطلبات المباشرة (مثل curl)
 			} else {
-				for _, o := range allowedOrigins {
-					if origin == o {
-						isAllowed = true
-						break
+				if strings.HasSuffix(origin, "lammah.site") ||
+					strings.HasSuffix(origin, "vercel.app") ||
+					strings.Contains(origin, "localhost") ||
+					strings.Contains(origin, "127.0.0.1") {
+					isAllowed = true
+				} else {
+					for _, o := range allowedOrigins {
+						if origin == o {
+							isAllowed = true
+							break
+						}
 					}
 				}
 			}
