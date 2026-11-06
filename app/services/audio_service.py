@@ -318,6 +318,9 @@ def _transcribe_large_audio(file_path: str, progress_callback=None) -> str:
     if not chunks:
         raise RuntimeError("لم يتم إنتاج أي مقاطع من عملية التقسيم.")
 
+    if progress_callback:
+        progress_callback(f"🚀 تم تجهيز {len(chunks)} مقاطع، جاري التفريغ المتوازي فائق السرعة عبر الذكاء الاصطناعي...")
+
     import threading
     from concurrent.futures import ThreadPoolExecutor
 
@@ -358,8 +361,8 @@ def _transcribe_large_audio(file_path: str, progress_callback=None) -> str:
             except Exception:
                 pass
 
-    # Concurrently transcribe chunks (up to 3 at a time to prevent rate limits)
-    max_workers = min(3, len(chunks))
+    # Concurrently transcribe chunks (up to 5 parallel workers for high throughput)
+    max_workers = min(5, len(chunks))
     with ThreadPoolExecutor(max_workers=max_workers) as executor:
         futures = [executor.submit(process_chunk, idx, chunk_path) for idx, chunk_path in enumerate(chunks)]
         for future in futures:
@@ -431,7 +434,8 @@ def transcribe_precomputed_chunks(chunk_paths: List[str], progress_callback=None
             with lock:
                 completed_count += 1
 
-    max_workers = min(3, len(chunk_paths))
+    # Concurrently transcribe precomputed chunks (up to 5 parallel workers)
+    max_workers = min(5, len(chunk_paths))
     with ThreadPoolExecutor(max_workers=max_workers) as executor:
         futures = [executor.submit(process_chunk, idx, cp) for idx, cp in enumerate(chunk_paths)]
         for future in futures:

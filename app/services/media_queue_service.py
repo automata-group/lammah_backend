@@ -27,28 +27,63 @@ class MediaQueueService:
     def __init__(self, redis_url: str = REDIS_URL):
         self.redis_url = redis_url
         self._redis: Optional[aioredis.Redis] = None
+        self._last_failure: float = 0.0
 
     async def get_redis(self) -> aioredis.Redis:
         """
-        Connects to Redis. Logs technical connection details internally,
-        and raises a sanitized MediaQueueUnavailableError if connection fails.
+        Connects to Redis with smart candidate discovery and fast-fail circuit breaker.
+        Raises sanitized MediaQueueUnavailableError if connection fails.
         """
-        if self._redis is None:
+        # Circuit breaker: don't block repeatedly if Redis failed recently
+        now = asyncio.get_event_loop().time()
+        if self._redis is None and (now - self._last_failure) < 30.0:
+            raise MediaQueueUnavailableError("خدمة طابور الوسائط غير متصلة حالياً (تفعيل المعالجة المباشرة).")
+
+        if self._redis is not None:
             try:
-                self._redis = aioredis.from_url(
-                    self.redis_url,
+                await self._redis.ping()
+                return self._redis
+            except Exception:
+                self._redis = None
+
+        candidate_urls = [
+            self.redis_url,
+            os.getenv("REDIS_URL", ""),
+            "redis://redis:6379/0",
+            "redis://127.0.0.1:6379/0",
+            "redis://localhost:6379/0"
+        ]
+        # Remove duplicates while preserving order
+        seen = set()
+        clean_urls = []
+        for u in candidate_urls:
+            if u and u not in seen:
+                seen.add(u)
+                clean_urls.append(u)
+
+        last_err = None
+        for candidate in clean_urls:
+            try:
+                client = aioredis.from_url(
+                    candidate,
                     encoding="utf-8",
                     decode_responses=True,
-                    socket_connect_timeout=2,
-                    socket_timeout=4,
+                    socket_connect_timeout=0.5,
+                    socket_timeout=1.0,
                 )
-                await self._redis.ping()
+                await client.ping()
+                logger.info(f"⚡ [REDIS] Connected successfully to Redis at {candidate}")
+                self._redis = client
+                self.redis_url = candidate
+                return self._redis
             except Exception as e:
-                # Log detailed infrastructure info internally for developers/admins
-                logger.error(f"❌ [INTERNAL] Failed to connect to Redis at {self.redis_url}: {e}")
-                self._redis = None
-                raise MediaQueueUnavailableError("تعذر الاتصال بخدمة طابور الوسائط.") from e
-        return self._redis
+                last_err = e
+                continue
+
+        self._redis = None
+        self._last_failure = now
+        logger.info(f"ℹ️ [MEDIA_QUEUE] Redis unreachable locally ({last_err}), using high-speed in-process direct pipeline.")
+        raise MediaQueueUnavailableError("تعذر الاتصال بخدمة طابور الوسائط.") from last_err
 
     async def is_available(self) -> bool:
         """Checks if Redis media queue is reachable without throwing."""

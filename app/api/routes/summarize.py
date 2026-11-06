@@ -622,109 +622,144 @@ async def process_batch_lectures(
             est_slides_sec = 6 if pdf_path else 0
             est_ai_sec = max(25, min(80, 20 + len(audio_paths) * 6 + (20 if pdf_path else 0)))
             est_pdf_sec = 20 if pdf_path else 0
-            total_batch_sec = est_audio_total + est_slides_sec + est_ai_sec + est_pdf_sec
-            
-            yield f"data: {json.dumps({'type': 'progress', 'step': '1/5', 'progress_percent': 6, 'time_estimate': total_batch_sec, 'message': '🎧 1/5 جاري تفريغ الصوت آلياً... نعدك بدقة عالية وسرعة فائقة!'}, ensure_ascii=False)}\n\n"
-            
-            transcript = ""
-            if chunk_paths:
-                # Parallel transcription of precomputed chunks from Go media worker
-                import queue
-                progress_q = queue.Queue()
-                def audio_progress_cb(msg):
-                    progress_q.put(msg)
-
-                transcription_task = asyncio.create_task(
-                    asyncio.to_thread(transcribe_precomputed_chunks, chunk_paths, audio_progress_cb)
-                )
-
-                chunk_start = asyncio.get_event_loop().time()
-                last_chunk_msg = "جاري تفريغ المقاطع الصوتية بالتوازي..."
-                while not transcription_task.done():
-                    try:
-                        while True:
-                            last_chunk_msg = progress_q.get_nowait()
-                    except queue.Empty:
-                        pass
-
-                    elapsed = asyncio.get_event_loop().time() - chunk_start
-                    pct = max(10, min(62, int(10 + min(0.95, elapsed / max(12, est_audio_total)) * 52)))
-                    cur_rem = max(5, total_batch_sec - int(elapsed))
-                    yield f": ping\n\n"
-                    yield f"data: {json.dumps({'type': 'progress', 'step': '1/5', 'progress_percent': pct, 'time_estimate': cur_rem, 'message': f'🎧 1/5 {last_chunk_msg}'}, ensure_ascii=False)}\n\n"
-                    await asyncio.sleep(1.2)
-
-                transcript = transcription_task.result()
-            else:
-                # Direct fallback transcription loop
-                transcripts = []
-                for idx, path in enumerate(audio_paths):
-                    f_est = file_estimates[idx] if idx < len(file_estimates) else 22
-                    rem_files_est = sum(file_estimates[idx+1:]) if (idx + 1 < len(file_estimates)) else 0
-                    
-                    import queue
-                    progress_q = queue.Queue()
-                    def audio_progress_cb(msg):
-                        progress_q.put(msg)
-                        
-                    transcription_task = asyncio.create_task(asyncio.to_thread(transcribe_audio, path, audio_progress_cb))
-                    
-                    last_audio_msg = f'جاري تفريغ المحاضرة #{idx + 1} من {len(audio_paths)}...'
-                    file_start = asyncio.get_event_loop().time()
-                    while not transcription_task.done():
-                        try:
-                            while True:
-                                last_audio_msg = progress_q.get_nowait()
-                        except queue.Empty:
-                            pass
-                        
-                        elapsed_f = asyncio.get_event_loop().time() - file_start
-                        cur_file_rem = max(2, int(f_est - elapsed_f))
-                        cur_total_rem = rem_files_est + cur_file_rem + est_slides_sec + est_ai_sec + est_pdf_sec
-                        
-                        completed_files = idx
-                        f_progress = min(1.0, elapsed_f / max(1, f_est))
-                        overall_audio_ratio = (completed_files + f_progress) / max(1, len(audio_paths))
-                        pct = max(6, min(62, int(6 + overall_audio_ratio * 56)))
-                        
-                        yield f": ping\n\n"
-                        yield f"data: {json.dumps({'type': 'progress', 'step': '1/5', 'progress_percent': pct, 'time_estimate': cur_total_rem, 'message': f'🎧 1/5 المحاضرة #{idx + 1} من {len(audio_paths)}: {last_audio_msg}'}, ensure_ascii=False)}\n\n"
-                        await asyncio.sleep(1.2)
-                        
-                    t = transcription_task.result()
-                    if t:
-                        if idx < len(urls_list):
-                            transcripts.append(f"--- [محاضرة رابط {idx+1}] ---\n{t}\n")
-                        else:
-                            file_idx = idx - len(urls_list) + 1
-                            transcripts.append(f"--- [ملف صوتي {file_idx}] ---\n{t}\n")
-
-                transcript = "\n\n".join(transcripts)
-
-            if not transcript or not transcript.strip():
-                yield f"data: {json.dumps({'type': 'error', 'message': 'لم يتم تفريغ أي نص من المحاضرات المرفوعة.'}, ensure_ascii=False)}\n\n"
-                return
-            yield f"data: {json.dumps({'type': 'transcript', 'text': transcript}, ensure_ascii=False)}\n\n"
-            
-            # 6. Document Handling
-            pdf_pages = []
-            pdf_context = []
-            if pdf_path:
-                cur_rem = est_ai_sec + est_pdf_sec + 5
-                if pdf_path.lower().endswith((".pptx", ".ppt")):
-                    yield f"data: {json.dumps({'type': 'progress', 'step': '2/5', 'progress_percent': 64, 'time_estimate': cur_rem, 'message': '📑 2/5 جاري تحويل ملف البوربوينت إلى PDF لضمان المطابقة 100%...'}, ensure_ascii=False)}\n\n"
-                    from app.services.pptx_converter import convert_pptx_to_pdf
-                    pdf_path = await asyncio.to_thread(convert_pptx_to_pdf, pdf_path, os.path.dirname(pdf_path))
-                if pdf_path and (start_page or end_page):
-                    from app.services.pdf_service import slice_pdf_pages
-                    sliced_output = os.path.join(os.path.dirname(pdf_path), f"sliced_batch_{unique_id}.pdf")
-                    sliced_path = await asyncio.to_thread(slice_pdf_pages, pdf_path, sliced_output, start_page, end_page)
-                    if sliced_path and os.path.exists(sliced_path):
-                        pdf_path = sliced_path
-                yield f"data: {json.dumps({'type': 'progress', 'step': '2/5', 'progress_percent': 68, 'time_estimate': cur_rem - 3, 'message': '🔍 2/5 جاري قراءة محتوى الشابتر المرفق بدقة هندسية...'}, ensure_ascii=False)}\n\n"
-                pdf_pages = await asyncio.to_thread(extract_pages_from_pdf, pdf_path)
-                pdf_context = [f"--- Page {p['page_number']} ---\n{p['text']}" for p in pdf_pages[:150]]
-            
+            total_batch_sec = est_audio_total + est_slides_sec + est_ai_sec + est_pdf_sec
+            
+            # Start parallel document extraction task immediately (Pipelined DAG)
+            async def _process_document_pipeline(path: Optional[str]):
+                if not path:
+                    return None, [], []
+                current_p = path
+                try:
+                    if current_p.lower().endswith((".pptx", ".ppt")):
+                        from app.services.pptx_converter import convert_pptx_to_pdf
+                        current_p = await asyncio.to_thread(convert_pptx_to_pdf, current_p, os.path.dirname(current_p))
+                    if current_p and (start_page or end_page):
+                        from app.services.pdf_service import slice_pdf_pages
+                        sliced_output = os.path.join(os.path.dirname(current_p), f"sliced_batch_{unique_id}.pdf")
+                        sliced_path = await asyncio.to_thread(slice_pdf_pages, current_p, sliced_output, start_page, end_page)
+                        if sliced_path and os.path.exists(sliced_path):
+                            current_p = sliced_path
+                    pages = await asyncio.to_thread(extract_pages_from_pdf, current_p)
+                    context = [f"--- Page {p['page_number']} ---\n{p['text']}" for p in pages[:150]]
+                    return current_p, pages, context
+                except Exception as doc_err:
+                    logger.error(f"Error in parallel document extraction: {doc_err}", exc_info=True)
+                    return current_p, [], []
+
+            doc_task = asyncio.create_task(_process_document_pipeline(pdf_path))
+            doc_notified = False
+
+            yield f"data: {json.dumps({'type': 'progress', 'step': '1/5', 'progress_percent': 12, 'time_estimate': total_batch_sec, 'message': '🎧 1/5 جاري تفريغ الصوت وتحليل الشرائح بالتوازي فائق السرعة...'}, ensure_ascii=False)}\n\n"
+            
+            transcript = ""
+            if chunk_paths:
+                # Parallel transcription of precomputed chunks from Go media worker
+                import queue
+                progress_q = queue.Queue()
+                def audio_progress_cb(msg):
+                    progress_q.put(msg)
+
+                transcription_task = asyncio.create_task(
+                    asyncio.to_thread(transcribe_precomputed_chunks, chunk_paths, audio_progress_cb)
+                )
+
+                chunk_start = asyncio.get_event_loop().time()
+                last_chunk_msg = "جاري تفريغ المقاطع الصوتية بالتوازي..."
+                while not transcription_task.done():
+                    try:
+                        while True:
+                            last_chunk_msg = progress_q.get_nowait()
+                    except queue.Empty:
+                        pass
+
+                    # Check if document extraction completed in parallel
+                    if doc_task.done() and not doc_notified and pdf_path:
+                        doc_notified = True
+                        res_p, p_pages, p_ctx = doc_task.result()
+                        if res_p:
+                            pdf_path = res_p
+                        yield f": ping\n\n"
+                        yield f"data: {json.dumps({'type': 'progress', 'step': '2/5', 'progress_percent': 35, 'time_estimate': max(5, total_batch_sec - int(asyncio.get_event_loop().time() - chunk_start)), 'message': f'📑 تم تحليل ومطابقة {len(p_pages)} شريحة بنجاح! جاري استكمال تفريغ الصوت...'}, ensure_ascii=False)}\n\n"
+
+                    elapsed = asyncio.get_event_loop().time() - chunk_start
+                    pct = max(15, min(65, int(15 + min(0.95, elapsed / max(12, est_audio_total)) * 50)))
+                    cur_rem = max(5, total_batch_sec - int(elapsed))
+                    yield f": ping\n\n"
+                    yield f"data: {json.dumps({'type': 'progress', 'step': '1/5', 'progress_percent': pct, 'time_estimate': cur_rem, 'message': f'🎧 1/5 {last_chunk_msg}'}, ensure_ascii=False)}\n\n"
+                    await asyncio.sleep(1.2)
+
+                transcript = transcription_task.result()
+            else:
+                # Direct fallback transcription loop
+                transcripts = []
+                for idx, path in enumerate(audio_paths):
+                    f_est = file_estimates[idx] if idx < len(file_estimates) else 22
+                    rem_files_est = sum(file_estimates[idx+1:]) if (idx + 1 < len(file_estimates)) else 0
+                    
+                    import queue
+                    progress_q = queue.Queue()
+                    def audio_progress_cb(msg):
+                        progress_q.put(msg)
+                        
+                    transcription_task = asyncio.create_task(asyncio.to_thread(transcribe_audio, path, audio_progress_cb))
+                    
+                    last_audio_msg = f'جاري تفريغ المحاضرة #{idx + 1} من {len(audio_paths)}...'
+                    file_start = asyncio.get_event_loop().time()
+                    while not transcription_task.done():
+                        try:
+                            while True:
+                                last_audio_msg = progress_q.get_nowait()
+                        except queue.Empty:
+                            pass
+
+                        # Check if document extraction completed in parallel
+                        if doc_task.done() and not doc_notified and pdf_path:
+                            doc_notified = True
+                            res_p, p_pages, p_ctx = doc_task.result()
+                            if res_p:
+                                pdf_path = res_p
+                            yield f": ping\n\n"
+                            yield f"data: {json.dumps({'type': 'progress', 'step': '2/5', 'progress_percent': 35, 'message': f'📑 تم تحليل ومطابقة {len(p_pages)} شريحة بنجاح! جاري استكمال تفريغ الصوت...'}, ensure_ascii=False)}\n\n"
+                        
+                        elapsed_f = asyncio.get_event_loop().time() - file_start
+                        cur_file_rem = max(2, int(f_est - elapsed_f))
+                        cur_total_rem = rem_files_est + cur_file_rem + est_slides_sec + est_ai_sec + est_pdf_sec
+                        
+                        completed_files = idx
+                        f_progress = min(1.0, elapsed_f / max(1, f_est))
+                        overall_audio_ratio = (completed_files + f_progress) / max(1, len(audio_paths))
+                        pct = max(15, min(65, int(15 + overall_audio_ratio * 50)))
+                        
+                        yield f": ping\n\n"
+                        yield f"data: {json.dumps({'type': 'progress', 'step': '1/5', 'progress_percent': pct, 'time_estimate': cur_total_rem, 'message': f'🎧 1/5 المحاضرة #{idx + 1} من {len(audio_paths)}: {last_audio_msg}'}, ensure_ascii=False)}\n\n"
+                        await asyncio.sleep(1.2)
+                        
+                    t = transcription_task.result()
+                    if t:
+                        if idx < len(urls_list):
+                            transcripts.append(f"--- [محاضرة رابط {idx+1}] ---\n{t}\n")
+                        else:
+                            file_idx = idx - len(urls_list) + 1
+                            transcripts.append(f"--- [ملف صوتي {file_idx}] ---\n{t}\n")
+
+                transcript = "\n\n".join(transcripts)
+
+            if not transcript or not transcript.strip():
+                yield f"data: {json.dumps({'type': 'error', 'message': 'لم يتم تفريغ أي نص من المحاضرات المرفوعة.'}, ensure_ascii=False)}\n\n"
+                return
+            yield f"data: {json.dumps({'type': 'transcript', 'text': transcript}, ensure_ascii=False)}\n\n"
+            
+            # 6. Await parallel Document Handling if still running
+            pdf_pages = []
+            pdf_context = []
+            if pdf_path:
+                if not doc_task.done():
+                    yield f"data: {json.dumps({'type': 'progress', 'step': '2/5', 'progress_percent': 68, 'message': '🔍 2/5 اللمسات الأخيرة في مطابقة الشرائح...'}, ensure_ascii=False)}\n\n"
+                    await doc_task
+                res_pdf, pdf_pages, pdf_context = doc_task.result()
+                if res_pdf:
+                    pdf_path = res_pdf
+            
             # 7. AI Annotations
             orchestrator = AIOrchestrator()
             llm = get_llm_for_user(profile["id"])
