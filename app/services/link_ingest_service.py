@@ -42,10 +42,8 @@ def download_audio_from_link(lecture_url: str, upload_dir: str, unique_id: str) 
 
     lower_url = lecture_url.lower()
     
-    # Route YouTube links to dedicated service
     if "youtube.com" in lower_url or "youtu.be" in lower_url:
-        from app.services.youtube_downloader_service import download_youtube_audio
-        return download_youtube_audio(lecture_url, upload_dir, unique_id)
+        raise ValueError("🚫 عذراً، تم إيقاف ميزة تنزيل روابط يوتيوب حالياً. يرجى رفع المحاضرة كملف صوتي مباشرة.")
 
     if "drive.google.com" in lower_url or "google.com/drive" in lower_url:
         raise ValueError("🚫 عذراً، روابط Google Drive غير مدعومة لأسباب أمنية. يرجى استخدام روابط يوتيوب فقط! 🎥")

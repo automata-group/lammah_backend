@@ -5,64 +5,14 @@ on:
     branches: [ main ]
   workflow_dispatch:
 
+
 env:
   REGISTRY: ghcr.io
   BACKEND_IMAGE: automata-group/lammah_backend
   UPLOADER_IMAGE: automata-group/lammah_uploader
-  YTDL_IMAGE: automata-group/lammah_ytdl_service
 
 jobs:
-  test:
-    name: Run Backend Security & Quality Tests
-    runs-on: ubuntu-latest
-    services:
-      redis:
-        image: redis:7-alpine
-        ports:
-          - 6379:6379
-        options: >-
-          --health-cmd "redis-cli ping"
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: "3.11"
-
-      - name: Install dependencies
-        run: |
-          python -m pip install --upgrade pip
-          pip install -r requirements.txt pytest pytest-asyncio
-
-      - name: Run Pytest
-        env:
-          SUPABASE_URL: "https://ci-test.supabase.co"
-          SUPABASE_KEY: "dummy-ci-supabase-key"
-          SECRET_KEY: "ci-secret-key-at-least-32-characters"
-          OPENROUTER_API_KEY: "dummy-ci-openrouter-key"
-          REDIS_URL: "redis://localhost:6379/0"
-        run: |
-          python -m pytest tests/
-
-      - name: Set up Go
-        uses: actions/setup-go@v5
-        with:
-          go-version: '1.23'
-          check-latest: true
-
-      - name: Run Go Unit Tests
-        working-directory: ./uploader-go
-        run: |
-          go test -v ./...
-
   build:
-    name: Build and Push Docker Images
-    needs: test
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -86,13 +36,6 @@ jobs:
           push: true
           tags: ${{ env.REGISTRY }}/${{ env.BACKEND_IMAGE }}:latest
 
-      - name: Build and push YTDL Service image
-        uses: docker/build-push-action@v5
-        with:
-          context: ./ytdl-service
-          push: true
-          tags: ${{ env.REGISTRY }}/${{ env.YTDL_IMAGE }}:latest
-
       - name: Build and push Go Uploader image
         uses: docker/build-push-action@v5
         with:
@@ -113,8 +56,8 @@ jobs:
           port: 2222
           script: |
             # Stop and remove legacy containers occupying ports 8000 / 8001
-            docker stop lammah-backend-backend-1 lammah-backend-ytdl-service-1 lammah-backend-warp-1 2>/dev/null || true
-            docker rm lammah-backend-backend-1 lammah-backend-ytdl-service-1 lammah-backend-warp-1 2>/dev/null || true
+            docker stop lammah-backend-backend-1 2>/dev/null || true
+            docker rm lammah-backend-backend-1 2>/dev/null || true
             if [ -d ~/lammah-backend ]; then
               (cd ~/lammah-backend && docker compose down) 2>/dev/null || true
             fi
@@ -129,77 +72,9 @@ jobs:
             # Cleanup
             docker system prune -f
 
-            # Write YouTube cookies from secret (bypasses VPS IP block completely)
-            if [ -n "${{ secrets.YOUTUBE_COOKIES }}" ]; then
-              printf '%s' "${{ secrets.YOUTUBE_COOKIES }}" > youtube_cookies.txt
-              chmod 600 youtube_cookies.txt
-              echo "YouTube cookies file written successfully."
-            else
-              echo "WARNING: YOUTUBE_COOKIES secret not set. YouTube downloads may fail on this server IP."
-            fi
-
             # Write docker-compose.yml
             cat > docker-compose.yml << 'COMPOSE_EOF'
             services:
-              warp:
-                image: caomingjun/warp:latest
-                restart: unless-stopped
-                cap_add:
-                  - NET_ADMIN
-                  - MKNOD
-                sysctls:
-                  - net.ipv6.conf.all.disable_ipv6=0
-                  - net.ipv4.conf.all.src_valid_mark=1
-                devices:
-                  - /dev/net/tun:/dev/net/tun
-                device_cgroup_rules:
-                  - 'c 10:200 rwm'
-                environment:
-                  - WARP_SLEEP=5
-                volumes:
-                  - warp_data:/var/lib/cloudflare-warp
-                healthcheck:
-                  test: ["CMD", "curl", "-sf", "--proxy", "socks5://127.0.0.1:1080", "https://cloudflare.com/cdn-cgi/trace"]
-                  interval: 30s
-                  timeout: 20s
-                  retries: 5
-                  start_period: 30s
-
-              redis:
-                image: redis:7-alpine
-                restart: unless-stopped
-                ports:
-                  - "6379:6379"
-                volumes:
-                  - redis_data:/data
-                healthcheck:
-                  test: ["CMD", "redis-cli", "ping"]
-                  interval: 10s
-                  timeout: 5s
-                  retries: 5
-
-              ytdl-service:
-                image: ghcr.io/automata-group/lammah_ytdl_service:latest
-                restart: unless-stopped
-                ports:
-                  - "8001:8001"
-                volumes:
-                  - shared_uploads:/app/uploads
-                  - ./youtube_cookies.txt:/app/youtube_cookies.txt
-                environment:
-                  - PORT=8001
-                  - UPLOAD_DIR=/app/uploads
-                  - YOUTUBE_PROXY=socks5://warp:1080
-                  - YOUTUBE_COOKIES_PATH=/app/youtube_cookies.txt
-                depends_on:
-                  - warp
-                healthcheck:
-                  test: ["CMD", "curl", "-f", "http://localhost:8001/health"]
-                  interval: 30s
-                  timeout: 10s
-                  retries: 3
-                  start_period: 10s
-
               backend:
                 image: ghcr.io/automata-group/lammah_backend:latest
                 restart: unless-stopped
@@ -208,7 +83,6 @@ jobs:
                 volumes:
                   - ./outputs:/app/outputs
                   - shared_uploads:/app/uploads
-                  - ./youtube_cookies.txt:/app/youtube_cookies.txt
                 environment:
                   - SUPABASE_URL=$SUPABASE_URL
                   - SUPABASE_KEY=$SUPABASE_KEY
@@ -220,14 +94,7 @@ jobs:
                   - WHISPER_API_KEY=$WHISPER_API_KEY
                   - TEMP_DIR=/app/uploads/temp
                   - UPLOAD_DIR=/app/uploads
-                  - YOUTUBE_DOWNLOADER_URL=http://ytdl-service:8001
-                  - YOUTUBE_COOKIES_PATH=/app/youtube_cookies.txt
-                  - REDIS_URL=redis://redis:6379/0
-                depends_on:
-                  redis:
-                    condition: service_healthy
-                  ytdl-service:
-                    condition: service_healthy
+
                 healthcheck:
                   test: ["CMD", "curl", "-f", "http://localhost:8000/api/v1/health"]
                   interval: 30s
@@ -245,10 +112,6 @@ jobs:
                   - SUPABASE_URL=$SUPABASE_URL
                   - SUPABASE_KEY=$SUPABASE_KEY
                   - TEMP_DIR=/app/uploads/temp
-                  - REDIS_URL=redis://redis:6379/0
-                depends_on:
-                  redis:
-                    condition: service_healthy
                 healthcheck:
                   test: ["CMD", "wget", "--spider", "-q", "http://localhost:8080/health"]
                   interval: 30s
@@ -257,8 +120,6 @@ jobs:
 
             volumes:
               shared_uploads:
-              redis_data:
-              warp_data:
             COMPOSE_EOF
 
             # Write .env
@@ -295,71 +156,15 @@ jobs:
 
             docker compose up -d --force-recreate
             
+            echo "Waiting 10 seconds for containers to initialize..."
+            sleep 10
+            
             echo "Deployment successful!"
-
-            # ── Update Caddyfile (fix ERR_QUIC_PROTOCOL_ERROR on SSE streams) ──
-            cat > ~/Caddyfile << 'CADDY_EOF'
-            {
-                email omar@lammah.site
-                servers {
-                    protocols h1 h2
-                }
-            }
-
-            lammah.site, www.lammah.site {
-                request_body_limit 500mb
-                reverse_proxy localhost:3001
-            }
-
-            api.lammah.site {
-                handle /api/v1/summarize/upload-temp {
-                    request_body_limit 500mb
-                    reverse_proxy localhost:8080
-                }
-
-                handle /api/v1/summarize/upload-temp-py {
-                    request_body_limit 500mb
-                    reverse_proxy localhost:8000
-                }
-
-                handle /api/v1/summarize/process-lecture {
-                    reverse_proxy localhost:8000 {
-                        flush_interval -1
-                    }
-                }
-                handle /api/v1/summarize/process-batch-lectures {
-                    reverse_proxy localhost:8000 {
-                        flush_interval -1
-                    }
-                }
-                handle /api/v1/notebook/process-notebook {
-                    reverse_proxy localhost:8000 {
-                        flush_interval -1
-                    }
-                }
-
-                handle /api/* {
-                    reverse_proxy localhost:8000
-                }
-            }
-            CADDY_EOF
-
-            # Apply Caddyfile to wherever Caddy is running
-            if systemctl is-active --quiet caddy; then
-              sudo cp ~/Caddyfile /etc/caddy/Caddyfile
-              sudo systemctl reload caddy
-              echo "Caddy reloaded successfully."
-            elif command -v caddy &>/dev/null; then
-              sudo caddy reload --config ~/Caddyfile --adapter caddyfile 2>/dev/null || echo "Caddy reload failed, may need manual restart."
-            else
-              echo "WARNING: Caddy not found as system service. Caddyfile written to ~/Caddyfile for manual use."
-            fi
             
             echo "=== Docker Container Status ==="
             docker ps -a
             echo "=== Backend Container Logs ==="
-            docker compose logs --tail=50 backend
+            docker compose logs --tail=100 backend
             echo "=== Uploader Container Logs ==="
-            docker compose logs --tail=50 uploader
-            echo "=== Redis Container Logs ==="
-            docker compose logs --tail=50 redis
+            docker compose logs --tail=100 uploader
+
