@@ -1,12 +1,16 @@
 import os
 import sys
-import subprocess
+import wave
+import struct
+import math
 from dotenv import load_dotenv
 
-# Load env from backend/.env
-env_path = os.path.join(os.path.dirname(__file__), ".env")
-load_dotenv(env_path)
-sys.path.insert(0, os.path.dirname(__file__))
+# Load env from backend/.env if present
+env_path = os.path.join(os.path.dirname(__file__), "..", "backend", ".env")
+if os.path.exists(env_path):
+    load_dotenv(env_path)
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "backend")))
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
 from app.services.audio_service import (
     get_audio_duration_seconds,
@@ -17,15 +21,25 @@ from app.services.audio_service import (
 )
 
 
-def test_audio_duration():
-    # Generate 5-second sine wave mp3
-    test_file = os.path.join(os.path.dirname(__file__), "test_temp_dur.mp3")
-    try:
-        subprocess.run([
-            "ffmpeg", "-y", "-f", "lavfi", "-i", "sine=frequency=1000:duration=5",
-            "-c:a", "libmp3lame", test_file
-        ], check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+def _generate_pure_python_wav(file_path: str, duration_sec: int = 5, sample_rate: int = 8000):
+    """Generates a valid, playable PCM WAV file in pure Python without requiring ffmpeg."""
+    os.makedirs(os.path.dirname(os.path.abspath(file_path)), exist_ok=True)
+    with wave.open(file_path, "wb") as wav:
+        wav.setnchannels(1)  # Mono
+        wav.setsampwidth(2)  # 16-bit
+        wav.setframerate(sample_rate)
+        total_samples = duration_sec * sample_rate
+        raw_data = bytearray()
+        for i in range(total_samples):
+            val = int(32767.0 * 0.3 * math.sin(2.0 * math.pi * 440.0 * i / sample_rate))
+            raw_data.extend(struct.pack("<h", val))
+        wav.writeframes(raw_data)
 
+
+def test_audio_duration():
+    test_file = os.path.join(os.path.dirname(__file__), "test_temp_dur.wav")
+    try:
+        _generate_pure_python_wav(test_file, duration_sec=5)
         dur = get_audio_duration_seconds(test_file)
         print(f"Detected duration: {dur}s")
         assert 4.0 <= dur <= 6.0
@@ -35,16 +49,11 @@ def test_audio_duration():
 
 
 def test_transcribe_with_gemini_fallback():
-    test_file = os.path.join(os.path.dirname(__file__), "test_temp_gemini.mp3")
+    test_file = os.path.join(os.path.dirname(__file__), "test_temp_gemini.wav")
     try:
-        subprocess.run([
-            "ffmpeg", "-y", "-f", "lavfi", "-i", "sine=frequency=800:duration=2",
-            "-c:a", "libmp3lame", test_file
-        ], check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-
-        res = _transcribe_with_gemini(test_file, "mp3")
+        _generate_pure_python_wav(test_file, duration_sec=2)
+        res = _transcribe_with_gemini(test_file, "wav")
         print(f"Gemini ASR Output: {res}")
-        # Gemini should either return detected sounds or handle gracefully without throwing
         assert res is None or isinstance(res, str)
     finally:
         if os.path.exists(test_file):
@@ -52,14 +61,10 @@ def test_transcribe_with_gemini_fallback():
 
 
 def test_transcribe_single_segment():
-    test_file = os.path.join(os.path.dirname(__file__), "test_temp_seg.mp3")
+    test_file = os.path.join(os.path.dirname(__file__), "test_temp_seg.wav")
     try:
-        subprocess.run([
-            "ffmpeg", "-y", "-f", "lavfi", "-i", "sine=frequency=440:duration=2",
-            "-c:a", "libmp3lame", test_file
-        ], check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-
-        res = _transcribe_single_segment(test_file, "mp3")
+        _generate_pure_python_wav(test_file, duration_sec=2)
+        res = _transcribe_single_segment(test_file, "wav")
         print(f"Single segment result: {res}")
         assert isinstance(res, str)
     finally:
