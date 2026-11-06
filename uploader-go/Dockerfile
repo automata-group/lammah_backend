@@ -2,8 +2,10 @@ FROM golang:1.23-alpine AS builder
 
 WORKDIR /app
 
+ENV GOTOOLCHAIN=auto
+
 # Install build dependencies
-RUN apk add --no-cache gcc musl-dev
+RUN apk add --no-cache gcc musl-dev git
 
 # Copy go mod files
 COPY go.mod go.sum ./
@@ -12,8 +14,8 @@ RUN go mod download
 # Copy source code
 COPY . .
 
-# Build the application
-RUN go build -o uploader .
+# Build the application statically
+RUN CGO_ENABLED=0 go build -o uploader .
 
 # Runtime stage
 FROM alpine:latest
